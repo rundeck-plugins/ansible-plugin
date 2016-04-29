@@ -2,7 +2,7 @@
 # run as: docker run -p 4440:4440 -v #ANSIBLE_CONFIG_FOLDER:/etc/settings/ansible   giovannipaologibilisco/rundeck
 # ANSIBLE_CONFIG_FOLDER should contain at least to following:
 #  - the file hosts with the groups of hosts to control. This file should contain also the static ip like:
-     server1 192.168.100.1
+#     server1 192.168.100.1
 #  - the file with a private key, named id_rsa, to use for connection
 FROM ubuntu:14.04
 
