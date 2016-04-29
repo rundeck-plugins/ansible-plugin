@@ -24,6 +24,9 @@ RUN wget http://dl.bintray.com/rundeck/rundeck-deb/rundeck-2.6.6-1-GA.deb \
     && dpkg -i rundeck-2.6.6-1-GA.deb \
     && rm rundeck-2.6.6-1-GA.deb
 
+RUN wget https://github.com/Batix/rundeck-ansible-plugin/releases/download/1.2.2/ansible-plugin-1.2.2.jar \
+    && mv ansible-plugin-1.2.2.jar /var/lib/rundeck/libext
+
 RUN mkdir -p /home/rundeck/.ssh
 RUN mkdir /var/lib/rundeck/.ssh
 RUN chsh -s /bin/bash rundeck
