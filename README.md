@@ -64,3 +64,17 @@ Run a playbook as a node or workflow step (see note above). You specify a path t
 
 ## Notes ##
 I'm new to both Rundeck and Ansible so I expect there to be room for improvements. Only basic features have been implemented in this first pass, so I can play around with both tools. Liking it very much so far! :)
+
+## Docker ##
+The docker image, available on dockerhub as giovannipaologibilisco/rundeck-ansible-plugin allows to easily run ansible and rundeck. 
+The installation of rundeck includes the plugin developed in this repo for the intergation with Ansible. 
+To run the container specify:
+ - the rundeck port to expose (-p 4440:4440)
+ - a volume containing the required configuration ( -v CONFIG_FOLDER:/etc/settings/ansible)
+
+The CONFIG_FOLDER should contain:
+ - id_rsa -> private key used by ansible to connect to hosts via SSH
+ - hosts -> ansible configuration file with the groups of hosts to control (a static ip should be provded e.g. ansible_host=192.168.100.120)
+ - ansible.cfg -> the main ansible configuration file (optional)
+
+Example of running the image: docker run -p 4440:4440 -v /home/giovanni/ansible-configuration:/etc/settings/ansible giovannipaologibilisco/rundeck-ansible-plugin
