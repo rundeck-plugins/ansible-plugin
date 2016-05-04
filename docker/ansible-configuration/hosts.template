@@ -1,0 +1,8 @@
+[fixed]
+movvml120 ansible_host=192.168.100.120
+movvml121 ansible_host=192.168.100.121
+movvml122 ansible_host=192.168.100.122
+movvml123 ansible_host=192.168.100.123
+
+[moving]
+movvml124 ansible_host=192.168.100.124
