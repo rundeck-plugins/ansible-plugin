@@ -114,6 +114,8 @@ public class AnsibleNodeExecutor implements NodeExecutor, AnsibleDescribable {
         return NodeExecutorResultImpl.createFailure(AnsibleException.AnsibleFailureReason.AnsibleError, e.getMessage(), node);
     }
 
+    builder.cleanupTempFiles();
+
     return NodeExecutorResultImpl.createSuccess(node);
   }
 

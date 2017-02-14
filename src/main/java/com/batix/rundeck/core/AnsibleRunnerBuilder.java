@@ -5,27 +5,26 @@
  */
 package com.batix.rundeck.core;
 
-import com.dtolabs.rundeck.core.common.INodeEntry;
 import com.batix.rundeck.core.AnsibleDescribable.AuthenticationType;
 import com.batix.rundeck.core.AnsibleDescribable.BecomeMethodType;
 import com.dtolabs.rundeck.core.common.Framework;
+import com.dtolabs.rundeck.core.common.INodeEntry;
+import com.dtolabs.rundeck.core.common.INodeSet;
 import com.dtolabs.rundeck.core.dispatcher.DataContextUtils;
 import com.dtolabs.rundeck.core.execution.ExecutionContext;
 import com.dtolabs.rundeck.core.plugins.configuration.ConfigurationException;
 import com.dtolabs.rundeck.core.storage.ResourceMeta;
+import org.rundeck.storage.api.Path;
+import org.rundeck.storage.api.PathUtil;
+import org.rundeck.storage.api.StorageException;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-
-import org.rundeck.storage.api.Path;
-import java.util.HashMap;
-import java.util.Map;
-
-import org.rundeck.storage.api.PathUtil;
-import org.rundeck.storage.api.StorageException;
+import java.util.*;
 
 public class AnsibleRunnerBuilder {
 
@@ -33,30 +32,34 @@ public class AnsibleRunnerBuilder {
     private Framework framework;
     private String frameworkProject;
     private Map<String, Object> jobConf;
-    private INodeEntry node;
+    private Collection<INodeEntry> nodes;
+    private Collection<File> tempFiles;
 
     AnsibleRunnerBuilder(final ExecutionContext context, final Framework framework) {
         this.context = context;
         this.framework = framework;
         this.frameworkProject = context.getFrameworkProject();
         this.jobConf = new HashMap<String, Object>();
-        this.node = null;
+        this.nodes = Collections.emptySet();
+        this.tempFiles = new LinkedList<>();
     }
 
-    public AnsibleRunnerBuilder(final ExecutionContext context, final Framework framework, final Map<String, Object> configuration) {
+    public AnsibleRunnerBuilder(final ExecutionContext context, final Framework framework, INodeSet nodes, final Map<String, Object> configuration) {
         this.context = context;
         this.framework = framework;
         this.frameworkProject = context.getFrameworkProject();
         this.jobConf = configuration;
-        this.node = null;
+        this.nodes = nodes.getNodes();
+        this.tempFiles = new LinkedList<>();
     }
 
-    public AnsibleRunnerBuilder(final INodeEntry node,final ExecutionContext context, final Framework framework, final Map<String, Object> configuration) {
+    public AnsibleRunnerBuilder(final INodeEntry node, final ExecutionContext context, final Framework framework, final Map<String, Object> configuration) {
         this.context = context;
         this.framework = framework;
         this.frameworkProject = context.getFrameworkProject();
         this.jobConf = configuration;
-        this.node = node;
+        this.nodes = Collections.singleton(node);
+        this.tempFiles = new LinkedList<>();
     }
 
     private byte[] loadStoragePathData(final String passwordStoragePath) throws IOException {
@@ -183,7 +186,7 @@ public class AnsibleRunnerBuilder {
     }
 
     public String getSshPassword()  throws ConfigurationException{
-        
+
         //look for option values first
         //typically jobs use secure options to dynamically setup the ssh password
         final String passwordOption = PropertyResolver.resolveProperty(
@@ -195,7 +198,7 @@ public class AnsibleRunnerBuilder {
                     getjobConf()
                     );
         String sshPassword = PropertyResolver.evaluateSecureOption(passwordOption, getContext());
-        
+
         if(null!=sshPassword){
             // is true if there is an ssh option defined in the private data context
             return sshPassword;
@@ -244,7 +247,7 @@ public class AnsibleRunnerBuilder {
         final String stimeout = PropertyResolver.resolveProperty(
         		    AnsibleDescribable.ANSIBLE_SSH_TIMEOUT,
                     null,
-                    getFrameworkProject(), 
+                    getFrameworkProject(),
                     getFramework(),
                     getNode(),
                     getjobConf()
@@ -303,7 +306,7 @@ public class AnsibleRunnerBuilder {
                    getFramework(),getNode(),
                    getjobConf()
                    );
-        
+
         if (null != user && user.contains("${")) {
             return DataContextUtils.replaceDataReferences(user, getContext().getDataContext());
         }
@@ -337,13 +340,13 @@ public class AnsibleRunnerBuilder {
     	            getNode(),
     	            getjobConf()
     	            );
-    	
+
     	if (null != extraParams && extraParams.contains("${")) {
     	     return DataContextUtils.replaceDataReferences(extraParams, getContext().getDataContext());
     	}
     	return extraParams;
     }
-    
+
     public BecomeMethodType getBecomeMethod() {
         String becomeMethod = PropertyResolver.resolveProperty(
                    AnsibleDescribable.ANSIBLE_BECOME_METHOD,
@@ -366,7 +369,7 @@ public class AnsibleRunnerBuilder {
     }
 
 
-    public String getBecomePasswordStoragePath() { 
+    public String getBecomePasswordStoragePath() {
         String path = PropertyResolver.resolveProperty(
         		AnsibleDescribable.ANSIBLE_BECOME_PASSWORD_STORAGE_PATH,
                 null,
@@ -391,7 +394,7 @@ public class AnsibleRunnerBuilder {
         final String passwordOption = PropertyResolver.resolveProperty(
                     AnsibleDescribable.ANSIBLE_BECOME_PASSWORD_OPTION,
                     AnsibleDescribable.DEFAULT_ANSIBLE_BECOME_PASSWORD_OPTION,
-                    getFrameworkProject(), 
+                    getFrameworkProject(),
                     getFramework(),
                     getNode(),
                     getjobConf()
@@ -401,7 +404,7 @@ public class AnsibleRunnerBuilder {
     }
 
     public String getBecomePassword()  throws ConfigurationException{
-        
+
         //look for option values first
         //typically jobs use secure options to dynamically setup the become password
         String passwordOption = PropertyResolver.resolveProperty(
@@ -413,7 +416,7 @@ public class AnsibleRunnerBuilder {
                     getjobConf()
                     );
         String becomePassword = PropertyResolver.evaluateSecureOption(passwordOption, getContext());
-        
+
         if(null!=becomePassword){
             // is true if there is a become option defined in the private data context
             return becomePassword;
@@ -536,7 +539,7 @@ public class AnsibleRunnerBuilder {
         if ( getjobConf().containsKey(AnsibleDescribable.ANSIBLE_MODULE) ) {
         	module = (String) jobConf.get(AnsibleDescribable.ANSIBLE_MODULE);
         }
-        
+
         if (null != module && module.contains("${")) {
             return DataContextUtils.replaceDataReferences(module, getContext().getDataContext());
         }
@@ -657,8 +660,8 @@ public class AnsibleRunnerBuilder {
         return extraVars;
     }
 
-    public String getInventory() {
-        final String inventory;
+    public String getInventory() throws ConfigurationException {
+        String inventory;
         inventory = PropertyResolver.resolveProperty(
                      AnsibleDescribable.ANSIBLE_INVENTORY,
                      null,
@@ -670,6 +673,10 @@ public class AnsibleRunnerBuilder {
 
         if (null != inventory && inventory.contains("${")) {
             return DataContextUtils.replaceDataReferences(inventory, getContext().getDataContext());
+        } else if (inventory == null) {
+            File tempInventory = new AnsibleInventoryBuilder(this.nodes).buildInventory();
+            tempFiles.add(tempInventory);
+            inventory = tempInventory.getAbsolutePath();
         }
         return inventory;
     }
@@ -690,7 +697,7 @@ public class AnsibleRunnerBuilder {
         }
         return limit;
     }
-    
+
     public AnsibleRunner buildAnsibleRunner() throws ConfigurationException{
 
         AnsibleRunner runner = null;
@@ -702,7 +709,7 @@ public class AnsibleRunnerBuilder {
         } else if (module != null) {
             runner = AnsibleRunner.adHoc(module, getModuleArgs());
         } else {
-            throw new ConfigurationException("Missing module or playbook job arguments");          
+            throw new ConfigurationException("Missing module or playbook job arguments");
         }
 
         final AuthenticationType authType = getSshAuthenticationType();
@@ -717,7 +724,7 @@ public class AnsibleRunnerBuilder {
                 runner = runner.sshUsePassword(Boolean.TRUE).sshPass(password);
             }
         }
-        
+
         // set rundeck options as environment variables
         Map<String,String> options = context.getDataContext().get("option");
         if (options != null) {
@@ -733,7 +740,7 @@ public class AnsibleRunnerBuilder {
         if (limit != null) {
             runner = runner.limit(limit);
         }
-        
+
         Boolean debug = getDebug();
         if (debug != null) {
             if (debug == Boolean.TRUE) {
@@ -752,7 +759,7 @@ public class AnsibleRunnerBuilder {
         if (extraVars != null) {
             runner = runner.extraVars(extraVars);
         }
-        
+
         String user = getSshUser();
         if (user != null) {
             runner = runner.sshUser(user);
@@ -800,7 +807,7 @@ public class AnsibleRunnerBuilder {
     }
 
     public INodeEntry getNode() {
-        return node;
+        return nodes.size() == 1 ? nodes.iterator().next() : null;
     }
 
     public String getFrameworkProject() {
@@ -809,5 +816,14 @@ public class AnsibleRunnerBuilder {
 
     public Map<String,Object> getjobConf() {
         return jobConf;
+    }
+
+    public void cleanupTempFiles() {
+        for (File temp : tempFiles) {
+            if (!getDebug()) {
+                temp.delete();
+            }
+        }
+        tempFiles.clear();
     }
 }

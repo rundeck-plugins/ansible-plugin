@@ -134,6 +134,8 @@ public class AnsibleFileCopier implements DestinationFileCopier, AnsibleDescriba
           throw new FileCopierException("Error running Ansible.", AnsibleFailureReason.AnsibleError, e);
     }
 
+    builder.cleanupTempFiles();
+
     return destinationPath;
   }
 
