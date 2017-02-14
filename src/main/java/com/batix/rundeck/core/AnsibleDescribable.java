@@ -63,6 +63,7 @@ public interface AnsibleDescribable extends Describable {
     public static final String SERVICE_PROVIDER_TYPE = "ansible-service";
 
     public static final String ANSIBLE_PLAYBOOK = "ansible-playbook";
+    public static final String ANSIBLE_INLINE_TASKS = "ansible-tasks-inline";
     public static final String ANSIBLE_INVENTORY = "ansible-inventory";
     public static final String ANSIBLE_MODULE = "ansible-module";
     public static final String ANSIBLE_MODULE_ARGS = "ansible-module-args";
@@ -111,6 +112,15 @@ public interface AnsibleDescribable extends Describable {
               true,
               null
     );
+
+    public static Property ANSIBLE_INLINE_TASKS_PROP = PropertyBuilder.builder()
+            .string(ANSIBLE_INLINE_TASKS)
+            .required(true)
+            .title("Playbook tasks")
+            .description("Use YAML syntax to define playbook tasks. Node properties and job options are included as ansible vars. " +
+                    "e.g ${node.my-prop} would become {{ node_my_prop }}, ${option.myOpt} would become {{ option_myOpt }}")
+            .renderingOption(StringRenderingConstants.DISPLAY_TYPE_KEY, StringRenderingConstants.DisplayType.CODE)
+            .build();
 
     public static Property MODULE_PROP = PropertyUtil.string(
               ANSIBLE_MODULE,
