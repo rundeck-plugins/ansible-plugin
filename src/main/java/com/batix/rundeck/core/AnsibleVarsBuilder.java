@@ -15,19 +15,20 @@ public class AnsibleVarsBuilder {
 
     public String buildVars() {
         StringBuilder builder = new StringBuilder();
-        appendProps(builder, "node");
-        appendProps(builder, "option");
+        for (String prefix : dataContext.keySet()) {
+            appendProps(builder, prefix);
+        }
         return builder.toString();
     }
 
     private void appendProps(StringBuilder builder, String prefix) {
         Map<String, String> properties = dataContext.get(prefix);
         if (properties != null) {
+            builder.append(String.format("%s:\n", prefix));
             for (String variable : properties.keySet()) {
                 String value = properties.get(variable);
-                String ansibleVar = String.format("%s_%s: \"%s\"", prefix, variable.replaceAll("-", "_"), value);
+                String ansibleVar = String.format("  %s: \"%s\"\n", variable.replaceAll("[.-]", "_"), value);
                 builder.append(ansibleVar);
-                builder.append(System.getProperty("line.separator"));
             }
         }
     }
