@@ -2,6 +2,7 @@ package com.batix.rundeck.plugins;
 
 import com.batix.rundeck.core.*;
 import com.dtolabs.rundeck.core.common.INodeEntry;
+import com.dtolabs.rundeck.core.dispatcher.DataContextUtils;
 import com.dtolabs.rundeck.core.execution.workflow.steps.node.NodeStepException;
 import com.dtolabs.rundeck.core.plugins.Plugin;
 import com.dtolabs.rundeck.core.plugins.configuration.ConfigurationException;
@@ -12,26 +13,23 @@ import com.dtolabs.rundeck.plugins.step.PluginStepContext;
 import com.dtolabs.rundeck.plugins.util.DescriptionBuilder;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.Map;
 
-@Plugin(name = AnsiblePlaybookNodeStep.SERVICE_PROVIDER_NAME, service = ServiceNameConstants.WorkflowNodeStep)
-public class AnsiblePlaybookNodeStep implements NodeStepPlugin, AnsibleDescribable {
+@Plugin(name = AnsibleRoleNodeStep.SERVICE_PROVIDER_NAME, service = ServiceNameConstants.WorkflowNodeStep)
+public class AnsibleRoleNodeStep implements NodeStepPlugin, AnsibleDescribable {
 
-    public static final String SERVICE_PROVIDER_NAME = "com.batix.rundeck.plugins.AnsiblePlaybookNodeStep";
+    public static final String SERVICE_PROVIDER_NAME = "com.batix.rundeck.plugins.AnsibleRoleNodeStep";
 
     public static Description DESC = null;
 
     static {
         DescriptionBuilder builder = DescriptionBuilder.builder();
         builder.name(SERVICE_PROVIDER_NAME);
-        builder.title("Ansible Playbook");
-        builder.description("Runs an Ansible Playbook.");
+        builder.title("Ansible Role");
+        builder.description("Runs an Ansible Role on selected nodes.");
 
-        builder.property(ANSIBLE_INLINE_TASKS_PROP);
-        builder.property(VAULT_KEY_FILE_PROP);
-        builder.property(VAULT_KEY_STORAGE_PROP);
-        builder.property(EXTRA_ATTRS_PROP);
+        builder.property(ROLE_PROP);
+        builder.property(ROLE_ARGS_PROP);
         builder.property(SSH_AUTH_TYPE_PROP);
         builder.property(SSH_USER_PROP);
         builder.property(SSH_PASSWORD_STORAGE_PROP);
@@ -52,17 +50,21 @@ public class AnsiblePlaybookNodeStep implements NodeStepPlugin, AnsibleDescribab
         AnsibleRunner runner = null;
 
 
-        String vars = new AnsibleVarsBuilder(context.getDataContext()).buildVars();
-        String tasks = (String) configuration.get(AnsibleDescribable.ANSIBLE_INLINE_TASKS);
+        String role = (String) configuration.get(AnsibleDescribable.ANSIBLE_ROLE);
+        String args = (String) configuration.get(AnsibleDescribable.ANSIBLE_ROLE_ARGS);
+
+        if (args != null && args.contains("${")) {
+            args = DataContextUtils.replaceDataReferences(args, context.getDataContext());
+        }
+
         File playbook = null;
         try {
-            playbook = AnsiblePlaybookBuilder.withTasks(tasks);
+            playbook = AnsiblePlaybookBuilder.withRole(role, args);
         } catch (ConfigurationException e) {
-            throw new NodeStepException(e.getMessage(), e, AnsibleException.AnsibleFailureReason.AnsibleError,  entry.getNodename());
+            throw new NodeStepException(e.getMessage(), e, AnsibleException.AnsibleFailureReason.AnsibleError, entry.getNodename());
         }
 
         configuration.put(AnsibleDescribable.ANSIBLE_PLAYBOOK, playbook.getAbsolutePath());
-        configuration.put(AnsibleDescribable.ANSIBLE_EXTRA_VARS, vars);
 
         // set log level
         if (context.getDataContext().get("job").get("loglevel").equals("DEBUG")) {
@@ -85,18 +87,15 @@ public class AnsiblePlaybookNodeStep implements NodeStepPlugin, AnsibleDescribab
         } catch (AnsibleException e) {
             throw new NodeStepException(e.getMessage(), e, e.getFailureReason(), entry.getNodename());
         } catch (Exception e) {
-            throw new NodeStepException(e.getMessage(), e, AnsibleException.AnsibleFailureReason.AnsibleError,  entry.getNodename());
+            throw new NodeStepException(e.getMessage(), e, AnsibleException.AnsibleFailureReason.AnsibleError, entry.getNodename());
         }
 
         playbook.delete();
         builder.cleanupTempFiles();
     }
 
-
-
     @Override
     public Description getDescription() {
         return DESC;
     }
-
 }

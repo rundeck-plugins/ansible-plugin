@@ -64,6 +64,8 @@ public interface AnsibleDescribable extends Describable {
 
     public static final String ANSIBLE_PLAYBOOK = "ansible-playbook";
     public static final String ANSIBLE_INLINE_TASKS = "ansible-tasks-inline";
+    public static final String ANSIBLE_ROLE = "ansible-role";
+    public static final String ANSIBLE_ROLE_ARGS = "ansible-role-args";
     public static final String ANSIBLE_INVENTORY = "ansible-inventory";
     public static final String ANSIBLE_MODULE = "ansible-module";
     public static final String ANSIBLE_MODULE_ARGS = "ansible-module-args";
@@ -117,8 +119,9 @@ public interface AnsibleDescribable extends Describable {
             .string(ANSIBLE_INLINE_TASKS)
             .required(true)
             .title("Playbook tasks")
-            .description("Use YAML syntax to define playbook tasks. Node properties and job options are included as ansible vars. " +
-                    "e.g ${node.my-prop} would become {{ node_my_prop }}, ${option.myOpt} would become {{ option_myOpt }}")
+            .description("Use YAML syntax to define playbook tasks. Context variables are available as ansible vars in the form " +
+                    "{{ <context>.<var> }}. In <var> dashes and periods are replaced by underscores." +
+                    "E.g ${node.my-prop} would become {{ node.my_prop }}, ${option.myOpt} would become {{ option.myOpt }}")
             .renderingOption(StringRenderingConstants.DISPLAY_TYPE_KEY, StringRenderingConstants.DisplayType.CODE)
             .build();
 
@@ -130,12 +133,31 @@ public interface AnsibleDescribable extends Describable {
               null
     );
 
+    public static Property ROLE_PROP = PropertyUtil.string(
+            ANSIBLE_ROLE,
+            "Role",
+            "Role name",
+            true,
+            null
+    );
+
     public static Property MODULE_ARGS_PROP = PropertyUtil.string(
         ANSIBLE_MODULE_ARGS,
         "Arguments",
         "Arguments to pass to the module (-a/--args flag)",
         false,
         null
+    );
+
+    public static Property ROLE_ARGS_PROP = PropertyUtil.string(
+            ANSIBLE_ROLE_ARGS,
+            "Arguments",
+            "Arguments to pass to the role." +
+                    "Format: 'key: value'." +
+                    "Multiple arguments can be provided, use comma (,) as separator." +
+                    "E.g. 'arg1: foo, arg2: ${option.bar}'",
+            false,
+            null
     );
 
     public static Property INVENTORY_PROP = PropertyUtil.string(ANSIBLE_INVENTORY, "ansible inventory File path",

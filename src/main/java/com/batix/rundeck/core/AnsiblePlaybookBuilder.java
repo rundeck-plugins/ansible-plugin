@@ -10,13 +10,8 @@ import java.io.PrintWriter;
  */
 public class AnsiblePlaybookBuilder {
 
-    private String tasks;
 
-    public AnsiblePlaybookBuilder(String tasks) {
-        this.tasks = tasks;
-    }
-
-    public File buildPlaybook() throws ConfigurationException {
+    public static File withTasks(String tasks) throws ConfigurationException {
         try {
             File file = File.createTempFile("playbook", ".tmp.yml");
             file.deleteOnExit();
@@ -31,6 +26,28 @@ public class AnsiblePlaybookBuilder {
         } catch (Exception e) {
             throw new ConfigurationException("Could not write temporary playbook: " + e.getMessage());
         }
+    }
+
+    public static File withRole(String role, String args) throws ConfigurationException {
+        try {
+            File file = File.createTempFile("playbook", ".tmp.yml");
+            file.deleteOnExit();
+            PrintWriter writer = new PrintWriter(file);
+            writer.write("- hosts: all\n");
+            writer.write("  roles:\n");
+            writer.write("  - { role: " + role);
+            if (args != null && args.length() > 0) {
+                writer.write(", " + args);
+            }
+            writer.write(" }\n");
+            writer.close();
+            return file;
+        } catch (Exception e) {
+            throw new ConfigurationException("Could not write temporary playbook: " + e.getMessage());
+        }
+    }
+
+    private AnsiblePlaybookBuilder() {
     }
 
 }
