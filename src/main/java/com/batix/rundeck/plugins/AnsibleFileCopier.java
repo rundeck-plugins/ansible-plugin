@@ -119,6 +119,8 @@ public class AnsibleFileCopier implements FileCopier, AnsibleDescribable {
           throw new FileCopierException("Error running Ansible.", AnsibleFailureReason.AnsibleError, e);
     }
 
+    builder.cleanupTempFiles();
+
     return destinationPath;
   }
 

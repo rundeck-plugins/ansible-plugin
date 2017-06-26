@@ -1,5 +1,5 @@
 group 'com.batix.rundeck'
-version '2.0.2'
+version '2.3.0-dev'
 
 ext.rundeckPluginVersion = '1.1'
 ext.pluginClassNames = [
@@ -7,7 +7,9 @@ ext.pluginClassNames = [
   'com.batix.rundeck.plugins.AnsibleNodeExecutor',
   'com.batix.rundeck.plugins.AnsibleFileCopier',
   'com.batix.rundeck.plugins.AnsiblePlaybookWorkflowStep',
-  'com.batix.rundeck.plugins.AnsibleModuleWorkflowStep'
+  'com.batix.rundeck.plugins.AnsiblePlaybookNodeStep',
+  'com.batix.rundeck.plugins.AnsibleModuleWorkflowStep',
+  'com.batix.rundeck.plugins.AnsibleRoleNodeStep'
 ].join(',')
 
 apply plugin: 'java'
