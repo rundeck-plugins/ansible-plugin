@@ -44,6 +44,8 @@ public class AnsibleNodeExecutor implements NodeExecutor, AnsibleDescribable {
         builder.property(BECOME_AUTH_TYPE_PROP);
         builder.property(BECOME_USER_PROP);
         builder.property(BECOME_PASSWORD_STORAGE_PROP);
+        builder.property(VAULT_KEY_FILE_PROP);
+        builder.property(VAULT_KEY_STORAGE_PROP);
         builder.mapping(ANSIBLE_EXECUTABLE,PROJ_PROP_PREFIX + ANSIBLE_EXECUTABLE);
         builder.frameworkMapping(ANSIBLE_EXECUTABLE,FWK_PROP_PREFIX + ANSIBLE_EXECUTABLE);
         builder.mapping(ANSIBLE_WINDOWS_EXECUTABLE,PROJ_PROP_PREFIX + ANSIBLE_WINDOWS_EXECUTABLE);
@@ -70,8 +72,12 @@ public class AnsibleNodeExecutor implements NodeExecutor, AnsibleDescribable {
         builder.frameworkMapping(ANSIBLE_BECOME_METHOD,FWK_PROP_PREFIX + ANSIBLE_BECOME_METHOD);
         builder.mapping(ANSIBLE_BECOME_PASSWORD_STORAGE_PATH,PROJ_PROP_PREFIX + ANSIBLE_BECOME_PASSWORD_STORAGE_PATH);
         builder.frameworkMapping(ANSIBLE_BECOME_PASSWORD_STORAGE_PATH,FWK_PROP_PREFIX + ANSIBLE_BECOME_PASSWORD_STORAGE_PATH);
+        builder.mapping(ANSIBLE_VAULT_PATH,PROJ_PROP_PREFIX + ANSIBLE_VAULT_PATH);
+        builder.frameworkMapping(ANSIBLE_VAULT_PATH,FWK_PROP_PREFIX + ANSIBLE_VAULT_PATH);
+        builder.mapping(ANSIBLE_VAULTSTORE_PATH,PROJ_PROP_PREFIX + ANSIBLE_VAULTSTORE_PATH);
+        builder.frameworkMapping(ANSIBLE_VAULTSTORE_PATH,FWK_PROP_PREFIX + ANSIBLE_VAULTSTORE_PATH);
 
-        DESC=builder.build();
+      DESC=builder.build();
   }
 
   @Override

@@ -104,6 +104,7 @@ public interface AnsibleDescribable extends Describable {
     public static final String ANSIBLE_EXTRA_PARAM = "ansible-extra-param";
     public static final String ANSIBLE_VAULT_PATH = "ansible-vault-path";
     public static final String ANSIBLE_VAULTSTORE_PATH = "ansible-vault-storage-path";
+    public static final String ANSIBLE_VAULT_PASSWORD = "ansible-vault-password";
 
     // ssh configuration
     public static final String ANSIBLE_SSH_PASSWORD = "ansible-ssh-password";
@@ -258,6 +259,15 @@ public interface AnsibleDescribable extends Describable {
     static final Property VAULT_KEY_FILE_PROP = PropertyUtil.string(ANSIBLE_VAULT_PATH, "Vault Key File path",
             "File Path to the ansible vault Key to use",
             false, null);
+
+    static final Property VAULT_PASSWORD_PROP = PropertyBuilder.builder()
+            .string(ANSIBLE_VAULT_PASSWORD)
+            .required(false)
+            .title("Vault Password")
+            .description("Ansible Vault password.")
+            .renderingOption(StringRenderingConstants.DISPLAY_TYPE_KEY,
+                    StringRenderingConstants.DisplayType.PASSWORD)
+            .build();
 
     static final Property VAULT_KEY_STORAGE_PROP = PropertyBuilder.builder()
             .string(ANSIBLE_VAULTSTORE_PATH)
