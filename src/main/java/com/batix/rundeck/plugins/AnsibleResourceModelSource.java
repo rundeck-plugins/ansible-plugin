@@ -284,7 +284,11 @@ public class AnsibleResourceModelSource implements ResourceModelSource {
           node.setTags(tags);
 
           if (root.has("ansible_lsb")) {
-            node.setDescription(root.getAsJsonObject("ansible_lsb").get("description").getAsString());
+            try {
+              node.setDescription(root.getAsJsonObject("ansible_lsb").get("description").getAsString());
+            }catch(Exception ex){
+              System.out.println("[warn] Problem getting the ansible_lsb.description attribute from node " + hostname);
+            }
           } else {
             StringBuilder sb = new StringBuilder();
 
