@@ -3,6 +3,7 @@
   vars:
     facts: True
   gather_facts: "{{facts}}"
+  serial: 10
   tasks:
     - local_action: file path="{{tmpdir}}/data" state=directory
       run_once: yes
