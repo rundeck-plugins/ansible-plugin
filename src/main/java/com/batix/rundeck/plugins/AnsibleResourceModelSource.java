@@ -61,6 +61,9 @@ public class AnsibleResourceModelSource implements ResourceModelSource {
   protected String becomePassword;
   protected String configFile;
 
+  protected String vaultFile;
+  protected String vaultPassword;
+
   public AnsibleResourceModelSource(final Framework framework) {
       this.framework = framework;
   }
@@ -123,6 +126,9 @@ public class AnsibleResourceModelSource implements ResourceModelSource {
 
 
     configFile = (String)  resolveProperty(AnsibleDescribable.ANSIBLE_CONFIG_FILE_PATH,null,configuration,executionDataContext);
+    vaultFile = (String) resolveProperty(AnsibleDescribable.ANSIBLE_VAULT_PATH,null,configuration,executionDataContext);
+    vaultPassword = (String) resolveProperty(AnsibleDescribable.ANSIBLE_VAULT_PASSWORD,null,configuration,executionDataContext);
+
 
   }
 
@@ -190,6 +196,20 @@ public class AnsibleResourceModelSource implements ResourceModelSource {
 
       if (configFile != null) {
         runner = runner.configFile(configFile);
+      }
+
+      if(vaultPassword!=null) {
+        runner.vaultPass(vaultPassword);
+      }
+
+      if (vaultFile != null) {
+        String vaultPassword;
+        try {
+          vaultPassword = new String(Files.readAllBytes(Paths.get(vaultFile)));
+        } catch (IOException e) {
+          throw new ResourceModelSourceException("Could not read vault file " + vaultFile,e);
+        }
+        runner.vaultPass(vaultPassword);
       }
 
 	  return runner;
