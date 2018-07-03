@@ -8,6 +8,7 @@ ext.pluginClassNames = [
   'com.batix.rundeck.plugins.AnsibleFileCopier',
   'com.batix.rundeck.plugins.AnsiblePlaybookWorkflowStep',
   'com.batix.rundeck.plugins.AnsiblePlaybookInlineWorkflowStep',
+  'com.batix.rundeck.plugins.AnsiblePlaybookInlineNodeStep',
   'com.batix.rundeck.plugins.AnsibleModuleWorkflowStep'
 ].join(',')
 
