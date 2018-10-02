@@ -86,6 +86,7 @@ public interface AnsibleDescribable extends Describable {
     public static final String SERVICE_PROVIDER_TYPE = "ansible-service";
     public static final String ANSIBLE_PLAYBOOK_PATH = "ansible-playbook";
     public static final String ANSIBLE_PLAYBOOK_INLINE = "ansible-playbook-inline";
+    public static final String ANSIBLE_INVENTORY_INLINE = "ansible-inventory-inline";
     public static final String ANSIBLE_INVENTORY = "ansible-inventory";
     public static final String ANSIBLE_GENERATE_INVENTORY = "ansible-generate-inventory";
     public static final String ANSIBLE_MODULE = "ansible-module";
@@ -161,6 +162,15 @@ public interface AnsibleDescribable extends Describable {
         .renderingOption(StringRenderingConstants.CODE_SYNTAX_MODE, "yaml")
         .renderingOption(StringRenderingConstants.CODE_SYNTAX_SELECTABLE, false)
     		.build();
+
+    public static Property INVENTORY_INLINE_PROP = PropertyBuilder.builder()
+            .string(ANSIBLE_INVENTORY_INLINE)
+            .required(false)
+            .title("Inline inventory")
+            .description("Provide an inline inventory.")
+            .renderingOption(StringRenderingConstants.DISPLAY_TYPE_KEY, StringRenderingConstants.DisplayType.CODE)
+            .renderingOption(StringRenderingConstants.CODE_SYNTAX_SELECTABLE, true)
+            .build();
 
 
     public static Property MODULE_PROP = PropertyUtil.string(

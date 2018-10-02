@@ -32,6 +32,7 @@ public class AnsiblePlaybookWorflowNodeStep implements NodeStepPlugin, AnsibleDe
         builder.property(BASE_DIR_PROP);
         builder.property(PLAYBOOK_PATH_PROP);
         builder.property(EXTRA_VARS_PROP);
+        builder.property(INVENTORY_INLINE_PROP);
         builder.property(VAULT_KEY_FILE_PROP);
         builder.property(VAULT_KEY_STORAGE_PROP);
         builder.property(EXTRA_ATTRS_PROP);

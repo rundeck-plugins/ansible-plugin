@@ -697,7 +697,9 @@ public class AnsibleRunnerBuilder {
 
     public String getInventory() throws ConfigurationException {
         String inventory;
+        String inline_inventory;
         Boolean isGenerated =  generateInventory();
+
 
         if (isGenerated !=null && isGenerated) {
             File tempInventory = new AnsibleInventoryBuilder(this.nodes).buildInventory();
@@ -705,14 +707,35 @@ public class AnsibleRunnerBuilder {
             inventory = tempInventory.getAbsolutePath();
             return inventory;
         }
+        inline_inventory = PropertyResolver.resolveProperty(
+                AnsibleDescribable.ANSIBLE_INVENTORY_INLINE,
+                null,
+                getFrameworkProject(),
+                getFramework(),
+                getNode(),
+                getjobConf()
+        );
+
+        if (inline_inventory != null) {
+            /* Create tmp file with inventory */
+            /*
+            the builder gets the nodes from rundeck in rundeck node format and converts to ansible inventory
+            we don't want that, we simply want the list we provided in ansible format
+             */
+            File tempInventory = new AnsibleInlineInventoryBuilder(inline_inventory).buildInventory();
+            tempFiles.add(tempInventory);
+            inventory = tempInventory.getAbsolutePath();
+            return inventory;
+        }
+
         inventory = PropertyResolver.resolveProperty(
-                     AnsibleDescribable.ANSIBLE_INVENTORY,
-                     null,
-                     getFrameworkProject(),
-                     getFramework(),
-                     getNode(),
-                     getjobConf()
-                     );
+                AnsibleDescribable.ANSIBLE_INVENTORY,
+                null,
+                getFrameworkProject(),
+                getFramework(),
+                getNode(),
+                getjobConf()
+        );
 
         if (null != inventory && inventory.contains("${")) {
             return DataContextUtils.replaceDataReferences(inventory, getContext().getDataContext());
@@ -818,6 +841,9 @@ public class AnsibleRunnerBuilder {
             runner = runner.options(options);
         }
 
+        /**
+         * TODO check inventoryInline
+         */
         String inventory = getInventory();
         if (inventory != null) {
             runner = runner.setInventory(inventory);
