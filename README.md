@@ -56,7 +56,7 @@ Note that Node attributes are only evaluated for Node Executor jobs, Workflow Jo
 
 The following configuration attributes can be set on the Node, or in the project.properties or framework.properties. To add them to project.properties, prefix them with "project." and for framework.properties prefix them with "framework.":
 
-* `ansible-inventory` - Specifies the ansible inventory to use, can define a global inventory file at the project level without requiring setting the same variable for each job. (default /etc/ansible/hosts) It is possible to provide an inventory _inline_ to a job.
+* `ansible-inventory` - Specifies the ansible inventory to use, can define a global inventory file at the project level without requiring setting the same variable for each job. It is also possible to provide an inventory _inline_ to a job. The default is /etc/ansible/hosts.
 * `ansible-executable` - The executable to use for node Node Executor. (default /bin/sh)
 * `ansible-limit` - Global groups limits can be set at the project level to filter hosts/groups from the Ansible inventory. See http://docs.ansible.com/ansible/intro_patterns.html for syntax help.
 * `ansible-vault-path` - Default vault file path to use for Playbook Jobs.
