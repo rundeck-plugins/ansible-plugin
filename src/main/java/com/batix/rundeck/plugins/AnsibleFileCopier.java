@@ -33,7 +33,6 @@ public class AnsibleFileCopier implements FileCopier, AnsibleDescribable {
         builder.name(SERVICE_PROVIDER_NAME);
         builder.title("Ansible File Copier");
         builder.description("Sends a file to a node via the copy module.");
-        builder.property(INVENTORY_INLINE_PROP);
         builder.property(CONFIG_FILE_PATH);
         builder.property(SSH_AUTH_TYPE_PROP);
         builder.property(SSH_USER_PROP);
