@@ -1,23 +1,9 @@
 ---
 - hosts: all
-
   vars:
     facts: True
-
-  gather_facts: "{{ facts }}"
-
+  gather_facts: "{{facts}}"
   tasks:
-    - name: "Ensure tmpdir data directory"
-      file:
-        path: "{{ tmpdir }}/data"
-        state: directory
-      become: no
+    - local_action: file path="{{tmpdir}}/data" state=directory
       run_once: yes
-      delegate_to: localhost
-
-    - name: "Template the gathered facts"
-      template:
-        src: host-tpl.j2
-        dest: "{{ tmpdir }}/data/{{ inventory_hostname }"
-      delegate_to: localhost
-      become: no
+    - local_action: template src=host-tpl.j2 dest="{{tmpdir}}/data/{{inventory_hostname}}"
