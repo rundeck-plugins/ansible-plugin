@@ -293,9 +293,21 @@ public class AnsibleResourceModelSource implements ResourceModelSource {
             System.out.println("[warn] Problem getting the ansible_host attribute from node " + hostname);
           }
 
-          String nodename = root.get("inventory_hostname").getAsString();
+          String port = root.get("inventory_hostname").getAsString();
+          try {
+            if (root.has("ansible_port")) {
+              port = root.get("ansible_port").getAsString();
+            } else { // fallback to default ssh port
+              port = "22";
+            }
+          }catch(Exception ex){
+            System.out.println("[warn] Problem getting the ansible_port attribute from node " + port);
+          }
 
-          node.setHostname(hostname);
+          String nodename = root.get("inventory_hostname").getAsString();
+          String hostname_with_port  = hostname + ":" + port;
+
+          node.setHostname(hostname_with_port);
           node.setNodename(nodename);
 
           String username = System.getProperty("user.name"); // TODO better default?
