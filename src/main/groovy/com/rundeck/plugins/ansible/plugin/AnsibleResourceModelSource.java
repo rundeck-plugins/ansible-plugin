@@ -347,7 +347,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource {
           } else {
             StringBuilder sb = new StringBuilder();
 
-            if (root.has("ansible_distribution")) {
+            if (root.has("ansible_distribution") && !root.get("ansible_distribution").isJsonNull()) {
               sb.append(root.get("ansible_distribution").getAsString()).append(" ");
             }
             if (root.has("ansible_distribution_version")) {
@@ -366,7 +366,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource {
             node.setOsFamily(root.get("ansible_os_family").getAsString());
           }
 
-          if (root.has("ansible_os_name")) {
+          if (root.has("ansible_os_name") && !root.get("ansible_os_name").isJsonNull()) {
             node.setOsName(root.get("ansible_os_name").getAsString());
           }
 
