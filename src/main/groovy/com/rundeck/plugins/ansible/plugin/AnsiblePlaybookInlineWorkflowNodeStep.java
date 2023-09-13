@@ -73,6 +73,23 @@ public class AnsiblePlaybookInlineWorkflowNodeStep implements NodeStepPlugin, An
     ) throws NodeStepException {
 
         AnsibleRunner runner = null;
+        NodeSetImpl nodes = null;
+
+        // Checking if the context comes empty, if so and we don't do anything,
+        // Then ansible inventory will be created with no hosts (if the property is true).
+        if(context.getNodes().getNodes().size() == 0){
+            if( entry == null ){
+                throw new InvalidParameterException("Entry node is empty, no target node to execute.");
+            }
+            // We have in entry the node to dispatch de node step, so we use it by default if
+            // the context's nodes are empty
+            NodeSetImpl nodeSet = new NodeSetImpl();
+            nodeSet.putNode(entry);
+            nodes = nodeSet;
+        }else{
+            nodes = new NodeSetImpl();
+            nodes.putNodes(context.getNodes());
+        }
 
         // set targets
         configuration.put(AnsibleDescribable.ANSIBLE_LIMIT,entry.getNodename());
@@ -85,7 +102,7 @@ public class AnsiblePlaybookInlineWorkflowNodeStep implements NodeStepPlugin, An
         }
 
        AnsibleRunnerBuilder
-                builder = new AnsibleRunnerBuilder(context.getExecutionContext(), context.getFramework(), context.getNodes(), configuration);
+                builder = new AnsibleRunnerBuilder(context.getExecutionContext(), context.getFramework(), nodes, configuration);
 
         try {
             runner = builder.buildAnsibleRunner();
