@@ -1,5 +1,6 @@
 package com.rundeck.plugins.ansible.plugin;
 
+import com.dtolabs.rundeck.core.common.NodeSetImpl;
 import com.dtolabs.rundeck.core.execution.ExecutionContext;
 import com.dtolabs.rundeck.core.execution.proxy.ProxySecretBundleCreator;
 import com.dtolabs.rundeck.core.execution.proxy.SecretBundle;
@@ -18,6 +19,7 @@ import com.dtolabs.rundeck.plugins.step.PluginStepContext;
 import com.dtolabs.rundeck.plugins.util.DescriptionBuilder;
 import com.rundeck.plugins.ansible.util.AnsibleUtil;
 
+import java.security.InvalidParameterException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -55,6 +57,7 @@ public class AnsiblePlaybookInlineWorkflowNodeStep implements NodeStepPlugin, An
         builder.property(BECOME_AUTH_TYPE_PROP);
         builder.property(BECOME_USER_PROP);
         builder.property(BECOME_PASSWORD_STORAGE_PROP);
+        builder.property(GENERATE_INVENTORY_PROP);
 
         DESC=builder.build();
     }
