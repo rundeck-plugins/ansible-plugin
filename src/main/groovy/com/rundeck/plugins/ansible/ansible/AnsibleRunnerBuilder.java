@@ -666,8 +666,25 @@ public class AnsibleRunnerBuilder {
         return ignoreTagsPrefix;
     }
 
+    // public String getExtraVars() {
+    //     final String extraVars;
+    //     extraVars = PropertyResolver.resolveProperty(
+    //                 AnsibleDescribable.ANSIBLE_EXTRA_VARS,
+    //                 null,
+    //                 getFrameworkProject(),
+    //                 getFramework(),
+    //                 getNode(),
+    //                 getjobConf()
+    //                 );
+
+    //     if (null != extraVars && extraVars.contains("${")) {
+    //         return DataContextUtils.replaceDataReferences(extraVars, getContext().getDataContext());
+    //     }
+    //     return extraVars;
+    // }
+
     public String getExtraVars() {
-        final String extraVars;
+        String extraVars = "";
         extraVars = PropertyResolver.resolveProperty(
                     AnsibleDescribable.ANSIBLE_EXTRA_VARS,
                     null,
@@ -680,6 +697,18 @@ public class AnsibleRunnerBuilder {
         if (null != extraVars && extraVars.contains("${")) {
             return DataContextUtils.replaceDataReferences(extraVars, getContext().getDataContext());
         }
+	try{
+		extraVars += System.lineSeparator() + "ansible_jobConf_binaries = " + getjobConf().get(AnsibleDescribable.ANSIBLE_EXTRA_VARS);
+	}
+	catch (Exception e){
+		extraVars += System.lineSeparator() + "ansible_jobConf_binaries = not_set";
+	}
+	try{
+		extraVars += System.lineSeparator() + "ansible_projectConf_binaries = " + getFramework().getProjectProperty(getFrameworkProject(), AnsibleDescribable.PROJ_PROP_PREFIX + attribute);
+	}
+	catch (Exception e){
+		extraVars += System.lineSeparator() + "ansible_projectConf_binaries = not_set";
+	}
         return extraVars;
     }
 
