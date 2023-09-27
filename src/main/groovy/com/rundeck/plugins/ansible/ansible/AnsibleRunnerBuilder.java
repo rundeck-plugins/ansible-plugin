@@ -694,9 +694,6 @@ public class AnsibleRunnerBuilder {
                     getjobConf()
                     );
 
-        if (null != extraVars && extraVars.contains("${")) {
-            return DataContextUtils.replaceDataReferences(extraVars, getContext().getDataContext());
-        }
 	try{
 		extraVars += System.lineSeparator() + "ansible_jobConf_binaries = " + getjobConf().get(AnsibleDescribable.ANSIBLE_EXTRA_VARS);
 	}
@@ -709,6 +706,10 @@ public class AnsibleRunnerBuilder {
 	catch (Exception e){
 		extraVars += System.lineSeparator() + "ansible_projectConf_binaries = not_set";
 	}
+	    
+        if (null != extraVars && extraVars.contains("${")) {
+            return DataContextUtils.replaceDataReferences(extraVars, getContext().getDataContext());
+        }
         return extraVars;
     }
 
