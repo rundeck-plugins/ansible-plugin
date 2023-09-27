@@ -32,7 +32,9 @@ import com.google.gson.JsonElement
 @Plugin(name = "ansible-set-stats", service = "LogFilter")
 @PluginDescription(title = "Ansible set_stats",
                    description = '''Parses the output of the ansible set_stats module and generates the corresponding data context variables.\n\n
-To display the output of the set_stats module, you must set show_custom_stats in section [defaults] in ansible.cfg or by defining environment variable ANSIBLE_SHOW_CUSTOM_STATS to true.  
+To display the output of the set_stats module, you must set show_custom_stats in section [defaults] in ansible.cfg or by defining environment variable ANSIBLE_SHOW_CUSTOM_STATS to true.
+
+See the [official Ansible documentation](https://docs.ansible.com/ansible/latest/collections/ansible/builtin/set_stats_module.html).
 ''')
 
 class AnsibleSetStatsFilterPlugin implements LogFilterPlugin{
