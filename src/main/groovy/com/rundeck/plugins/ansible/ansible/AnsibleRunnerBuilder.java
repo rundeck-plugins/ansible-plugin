@@ -811,14 +811,15 @@ public class AnsibleRunnerBuilder {
     }
 
     public String getBinariesFilePath() {
-        String binariesFilePathStr = PropertyResolver.resolveProperty(
-        		AnsibleDescribable.ANSIBLE_BINARIES_DIR_PATH,
-	                null,
-	                getFrameworkProject(),
-	                getFramework(),
-	                getNode(),
-	                getjobConf()
-	                );
+        String binariesFilePathStr;
+	binariesFilePathStr = PropertyResolver.resolveProperty(
+		AnsibleDescribable.ANSIBLE_BINARIES_DIR_PATH,
+		null,
+		getFrameworkProject(),
+		getFramework(),
+		getNode(),
+		getjobConf()
+		);
 	    
         // Object projectConfBinariesFilePath = getFrameworkProject().get(AnsibleDescribable.ANSIBLE_BINARIES_DIR_PATH);
         // if (null != projectConfBinariesFilePath) {
