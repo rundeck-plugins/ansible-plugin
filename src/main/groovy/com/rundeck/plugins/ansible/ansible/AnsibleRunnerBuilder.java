@@ -704,7 +704,7 @@ public class AnsibleRunnerBuilder {
 		extraVars += System.lineSeparator() + "ansible_jobConf_binaries = not_set";
 	}
 	try{
-		extraVars += System.lineSeparator() + "ansible_projectConf_binaries = " + getFramework().getProjectProperty(getFrameworkProject(), AnsibleDescribable.PROJ_PROP_PREFIX + attribute);
+		extraVars += System.lineSeparator() + "ansible_projectConf_binaries = " + getFramework().getProjectProperty(getFrameworkProject(), AnsibleDescribable.PROJ_PROP_PREFIX + AnsibleDescribable.ANSIBLE_EXTRA_VARS);
 	}
 	catch (Exception e){
 		extraVars += System.lineSeparator() + "ansible_projectConf_binaries = not_set";
