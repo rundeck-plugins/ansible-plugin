@@ -819,24 +819,7 @@ public class AnsibleRunnerBuilder {
 		getFramework(),
 		getNode(),
 		getjobConf()
-		);
-	    
-        // Object projectConfBinariesFilePath = getFrameworkProject().get(AnsibleDescribable.ANSIBLE_BINARIES_DIR_PATH);
-        // if (null != projectConfBinariesFilePath) {
-        //     binariesFilePathStr = (String) projectConfBinariesFilePath;
-        //     if (binariesFilePathStr.contains("${")) {
-        //         return DataContextUtils.replaceDataReferences(binariesFilePathStr, getContext().getDataContext());
-        //     }
-        // }
-	    
-        // Object jobConfBinariesFilePath = getjobConf().get(AnsibleDescribable.ANSIBLE_BINARIES_DIR_PATH);
-        // if (null != jobConfBinariesFilePath) {
-        //     binariesFilePathStr = (String) jobConfBinariesFilePath;
-        //     if (binariesFilePathStr.contains("${")) {
-        //         return DataContextUtils.replaceDataReferences(binariesFilePathStr, getContext().getDataContext());
-        //     }
-        // }
-	
+		);	
         return binariesFilePathStr;
     }
 
