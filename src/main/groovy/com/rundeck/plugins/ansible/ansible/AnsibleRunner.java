@@ -449,7 +449,7 @@ public class AnsibleRunner {
        perms.add(PosixFilePermission.OWNER_WRITE);
        Files.setPosixFilePermissions(tempPkFile.toPath(), perms);
 
-       Files.write(tempPkFile.toPath(), sshPrivateKey.getBytes());
+       Files.write(tempPkFile.toPath(), sshPrivateKey.replaceAll("\r\n","\n").getBytes());
        procArgs.add("--private-key" + "=" + tempPkFile.toPath());
 
        if(sshUseAgent){
