@@ -57,7 +57,7 @@ class AnsibleSetStatsFilterPlugin implements LogFilterPlugin{
         setStatsGlobalPattern = Pattern.compile(regex);
         outputContext = context.getOutputContext();
         mapper = new ObjectMapper();
-        allData = [:];
+        allData = Map.of();
     }
 
     @Override
