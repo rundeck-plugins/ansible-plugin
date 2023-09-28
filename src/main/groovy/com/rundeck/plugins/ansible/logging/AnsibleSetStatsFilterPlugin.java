@@ -53,7 +53,7 @@ class AnsibleSetStatsFilterPlugin implements LogFilterPlugin{
 
     @Override
     void init(final PluginLoggingContext context) {
-        String regex = "^\tRUN:\s(\{.*\})$";
+        String regex = "^\\tRUN:\\s(\\{.*\\})$";
         setStatsGlobalPattern = Pattern.compile(regex);
         outputContext = context.getOutputContext();
         mapper = new ObjectMapper();
