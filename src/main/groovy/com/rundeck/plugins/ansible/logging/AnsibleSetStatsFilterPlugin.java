@@ -62,7 +62,7 @@ class AnsibleSetStatsFilterPlugin implements LogFilterPlugin{
 
     @Override
     void handleEvent(final PluginLoggingContext context, final LogEventControl event) {
-        if (event.eventType == 'log' && event.loglevel == LogLevel.NORMAL && event.message?.length() > 0) {
+        if (event.eventType == "log" && event.loglevel == LogLevel.NORMAL && event.message?.length() > 0) {
             Matcher match = setStatsGlobalPattern.matcher(event.message);
 
             if(match.matches()){
@@ -87,8 +87,8 @@ class AnsibleSetStatsFilterPlugin implements LogFilterPlugin{
                         2,
                         mapper.writeValueAsString(allData),
                         [
-                                'content-data-type'       : 'application/json',
-                                'content-meta:table-title': 'Ansible set_stats: Results'
+                                "content-data-type"       : "application/json",
+                                "content-meta:table-title": "Ansible set_stats: Results"
                         ]
                 );
             }
