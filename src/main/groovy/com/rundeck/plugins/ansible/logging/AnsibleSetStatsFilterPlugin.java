@@ -43,7 +43,7 @@ class AnsibleSetStatsFilterPlugin implements LogFilterPlugin{
         description = "If true, log the captured data",
         defaultValue = 'false'
     )
-    Boolean outputData
+    Boolean outputData;
 
     Pattern setStatsGlobalPattern;
     OutputContext outputContext;
