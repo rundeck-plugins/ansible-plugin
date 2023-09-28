@@ -42,7 +42,7 @@ class AnsibleSetStatsFilterPlugin implements LogFilterPlugin{
     @PluginProperty(
         title = "Log Data",
         description = "If true, log the captured data",
-        defaultValue = 'false'
+        defaultValue = "false"
     )
     Boolean outputData;
 
