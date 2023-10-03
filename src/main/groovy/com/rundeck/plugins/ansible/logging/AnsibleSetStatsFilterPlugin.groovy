@@ -29,7 +29,7 @@ import com.google.gson.JsonElement
  * @author Simon Cateau
  * @since 20/09/2023
  */
-@Plugin(name = "Ansible set-stats", service = "LogFilter")
+@Plugin(name = "Ansible set_stats", service = "LogFilter")
 @PluginDescription(title = "Ansible set_stats",
                    description = '''Parses the output of the ansible set_stats module and generates the corresponding data context variables.\n\n
 To display the output of the set_stats module, you must set show_custom_stats in section [defaults] in ansible.cfg or by defining environment variable ANSIBLE_SHOW_CUSTOM_STATS to true.
