@@ -96,12 +96,12 @@ public class AnsiblePlaybookInlineWorkflowNodeStep implements NodeStepPlugin, An
         } catch (AnsibleException e) {
             Map<String,Object> failureData = new HashMap<>();
             failureData.put("message",e.getMessage());
-            failureData.put("ansible-config", builder.getConfigFile());
+            failureData.put("ansible-config", configuration);
             throw new NodeStepException(e.getMessage(), e, e.getFailureReason(), failureData, e.getMessage());
         } catch (Exception e) {
             Map<String,Object> failureData = new HashMap<>();
             failureData.put("message",e.getMessage());
-            failureData.put("ansible-config", builder.getConfigFile());
+            failureData.put("ansible-config", configuration);
             throw new NodeStepException(e.getMessage(),e, AnsibleException.AnsibleFailureReason.AnsibleError, failureData, e.getMessage());
         }
 
