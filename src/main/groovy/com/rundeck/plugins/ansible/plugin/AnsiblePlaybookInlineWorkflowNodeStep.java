@@ -81,8 +81,7 @@ public class AnsiblePlaybookInlineWorkflowNodeStep implements NodeStepPlugin, An
             configuration.put(AnsibleDescribable.ANSIBLE_DEBUG,"False");
         }
 
-       AnsibleRunnerBuilder
-                builder = new AnsibleRunnerBuilder(context.getExecutionContext(), context.getFramework(), context.getNodes(), configuration);
+       AnsibleRunnerBuilder builder = new AnsibleRunnerBuilder(context.getExecutionContext(), context.getFramework(), context.getNodes(), configuration);
 
         try {
             runner = builder.buildAnsibleRunner();
