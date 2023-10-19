@@ -48,6 +48,13 @@ dependencies {
   pluginLibs 'com.google.code.gson:gson:2.10.1'
   implementation('org.rundeck:rundeck-core:4.16.0-rc1-20230815')
   implementation 'org.codehaus.groovy:groovy-all:3.0.9'
+
+  testImplementation platform("org.spockframework:spock-bom:2.0-groovy-3.0")
+  testImplementation "org.spockframework:spock-core"
+}
+
+tasks.withType(Test).configureEach {
+  useJUnitPlatform()
 }
 
 task copyToLib(type: Copy) {
