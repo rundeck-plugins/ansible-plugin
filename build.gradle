@@ -14,7 +14,8 @@ ext.pluginClassNames = [
   'com.rundeck.plugins.ansible.plugin.AnsiblePlaybookInlineWorkflowStep',
   'com.rundeck.plugins.ansible.plugin.AnsibleModuleWorkflowStep',
   'com.rundeck.plugins.ansible.plugin.AnsiblePlaybookWorflowNodeStep',
-  'com.rundeck.plugins.ansible.plugin.AnsiblePlaybookInlineWorkflowNodeStep'
+  'com.rundeck.plugins.ansible.plugin.AnsiblePlaybookInlineWorkflowNodeStep',
+  'com.rundeck.plugins.ansible.logging.AnsibleSetStatsFilterPlugin'
 ].join(',')
 
 apply plugin: 'java'
