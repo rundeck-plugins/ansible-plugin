@@ -1,8 +1,6 @@
 package com.rundeck.plugins.ansible.plugin;
 
-import com.dtolabs.rundeck.core.execution.proxy.DefaultSecretBundle;
-import com.dtolabs.rundeck.core.execution.proxy.ProxySecretBundleCreator;
-import com.dtolabs.rundeck.core.execution.proxy.SecretBundle;
+import com.dtolabs.rundeck.core.execution.proxy.ProxyRunnerPlugin;
 import com.dtolabs.rundeck.core.storage.ResourceMeta;
 import com.dtolabs.rundeck.core.storage.StorageTree;
 import com.dtolabs.rundeck.core.storage.keys.KeyStorageTree;
@@ -38,7 +36,7 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
 import java.util.Map.Entry;
 
-public class AnsibleResourceModelSource implements ResourceModelSource, ProxySecretBundleCreator {
+public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRunnerPlugin {
 
   private Framework framework;
 
@@ -691,61 +689,5 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxySec
     return keys;
 
   }
-
-  @Override
-  public SecretBundle prepareSecretBundleResourceModel(Services services, Map<String, Object> configuration){
-    DefaultSecretBundle secretBundle = new DefaultSecretBundle();
-
-    try {
-      StorageTree storageTree = services.getService(KeyStorageTree.class);
-
-      String passwordStoragePath = (String) configuration.get(AnsibleDescribable.ANSIBLE_SSH_PASSWORD_STORAGE_PATH);
-      String privateKeyStoragePath = (String) configuration.get(AnsibleDescribable.ANSIBLE_SSH_KEYPATH_STORAGE_PATH);
-      String passphraseStoragePath = (String) configuration.get(AnsibleDescribable.ANSIBLE_SSH_PASSPHRASE);
-      String vaultPasswordStoragePath = (String) configuration.get(AnsibleDescribable.ANSIBLE_VAULTSTORE_PATH);
-      String becamePasswordStoragePath = (String) configuration.get(AnsibleDescribable.ANSIBLE_BECOME_PASSWORD_STORAGE_PATH);
-
-      if(passwordStoragePath!=null && !passwordStoragePath.isEmpty()){
-        secretBundle.addSecret(
-                passwordStoragePath,
-                getStorageContent(passwordStoragePath,storageTree )
-        );
-      }
-
-      if(privateKeyStoragePath!=null && !privateKeyStoragePath.isEmpty()){
-        secretBundle.addSecret(
-                privateKeyStoragePath,
-                getStorageContent(privateKeyStoragePath,storageTree )
-        );
-      }
-
-      if(passphraseStoragePath!=null && !passphraseStoragePath.isEmpty()){
-        secretBundle.addSecret(
-                passphraseStoragePath,
-                getStorageContent(passphraseStoragePath,storageTree )
-        );
-      }
-
-      if(vaultPasswordStoragePath!=null && !vaultPasswordStoragePath.isEmpty()){
-        secretBundle.addSecret(
-                vaultPasswordStoragePath,
-                getStorageContent(vaultPasswordStoragePath,storageTree )
-        );
-      }
-
-      if(becamePasswordStoragePath!=null && !becamePasswordStoragePath.isEmpty()){
-        secretBundle.addSecret(
-                becamePasswordStoragePath,
-                getStorageContent(becamePasswordStoragePath,storageTree )
-        );
-      }
-
-      return secretBundle;
-
-    } catch (Exception e) {
-      throw new RuntimeException(e.getMessage());
-    }
-  }
-
 
 }

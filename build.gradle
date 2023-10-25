@@ -46,7 +46,7 @@ configurations {
 
 dependencies {
   pluginLibs 'com.google.code.gson:gson:2.10.1'
-  implementation('org.rundeck:rundeck-core:5.0.0-SNAPSHOT')
+  implementation('org.rundeck:rundeck-core:4.17.2-rc1-20231025')
   implementation 'org.codehaus.groovy:groovy-all:3.0.9'
 }
 
