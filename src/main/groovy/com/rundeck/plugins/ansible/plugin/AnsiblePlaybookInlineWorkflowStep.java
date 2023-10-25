@@ -1,8 +1,7 @@
 package com.rundeck.plugins.ansible.plugin;
 
 import com.dtolabs.rundeck.core.execution.ExecutionContext;
-import com.dtolabs.rundeck.core.execution.proxy.ProxySecretBundleCreator;
-import com.dtolabs.rundeck.core.execution.proxy.SecretBundle;
+import com.dtolabs.rundeck.core.execution.proxy.ProxyRunnerPlugin;
 import com.rundeck.plugins.ansible.ansible.AnsibleDescribable;
 import com.rundeck.plugins.ansible.ansible.AnsibleException;
 import com.rundeck.plugins.ansible.ansible.AnsibleRunner;
@@ -20,9 +19,10 @@ import com.rundeck.plugins.ansible.util.AnsibleUtil;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Plugin(name = AnsiblePlaybookInlineWorkflowStep.SERVICE_PROVIDER_NAME, service = ServiceNameConstants.WorkflowStep)
-public class AnsiblePlaybookInlineWorkflowStep implements StepPlugin, AnsibleDescribable, ProxySecretBundleCreator {
+public class AnsiblePlaybookInlineWorkflowStep implements StepPlugin, AnsibleDescribable, ProxyRunnerPlugin {
 
     public static final String SERVICE_PROVIDER_NAME = "com.batix.rundeck.plugins.AnsiblePlaybookInlineWorkflowStep";
 
@@ -111,20 +111,27 @@ public class AnsiblePlaybookInlineWorkflowStep implements StepPlugin, AnsibleDes
         builder.cleanupTempFiles();
     }
 
+
+
     @Override
     public Description getDescription() {
         return DESC;
     }
 
-    @Override
-    public SecretBundle prepareSecretBundleWorkflowStep(ExecutionContext context, Map<String, Object> configuration) {
-        AnsibleRunnerBuilder builder = new AnsibleRunnerBuilder(context, context.getFramework(), context.getNodes(), configuration);
-        return AnsibleUtil.createBundle(builder);
-    }
 
     @Override
     public List<String> listSecretsPathWorkflowStep(ExecutionContext context, Map<String, Object> configuration) {
         AnsibleRunnerBuilder builder = new AnsibleRunnerBuilder(context, context.getFramework(), context.getNodes(), configuration);
         return AnsibleUtil.getSecretsPath(builder);
+    }
+
+    @Override
+    public Map<String, String> getRuntimeProperties(ExecutionContext context) {
+        return AnsibleUtil.getRuntimeProperties(context, AnsibleDescribable.PROJ_PROP_PREFIX);
+    }
+
+    @Override
+    public Map<String, String> getRuntimeFrameworkProperties(ExecutionContext context) {
+        return AnsibleUtil.getRuntimeProperties(context, AnsibleDescribable.FWK_PROP_PREFIX);
     }
 }

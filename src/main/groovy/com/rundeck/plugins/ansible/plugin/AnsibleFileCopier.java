@@ -1,7 +1,6 @@
 package com.rundeck.plugins.ansible.plugin;
 
-import com.dtolabs.rundeck.core.execution.proxy.ProxySecretBundleCreator;
-import com.dtolabs.rundeck.core.execution.proxy.SecretBundle;
+import com.dtolabs.rundeck.core.execution.proxy.ProxyRunnerPlugin;
 import com.rundeck.plugins.ansible.ansible.AnsibleDescribable;
 import com.rundeck.plugins.ansible.ansible.AnsibleException.AnsibleFailureReason;
 import com.rundeck.plugins.ansible.ansible.AnsibleRunner;
@@ -26,7 +25,7 @@ import java.util.List;
 import java.util.Map;
 
 @Plugin(name = AnsibleFileCopier.SERVICE_PROVIDER_NAME, service = ServiceNameConstants.FileCopier)
-public class AnsibleFileCopier implements FileCopier, AnsibleDescribable, ProxySecretBundleCreator {
+public class AnsibleFileCopier implements FileCopier, AnsibleDescribable, ProxyRunnerPlugin {
 
   public static final String SERVICE_PROVIDER_NAME = "com.batix.rundeck.plugins.AnsibleFileCopier";
 
@@ -167,21 +166,6 @@ public class AnsibleFileCopier implements FileCopier, AnsibleDescribable, ProxyS
   public Description getDescription() {
     return DESC;
   }
-
-    @Override
-    public SecretBundle prepareSecretBundle(ExecutionContext context, INodeEntry node) {
-        Map<String, Object> jobConf = new HashMap<>();
-        jobConf.put(AnsibleDescribable.ANSIBLE_LIMIT,node.getNodename());
-
-        if ("true".equals(System.getProperty("ansible.debug"))) {
-            jobConf.put(AnsibleDescribable.ANSIBLE_DEBUG,"True");
-        } else {
-            jobConf.put(AnsibleDescribable.ANSIBLE_DEBUG,"False");
-        }
-
-        AnsibleRunnerBuilder builder = new AnsibleRunnerBuilder(node, context, context.getFramework(), jobConf);
-        return AnsibleUtil.createBundle(builder);
-    }
 
     @Override
     public List<String> listSecretsPath(ExecutionContext context, INodeEntry node) {
