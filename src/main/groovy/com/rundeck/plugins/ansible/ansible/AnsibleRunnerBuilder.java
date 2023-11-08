@@ -820,6 +820,11 @@ public class AnsibleRunnerBuilder {
 		getNode(),
 		getjobConf()
 		);	
+        if (null != binariesFilePathStr) {
+            if (binariesFilePathStr.contains("${")) {
+                return DataContextUtils.replaceDataReferences(binariesFilePathStr, getContext().getDataContext());
+            }
+        }
         return binariesFilePathStr;
     }
 
