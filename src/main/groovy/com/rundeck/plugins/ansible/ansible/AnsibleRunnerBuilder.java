@@ -18,14 +18,12 @@ import com.dtolabs.rundeck.core.storage.ResourceMeta;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 
 import org.rundeck.storage.api.Path;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Map;
 
@@ -41,14 +39,6 @@ public class AnsibleRunnerBuilder {
     private Collection<INodeEntry> nodes;
     private Collection<File> tempFiles;
 
-    AnsibleRunnerBuilder(final ExecutionContext context, final Framework framework) {
-        this.context = context;
-        this.framework = framework;
-        this.frameworkProject = context.getFrameworkProject();
-        this.jobConf = new HashMap<String, Object>();
-        this.nodes = Collections.emptySet();
-        this.tempFiles = new LinkedList<>();
-    }
 
     public AnsibleRunnerBuilder(final ExecutionContext context, final Framework framework, INodeSet nodes, final Map<String, Object> configuration) {
         this.context = context;
@@ -90,7 +80,7 @@ public class AnsibleRunnerBuilder {
 
         //expand properties in path
         if (path != null && path.contains("${")) {
-            path = DataContextUtils.replaceDataReferences(path, context.getDataContext());
+            path = DataContextUtils.replaceDataReferencesInString(path, context.getDataContext());
         }
         return path;
     }
@@ -106,28 +96,15 @@ public class AnsibleRunnerBuilder {
                 );
         //expand properties in path
         if (path != null && path.contains("${")) {
-            path = DataContextUtils.replaceDataReferences(path, context.getDataContext());
+            path = DataContextUtils.replaceDataReferencesInString(path, context.getDataContext());
         }
         return path;
-    }
-
-    public InputStream getPrivateKeyStorageData() throws IOException {
-        String privateKeyResourcePath = getPrivateKeyStoragePath();
-        if (null == privateKeyResourcePath) {
-            return null;
-        }
-        return context
-                .getStorageTree()
-                .getResource(privateKeyResourcePath)
-                .getContents()
-                .getInputStream();
     }
 
     public  byte[] getPrivateKeyStorageDataBytes() throws IOException {
         String privateKeyResourcePath = getPrivateKeyStoragePath();
         return this.loadStoragePathData(privateKeyResourcePath);
     }
-
 
     public String getPasswordStoragePath() {
 
@@ -142,41 +119,24 @@ public class AnsibleRunnerBuilder {
 
         //expand properties in path
         if (path != null && path.contains("${")) {
-            path = DataContextUtils.replaceDataReferences(path, context.getDataContext());
+            path = DataContextUtils.replaceDataReferencesInString(path, context.getDataContext());
         }
          return path;
     }
 
     public String getSshPrivateKey()  throws ConfigurationException{
         //look for storage option
-        String storagePath = PropertyResolver.resolveProperty(
-        	AnsibleDescribable.ANSIBLE_SSH_KEYPATH_STORAGE_PATH,
-                null,
-                getFrameworkProject(),
-                getFramework(),
-                getNode(),
-                getjobConf()
-                );
+        String storagePath = getPrivateKeyStoragePath();
 
         if(null!=storagePath){
-            //look up storage value
-            if (storagePath.contains("${")) {
-                storagePath = DataContextUtils.replaceDataReferences(
-                        storagePath,
-                        context.getDataContext()
-                );
-            }
             Path path = PathUtil.asPath(storagePath);
             try {
                 ResourceMeta contents = context.getStorageTree().getResource(path)
                         .getContents();
                 ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
                 contents.writeContent(byteArrayOutputStream);
-                return new String(byteArrayOutputStream.toByteArray());
-            } catch (StorageException e) {
-                throw new ConfigurationException("Failed to read the ssh private key for " +
-                        "storage path: " + storagePath + ": " + e.getMessage());
-            } catch (IOException e) {
+                return byteArrayOutputStream.toString();
+            } catch (StorageException | IOException e) {
                 throw new ConfigurationException("Failed to read the ssh private key for " +
                         "storage path: " + storagePath + ": " + e.getMessage());
             }
@@ -215,34 +175,18 @@ public class AnsibleRunnerBuilder {
             return sshPassword;
         } else {
             //look for storage option
-            String storagePath = PropertyResolver.resolveProperty(
-                AnsibleDescribable.ANSIBLE_SSH_PASSWORD_STORAGE_PATH,
-                null,
-                getFrameworkProject(),
-                getFramework(),
-                getNode(),
-                getjobConf()
-                );
+            String storagePath = getPasswordStoragePath();
 
             if(null!=storagePath){
                 //look up storage value
-                if (storagePath.contains("${")) {
-                    storagePath = DataContextUtils.replaceDataReferences(
-                            storagePath,
-                            context.getDataContext()
-                    );
-                }
                 Path path = PathUtil.asPath(storagePath);
                 try {
                     ResourceMeta contents = context.getStorageTree().getResource(path)
                             .getContents();
                     ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
                     contents.writeContent(byteArrayOutputStream);
-                    return new String(byteArrayOutputStream.toByteArray());
-                } catch (StorageException e) {
-                    throw new ConfigurationException("Failed to read the ssh password for " +
-                            "storage path: " + storagePath + ": " + e.getMessage());
-                } catch (IOException e) {
+                    return byteArrayOutputStream.toString();
+                } catch (StorageException | IOException e) {
                     throw new ConfigurationException("Failed to read the ssh password for " +
                             "storage path: " + storagePath + ": " + e.getMessage());
                 }
@@ -286,7 +230,7 @@ public class AnsibleRunnerBuilder {
                   );
 
         if (null != user && user.contains("${")) {
-            return DataContextUtils.replaceDataReferences(user, getContext().getDataContext());
+            return DataContextUtils.replaceDataReferencesInString(user, getContext().getDataContext());
         }
         return user;
     }
@@ -319,7 +263,7 @@ public class AnsibleRunnerBuilder {
                    );
 
         if (null != user && user.contains("${")) {
-            return DataContextUtils.replaceDataReferences(user, getContext().getDataContext());
+            return DataContextUtils.replaceDataReferencesInString(user, getContext().getDataContext());
         }
         return user;
     }
@@ -353,7 +297,7 @@ public class AnsibleRunnerBuilder {
     	            );
 
     	if (null != extraParams && extraParams.contains("${")) {
-    	     return DataContextUtils.replaceDataReferences(extraParams, getContext().getDataContext());
+    	     return DataContextUtils.replaceDataReferencesInString(extraParams, getContext().getDataContext());
     	}
     	return extraParams;
     }
@@ -374,11 +318,9 @@ public class AnsibleRunnerBuilder {
         return null;
     }
 
-
     public byte[] getPasswordStorageData() throws IOException{
         return loadStoragePathData(getPasswordStoragePath());
     }
-
 
     public String getBecomePasswordStoragePath() {
         String path = PropertyResolver.resolveProperty(
@@ -391,27 +333,13 @@ public class AnsibleRunnerBuilder {
                 );
         //expand properties in path
         if (path != null && path.contains("${")) {
-            path = DataContextUtils.replaceDataReferences(path, context.getDataContext());
+            path = DataContextUtils.replaceDataReferencesInString(path, context.getDataContext());
         }
         return path;
     }
 
     public byte[] getBecomePasswordStorageData() throws IOException{
         return loadStoragePathData(getBecomePasswordStoragePath());
-    }
-
-
-    public String getBecomePassword(String prefix) {
-        final String passwordOption = PropertyResolver.resolveProperty(
-                    AnsibleDescribable.ANSIBLE_BECOME_PASSWORD_OPTION,
-                    AnsibleDescribable.DEFAULT_ANSIBLE_BECOME_PASSWORD_OPTION,
-                    getFrameworkProject(),
-                    getFramework(),
-                    getNode(),
-                    getjobConf()
-                    );
-
-        return PropertyResolver.evaluateSecureOption(passwordOption, getContext());
     }
 
     public String getBecomePassword()  throws ConfigurationException{
@@ -445,7 +373,7 @@ public class AnsibleRunnerBuilder {
             if(null!=storagePath){
                 //look up storage value
                 if (storagePath.contains("${")) {
-                    storagePath = DataContextUtils.replaceDataReferences(
+                    storagePath = DataContextUtils.replaceDataReferencesInString(
                             storagePath,
                             context.getDataContext()
                     );
@@ -456,11 +384,8 @@ public class AnsibleRunnerBuilder {
                             .getContents();
                     ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
                     contents.writeContent(byteArrayOutputStream);
-                    return new String(byteArrayOutputStream.toByteArray());
-                } catch (StorageException e) {
-                    throw new ConfigurationException("Failed to read the become password for " +
-                            "storage path: " + storagePath + ": " + e.getMessage());
-                } catch (IOException e) {
+                    return byteArrayOutputStream.toString();
+                } catch (StorageException | IOException e) {
                     throw new ConfigurationException("Failed to read the become password for " +
                             "storage path: " + storagePath + ": " + e.getMessage());
                 }
@@ -485,7 +410,7 @@ public class AnsibleRunnerBuilder {
         if(null!=storagePath){
             //look up storage value
             if (storagePath.contains("${")) {
-                storagePath = DataContextUtils.replaceDataReferences(
+                storagePath = DataContextUtils.replaceDataReferencesInString(
                         storagePath,
                         context.getDataContext()
                 );
@@ -496,11 +421,8 @@ public class AnsibleRunnerBuilder {
                         .getContents();
                 ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
                 contents.writeContent(byteArrayOutputStream);
-                return new String(byteArrayOutputStream.toByteArray());
-            } catch (StorageException e) {
-                throw new ConfigurationException("Failed to read the vault key for " +
-                        "storage path: " + storagePath + ": " + e.getMessage());
-            } catch (IOException e) {
+                return byteArrayOutputStream.toString();
+            } catch (StorageException | IOException e) {
                 throw new ConfigurationException("Failed to read the vault key for " +
                         "storage path: " + storagePath + ": " + e.getMessage());
             }
@@ -517,7 +439,7 @@ public class AnsibleRunnerBuilder {
 
             //expand properties in path
             if (path != null && path.contains("${")) {
-                path = DataContextUtils.replaceDataReferences(path, context.getDataContext());
+                path = DataContextUtils.replaceDataReferencesInString(path, context.getDataContext());
             }
 
             if (path != null) {
@@ -540,7 +462,7 @@ public class AnsibleRunnerBuilder {
         }
 
         if (null != playbook && playbook.contains("${")) {
-            return DataContextUtils.replaceDataReferences(playbook, getContext().getDataContext());
+            return DataContextUtils.replaceDataReferencesInString(playbook, getContext().getDataContext());
         }
         return playbook;
     }
@@ -552,7 +474,7 @@ public class AnsibleRunnerBuilder {
          }
 
          if (null != playbook && playbook.contains("${")) {
-             return DataContextUtils.replaceDataReferences(playbook, getContext().getDataContext());
+             return DataContextUtils.replaceDataReferencesInString(playbook, getContext().getDataContext());
          }
          return playbook;
     }
@@ -564,7 +486,7 @@ public class AnsibleRunnerBuilder {
         }
 
         if (null != module && module.contains("${")) {
-            return DataContextUtils.replaceDataReferences(module, getContext().getDataContext());
+            return DataContextUtils.replaceDataReferencesInString(module, getContext().getDataContext());
         }
         return module;
     }
@@ -576,7 +498,7 @@ public class AnsibleRunnerBuilder {
         }
 
         if (null != args && args.contains("${")) {
-            return DataContextUtils.replaceDataReferences(args, getContext().getDataContext());
+            return DataContextUtils.replaceDataReferencesInString(args, getContext().getDataContext());
         }
         return args;
     }
@@ -593,7 +515,7 @@ public class AnsibleRunnerBuilder {
                   );
 
         if (null != executable && executable.contains("${")) {
-            return DataContextUtils.replaceDataReferences(executable, getContext().getDataContext());
+            return DataContextUtils.replaceDataReferencesInString(executable, getContext().getDataContext());
         }
         return executable;
     }
@@ -615,57 +537,6 @@ public class AnsibleRunnerBuilder {
         return debug;
     }
 
-    public Boolean gatherFacts() {
-        Boolean gatherFacts = null;
-        String sgatherFacts = PropertyResolver.resolveProperty(
-                  AnsibleDescribable.ANSIBLE_GATHER_FACTS,
-                  null,
-                  getFrameworkProject(),
-                  getFramework(),
-                  getNode(),
-                  getjobConf()
-                  );
-
-        if (null != sgatherFacts) {
-        	gatherFacts = Boolean.parseBoolean(sgatherFacts);
-        }
-        return gatherFacts;
-    }
-
-    public Boolean ignoreErrors() {
-        Boolean ignoreErrors = null;
-        String signoreErrors = PropertyResolver.resolveProperty(
-                   AnsibleDescribable.ANSIBLE_IGNORE_ERRORS,
-                   null,
-                   getFrameworkProject(),
-                   getFramework(),
-                   getNode(),
-                   getjobConf()
-                   );
-
-        if (null != signoreErrors) {
-        	ignoreErrors = Boolean.parseBoolean(signoreErrors);
-        }
-        return ignoreErrors;
-    }
-
-    public String getIgnoreTagsPrefix() {
-        final String ignoreTagsPrefix;
-        ignoreTagsPrefix = PropertyResolver.resolveProperty(
-                   AnsibleDescribable.ANSIBLE_IGNORE_TAGS,
-                   null,
-                   getFrameworkProject(),
-                   getFramework(),
-                   getNode(),
-                   getjobConf()
-                   );
-
-        if (null != ignoreTagsPrefix && ignoreTagsPrefix.contains("${")) {
-            return DataContextUtils.replaceDataReferences(ignoreTagsPrefix, getContext().getDataContext());
-        }
-        return ignoreTagsPrefix;
-    }
-
     public String getExtraVars() {
         final String extraVars;
         extraVars = PropertyResolver.resolveProperty(
@@ -678,7 +549,7 @@ public class AnsibleRunnerBuilder {
                     );
 
         if (null != extraVars && extraVars.contains("${")) {
-            return DataContextUtils.replaceDataReferences(extraVars, getContext().getDataContext());
+            return DataContextUtils.replaceDataReferencesInString(extraVars, getContext().getDataContext());
         }
         return extraVars;
     }
@@ -743,7 +614,7 @@ public class AnsibleRunnerBuilder {
         );
 
         if (null != inventory && inventory.contains("${")) {
-            return DataContextUtils.replaceDataReferences(inventory, getContext().getDataContext());
+            return DataContextUtils.replaceDataReferencesInString(inventory, getContext().getDataContext());
         }
 
         return inventory;
@@ -775,7 +646,7 @@ public class AnsibleRunnerBuilder {
                      );
 
         if (null != limit && limit.contains("${")) {
-            return DataContextUtils.replaceDataReferences(limit, getContext().getDataContext());
+            return DataContextUtils.replaceDataReferencesInString(limit, getContext().getDataContext());
         }
         return limit;
     }
@@ -793,7 +664,7 @@ public class AnsibleRunnerBuilder {
         );
 
         if (null != configFile && configFile.contains("${")) {
-            return DataContextUtils.replaceDataReferences(configFile, getContext().getDataContext());
+            return DataContextUtils.replaceDataReferencesInString(configFile, getContext().getDataContext());
         }
         return configFile;
     }
@@ -805,7 +676,7 @@ public class AnsibleRunnerBuilder {
         }
 
         if (null != baseDir && baseDir.contains("${")) {
-            return DataContextUtils.replaceDataReferences(baseDir, getContext().getDataContext());
+            return DataContextUtils.replaceDataReferencesInString(baseDir, getContext().getDataContext());
         }
         return baseDir;
     }
@@ -822,7 +693,7 @@ public class AnsibleRunnerBuilder {
 		);	
         if (null != binariesFilePathStr) {
             if (binariesFilePathStr.contains("${")) {
-                return DataContextUtils.replaceDataReferences(binariesFilePathStr, getContext().getDataContext());
+                return DataContextUtils.replaceDataReferencesInString(binariesFilePathStr, getContext().getDataContext());
             }
         }
         return binariesFilePathStr;
@@ -991,7 +862,7 @@ public class AnsibleRunnerBuilder {
     }
 
     public Boolean getUseSshAgent() {
-        Boolean useAgent = false;
+        boolean useAgent = false;
         String sAgent = PropertyResolver.resolveProperty(
                 AnsibleDescribable.ANSIBLE_SSH_USE_AGENT,
                 null,
@@ -1024,16 +895,11 @@ public class AnsibleRunnerBuilder {
             // is true if there is an ssh option defined in the private data context
             return sshPassword;
         }else{
-            sshPassword = getPassphraseStoragePath();
-            if(null!=sshPassword){
-                return sshPassword;
-            }
+            return getPassphraseStorageData(getPassphraseStoragePath());
         }
-
-        return null;
     }
 
-    public String getPassphraseStoragePath() throws ConfigurationException {
+    public String getPassphraseStoragePath(){
 
         String storagePath = PropertyResolver.resolveProperty(
                 AnsibleDescribable.ANSIBLE_SSH_PASSPHRASE,
@@ -1046,27 +912,29 @@ public class AnsibleRunnerBuilder {
 
         if(null!=storagePath) {
             //expand properties in path
-            if (storagePath != null && storagePath.contains("${")) {
-                storagePath = DataContextUtils.replaceDataReferences(storagePath, context.getDataContext());
+            if (storagePath.contains("${")) {
+                storagePath = DataContextUtils.replaceDataReferencesInString(storagePath, context.getDataContext());
             }
 
-            Path path = PathUtil.asPath(storagePath);
-            try {
-                ResourceMeta contents = context.getStorageTree().getResource(path)
-                        .getContents();
-                ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-                contents.writeContent(byteArrayOutputStream);
-                return new String(byteArrayOutputStream.toByteArray());
-            } catch (StorageException e) {
-                throw new ConfigurationException("Failed to read the ssh Passphrase for " +
-                        "storage path: " + storagePath + ": " + e.getMessage());
-            } catch (IOException e) {
-                throw new ConfigurationException("Failed to read the ssh Passphrase for " +
-                        "storage path: " + storagePath + ": " + e.getMessage());
-            }
+            return storagePath;
         }
 
         return null;
 
+    }
+    
+    public String getPassphraseStorageData(String storagePath) throws ConfigurationException {
+
+        Path path = PathUtil.asPath(storagePath);
+        try {
+            ResourceMeta contents = context.getStorageTree().getResource(path)
+                    .getContents();
+            ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+            contents.writeContent(byteArrayOutputStream);
+            return byteArrayOutputStream.toString();
+        } catch (StorageException | IOException e) {
+            throw new ConfigurationException("Failed to read the ssh Passphrase for " +
+                    "storage path: " + storagePath + ": " + e.getMessage());
+        }
     }
 }
