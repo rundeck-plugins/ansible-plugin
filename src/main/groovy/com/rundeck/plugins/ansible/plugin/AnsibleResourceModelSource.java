@@ -226,7 +226,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
           String sshPrivateKey = getStorageContentString(sshPrivateKeyPath, storageTree);
           runner = runner.sshPrivateKey(sshPrivateKey);
         } catch (ConfigurationException e) {
-          throw new ResourceModelSourceException("Could not read password from storage path " + sshPasswordPath,e);
+          throw new ResourceModelSourceException("Could not read private key from storage path " + sshPrivateKeyPath,e);
         }
       }
 
