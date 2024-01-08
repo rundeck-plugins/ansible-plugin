@@ -9,6 +9,7 @@ import java.util.Collection;
 import java.util.HashMap;
 
 import com.google.gson.Gson;
+import groovy.lang.MissingPropertyException;
 
 public class AnsibleInventoryBuilder {
 
@@ -25,6 +26,9 @@ public class AnsibleInventoryBuilder {
             PrintWriter writer = new PrintWriter(file);
             AnsibleInventory ai = new AnsibleInventory();
             for (INodeEntry e : nodes) {
+                if( e.getHostname() == null ){
+                    throw new MissingPropertyException("No hostname for node: " + e.getNodename());
+                }
                 ai.addHost(e.getNodename(), e.getHostname(), new HashMap<String, String>(e.getAttributes()));
             }
             writer.write(new Gson().toJson(ai));
