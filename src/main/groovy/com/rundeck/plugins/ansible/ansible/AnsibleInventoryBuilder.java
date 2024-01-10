@@ -10,7 +10,6 @@ import java.util.Collection;
 import java.util.HashMap;
 
 import com.google.gson.Gson;
-import groovy.lang.MissingPropertyException;
 
 public class AnsibleInventoryBuilder {
 
