@@ -14,13 +14,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.Collection;
-import java.util.Map;
-import java.util.HashMap;
+import java.util.*;
 
 public class AnsibleRunner {
 
@@ -626,6 +620,7 @@ public class AnsibleRunner {
 
     List<String> procArgs = new ArrayList<>();
     procArgs.add("/usr/bin/ssh-add");
+    //procArgs.add("-v");
     procArgs.add(keyPath);
 
     if (debug) {
@@ -637,33 +632,63 @@ public class AnsibleRunner {
     ProcessBuilder processBuilder = new ProcessBuilder()
             .command(procArgs)
             .directory(baseDirectory.toFile());
+
     Process proc = null;
 
     Map<String, String> env = processBuilder.environment();
     env.put("SSH_AUTH_SOCK", this.sshAgent.getSocketPath());
 
+    File tempPassVarsFile = null;
+    if (sshPassphrase != null && sshPassphrase.length() > 0) {
+      tempPassVarsFile = File.createTempFile("ansible-runner", "ssh-add-check");
+      tempPassVarsFile.setExecutable(true);
+
+      String passCmd = "echo '" + sshPassphrase + "'";
+      Files.write(tempPassVarsFile.toPath(), passCmd.getBytes());
+
+      env.put("DISPLAY", "1");
+      env.put("SSH_ASKPASS", tempPassVarsFile.getAbsolutePath());
+    }
+
     try {
       proc = processBuilder.start();
 
-      OutputStream stdin = proc.getOutputStream();
-      OutputStreamWriter stdinw = new OutputStreamWriter(stdin);
+      //OutputStream stdin = proc.getOutputStream();
+      //OutputStreamWriter stdinw = new OutputStreamWriter(stdin);
 
-      try{
-        if (sshPassphrase != null && sshPassphrase.length() > 0) {
-          stdinw.write(sshPassphrase+"\n");
-          stdinw.flush();
-        }
-      } catch (Exception  e) {
-        if (debug) {
-          System.out.println("not prompt enable");
-        }
-      }
+//      try{
+//        if (sshPassphrase != null && sshPassphrase.length() > 0) {
+//          stdinw.write(sshPassphrase+"\n");
+//          stdinw.flush();
+//        }
+//      } catch (Exception  e) {
+//        System.out.println("ERROR: " + e.getMessage());
+//        if (debug) {
+//          System.out.println("not prompt enable");
+//        }
+//      }
+
+      Thread errthread = Logging.copyStreamThread(proc.getErrorStream(), ListenerFactory.getListener(System.out));
+      Thread outthread = Logging.copyStreamThread(proc.getInputStream(), ListenerFactory.getListener(System.out));
+      errthread.start();
+      outthread.start();
 
       int exitCode = proc.waitFor();
+
+      outthread.join();
+      errthread.join();
+      System.err.flush();
+      System.out.flush();
+
+      System.out.println("exit code " + exitCode);
 
      if (exitCode != 0) {
           throw new AnsibleException("ERROR: ssh-add returns with non zero code:" + procArgs.toString(),
                   AnsibleException.AnsibleFailureReason.AnsibleNonZero);
+      }
+
+      if(tempPassVarsFile!=null && tempPassVarsFile.exists()){
+        tempPassVarsFile.delete();
       }
 
     } catch (IOException  e) {
