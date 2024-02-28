@@ -73,6 +73,11 @@ public class AnsibleUtil {
                     builder.getPassphraseStoragePath()
             );
         }
+        if(builder.getVaultKeyStoragePath()!=null){
+            secretPaths.add(
+                    builder.getVaultKeyStoragePath()
+            );
+        }
         return secretPaths;
 
     }

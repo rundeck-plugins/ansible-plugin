@@ -396,25 +396,39 @@ public class AnsibleRunnerBuilder {
         }
     }
 
-    public String getVaultKey()  throws ConfigurationException{
-        //look for storage option
+    public String  getVaultKeyStoragePath(){
+
         String storagePath = PropertyResolver.resolveProperty(
-        		AnsibleDescribable.ANSIBLE_VAULTSTORE_PATH,
+                AnsibleDescribable.ANSIBLE_VAULTSTORE_PATH,
                 null,
                 getFrameworkProject(),
                 getFramework(),
                 getNode(),
                 getjobConf()
-                );
+        );
 
-        if(null!=storagePath){
-            //look up storage value
+        if(null!=storagePath) {
+            //expand properties in path
             if (storagePath.contains("${")) {
                 storagePath = DataContextUtils.replaceDataReferencesInString(
                         storagePath,
                         context.getDataContext()
                 );
             }
+
+            return storagePath;
+        }
+
+        return null;
+
+    }
+
+    public String getVaultKey()  throws ConfigurationException{
+        //look for storage option
+        String storagePath = getVaultKeyStoragePath();
+
+        if(null!=storagePath){
+            //look up storage value
             Path path = PathUtil.asPath(storagePath);
             try {
                 ResourceMeta contents = context.getStorageTree().getResource(path)
