@@ -620,7 +620,6 @@ public class AnsibleRunner {
 
     List<String> procArgs = new ArrayList<>();
     procArgs.add("/usr/bin/ssh-add");
-    //procArgs.add("-v");
     procArgs.add(keyPath);
 
     if (debug) {
@@ -643,32 +642,33 @@ public class AnsibleRunner {
       tempPassVarsFile = File.createTempFile("ansible-runner", "ssh-add-check");
       tempPassVarsFile.setExecutable(true);
 
-      String passCmd = "echo '" + sshPassphrase + "'";
-      Files.write(tempPassVarsFile.toPath(), passCmd.getBytes());
+      List<String> passScript = new ArrayList<>();
+      passScript.add("read SECRET");
+      passScript.add("echo $SECRET");
+      Files.write(tempPassVarsFile.toPath(), passScript);
 
-      env.put("DISPLAY", "1");
+      env.put("DISPLAY", "0");
       env.put("SSH_ASKPASS", tempPassVarsFile.getAbsolutePath());
     }
 
     try {
       proc = processBuilder.start();
 
-      //OutputStream stdin = proc.getOutputStream();
-      //OutputStreamWriter stdinw = new OutputStreamWriter(stdin);
+      OutputStream stdin = proc.getOutputStream();
+      OutputStreamWriter stdinw = new OutputStreamWriter(stdin);
 
-//      try{
-//        if (sshPassphrase != null && sshPassphrase.length() > 0) {
-//          stdinw.write(sshPassphrase+"\n");
-//          stdinw.flush();
-//        }
-//      } catch (Exception  e) {
-//        System.out.println("ERROR: " + e.getMessage());
-//        if (debug) {
-//          System.out.println("not prompt enable");
-//        }
-//      }
+      try{
+        if (sshPassphrase != null && sshPassphrase.length() > 0) {
+          stdinw.write(sshPassphrase+"\n");
+          stdinw.flush();
+        }
+      } catch (Exception  e) {
+        if (debug) {
+          System.out.println("not prompt enable");
+        }
+      }
 
-      Thread errthread = Logging.copyStreamThread(proc.getErrorStream(), ListenerFactory.getListener(System.out));
+      Thread errthread = Logging.copyStreamThread(proc.getErrorStream(), ListenerFactory.getListener(System.err));
       Thread outthread = Logging.copyStreamThread(proc.getInputStream(), ListenerFactory.getListener(System.out));
       errthread.start();
       outthread.start();
@@ -679,8 +679,6 @@ public class AnsibleRunner {
       errthread.join();
       System.err.flush();
       System.out.flush();
-
-      System.out.println("exit code " + exitCode);
 
      if (exitCode != 0) {
           throw new AnsibleException("ERROR: ssh-add returns with non zero code:" + procArgs.toString(),
