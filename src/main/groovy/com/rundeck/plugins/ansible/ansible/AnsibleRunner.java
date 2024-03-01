@@ -113,6 +113,7 @@ public class AnsibleRunner {
 
   private Listener listener;
 
+
   private AnsibleRunner(AnsibleCommand type) {
     this.type = type;
   }
@@ -364,10 +365,16 @@ public class AnsibleRunner {
     }
     done = true;
 
+    File baseDirectoryFile = null;
+
     if (baseDirectory == null) {
       // Use a temporary directory and mark it for possible removal later
       this.usingTempDirectory = true;
       baseDirectory = Files.createTempDirectory("ansible-rundeck");
+    }
+
+    if(usingTempDirectory){
+      baseDirectoryFile = baseDirectory.toFile();
     }
 
     File tempPlaybook = null;
@@ -375,153 +382,154 @@ public class AnsibleRunner {
     File tempVaultFile = null;
     File tempPkFile = null;
     File tempVarsFile = null;
-
-    List<String> procArgs = new ArrayList<>();
-    String ansibleCommand = type.command;
-    if (ansibleBinariesDirectory != null) {
-      ansibleCommand = Paths.get(ansibleBinariesDirectory.toFile().getAbsolutePath(), ansibleCommand).toFile().getAbsolutePath();
-    }
-    procArgs.add(ansibleCommand);
-
-    // parse arguments
-    if (type == AnsibleCommand.AdHoc) {
-      procArgs.add("all");
-
-      procArgs.add("-m");
-      procArgs.add(module);
-
-      if (arg != null && arg.length() > 0) {
-        procArgs.add("-a");
-        procArgs.add(arg);
-      }
-      procArgs.add("-t");
-      procArgs.add(baseDirectory.toFile().getAbsolutePath());
-    } else if (type == AnsibleCommand.PlaybookPath) {
-      procArgs.add(playbook);
-    } else if (type == AnsibleCommand.PlaybookInline) {
-
-	  tempPlaybook = File.createTempFile("ansible-runner", "playbook");
-	  Files.write(tempPlaybook.toPath(), playbook.toString().getBytes());
-	  procArgs.add(tempPlaybook.getAbsolutePath());
-    }
-
-    if (inventory != null && inventory.length() > 0) {
-      procArgs.add("--inventory-file" + "=" + inventory);
-    }
-
-    if (limits != null && limits.size() == 1) {
-      procArgs.add("-l");
-      procArgs.add(limits.get(0));
-
-    } else if (limits != null && limits.size() > 1) {
-      tempFile = File.createTempFile("ansible-runner", "targets");
-      StringBuilder sb = new StringBuilder();
-      for (String limit : limits) {
-        sb.append(limit).append("\n");
-      }
-      Files.write(tempFile.toPath(), sb.toString().getBytes());
-
-      procArgs.add("-l");
-      procArgs.add("@" + tempFile.getAbsolutePath());
-    }
-
-    if (debug == Boolean.TRUE) {
-      procArgs.add("-vvv");
-    }
-
-    if (extraVars != null && extraVars.length() > 0) {
-    	tempVarsFile = File.createTempFile("ansible-runner", "extra-vars");
-    	Files.write(tempVarsFile.toPath(), extraVars.getBytes());
-        procArgs.add("--extra-vars" + "=" + "@" + tempVarsFile.getAbsolutePath());
-    }
-
-    if (vaultPass != null && vaultPass.length() > 0) {
-      tempVaultFile = File.createTempFile("ansible-runner", "vault");
-      Files.write(tempVaultFile.toPath(), vaultPass.getBytes());
-      procArgs.add("--vault-password-file" + "=" + tempVaultFile.getAbsolutePath());
-    }
-
-    if (sshPrivateKey != null && sshPrivateKey.length() > 0) {
-       tempPkFile = File.createTempFile("ansible-runner", "id_rsa");
-       // Only the owner can read and write
-       Set<PosixFilePermission> perms = new HashSet<PosixFilePermission>();
-       perms.add(PosixFilePermission.OWNER_READ);
-       perms.add(PosixFilePermission.OWNER_WRITE);
-       Files.setPosixFilePermissions(tempPkFile.toPath(), perms);
-
-       Files.write(tempPkFile.toPath(), sshPrivateKey.replaceAll("\r\n","\n").getBytes());
-       procArgs.add("--private-key" + "=" + tempPkFile.toPath());
-
-       if(sshUseAgent){
-         registerKeySshAgent(tempPkFile.getAbsolutePath());
-       }
-    }
-
-    if (sshUser != null && sshUser.length() > 0) {
-       procArgs.add("--user" + "=" + sshUser);
-    }
-
-    if (sshUsePassword) {
-       procArgs.add("--ask-pass");
-    }
-
-    if (sshTimeout != null && sshTimeout  > 0) {
-      procArgs.add("--timeout" + "=" + sshTimeout);
-    }
-
-    if (become == true) {
-       procArgs.add("--become");
-       if (becomePassword != null && becomePassword.length() > 0) {
-         procArgs.add("--ask-become-pass");
-       }
-    }
-
-    if (becomeMethod != null && becomeMethod.length() > 0) {
-       procArgs.add("--become-method" + "=" + becomeMethod);
-    }
-
-    if (becomeUser != null && becomeUser.length() > 0) {
-       procArgs.add("--become-user" + "=" + becomeUser);
-    }
-
-    // default the listener to stdout logger
-    if (listener == null) {
-        listener = ListenerFactory.getListener(System.out);
-    }
-
-    if (extraParams != null && extraParams.length() > 0) {
-        procArgs.addAll(tokenizeCommand(extraParams));
-    }
-
-    if (debug) {
-        System.out.println(" procArgs: " +  procArgs);
-    }
-
-    // execute the ansible process
-    ProcessBuilder processBuilder = new ProcessBuilder()
-      .command(procArgs)
-      .directory(baseDirectory.toFile()); // set cwd
     Process proc = null;
 
-    Map<String, String> processEnvironment = processBuilder.environment();
+    try {
 
-    if (configFile != null && configFile.length() > 0) {
-      if (debug) {
-        System.out.println(" ANSIBLE_CONFIG: "+configFile);
+      List<String> procArgs = new ArrayList<>();
+      String ansibleCommand = type.command;
+      if (ansibleBinariesDirectory != null) {
+        ansibleCommand = Paths.get(ansibleBinariesDirectory.toFile().getAbsolutePath(), ansibleCommand).toFile().getAbsolutePath();
+      }
+      procArgs.add(ansibleCommand);
+
+      // parse arguments
+      if (type == AnsibleCommand.AdHoc) {
+        procArgs.add("all");
+
+        procArgs.add("-m");
+        procArgs.add(module);
+
+        if (arg != null && arg.length() > 0) {
+          procArgs.add("-a");
+          procArgs.add(arg);
+        }
+        procArgs.add("-t");
+        procArgs.add(baseDirectory.toFile().getAbsolutePath());
+      } else if (type == AnsibleCommand.PlaybookPath) {
+        procArgs.add(playbook);
+      } else if (type == AnsibleCommand.PlaybookInline) {
+
+        tempPlaybook = File.createTempFile("ansible-runner", "playbook", baseDirectoryFile);
+        Files.write(tempPlaybook.toPath(), playbook.toString().getBytes());
+        procArgs.add(tempPlaybook.getAbsolutePath());
       }
 
-      processEnvironment.put("ANSIBLE_CONFIG", configFile);
-    }
+      if (inventory != null && inventory.length() > 0) {
+        procArgs.add("--inventory-file" + "=" + inventory);
+      }
 
-    for (String optionName : this.options.keySet()) {
-        processEnvironment.put(optionName, this.options.get(optionName));
-    }
+      if (limits != null && limits.size() == 1) {
+        procArgs.add("-l");
+        procArgs.add(limits.get(0));
 
-    if(sshUseAgent && sshAgent!=null){
-      processEnvironment.put("SSH_AUTH_SOCK", this.sshAgent.getSocketPath());
-    }
+      } else if (limits != null && limits.size() > 1) {
+        tempFile = File.createTempFile("ansible-runner", "targets", baseDirectoryFile);
+        StringBuilder sb = new StringBuilder();
+        for (String limit : limits) {
+          sb.append(limit).append("\n");
+        }
+        Files.write(tempFile.toPath(), sb.toString().getBytes());
 
-    try {
+        procArgs.add("-l");
+        procArgs.add("@" + tempFile.getAbsolutePath());
+      }
+
+      if (debug == Boolean.TRUE) {
+        procArgs.add("-vvv");
+      }
+
+      if (extraVars != null && extraVars.length() > 0) {
+          tempVarsFile = File.createTempFile("ansible-runner", "extra-vars", baseDirectoryFile);
+          Files.write(tempVarsFile.toPath(), extraVars.getBytes());
+          procArgs.add("--extra-vars" + "=" + "@" + tempVarsFile.getAbsolutePath());
+      }
+
+      if (vaultPass != null && vaultPass.length() > 0) {
+        tempVaultFile = File.createTempFile("ansible-runner", "vault", baseDirectoryFile);
+        Files.write(tempVaultFile.toPath(), vaultPass.getBytes());
+        procArgs.add("--vault-password-file" + "=" + tempVaultFile.getAbsolutePath());
+      }
+
+      if (sshPrivateKey != null && sshPrivateKey.length() > 0) {
+         tempPkFile = File.createTempFile("ansible-runner", "id_rsa", baseDirectoryFile);
+         // Only the owner can read and write
+         Set<PosixFilePermission> perms = new HashSet<PosixFilePermission>();
+         perms.add(PosixFilePermission.OWNER_READ);
+         perms.add(PosixFilePermission.OWNER_WRITE);
+         Files.setPosixFilePermissions(tempPkFile.toPath(), perms);
+
+         Files.write(tempPkFile.toPath(), sshPrivateKey.replaceAll("\r\n","\n").getBytes());
+         procArgs.add("--private-key" + "=" + tempPkFile.toPath());
+
+         if(sshUseAgent){
+           registerKeySshAgent(tempPkFile.getAbsolutePath());
+         }
+      }
+
+      if (sshUser != null && sshUser.length() > 0) {
+         procArgs.add("--user" + "=" + sshUser);
+      }
+
+      if (sshUsePassword) {
+         procArgs.add("--ask-pass");
+      }
+
+      if (sshTimeout != null && sshTimeout  > 0) {
+        procArgs.add("--timeout" + "=" + sshTimeout);
+      }
+
+      if (become == true) {
+         procArgs.add("--become");
+         if (becomePassword != null && becomePassword.length() > 0) {
+           procArgs.add("--ask-become-pass");
+         }
+      }
+
+      if (becomeMethod != null && becomeMethod.length() > 0) {
+         procArgs.add("--become-method" + "=" + becomeMethod);
+      }
+
+      if (becomeUser != null && becomeUser.length() > 0) {
+         procArgs.add("--become-user" + "=" + becomeUser);
+      }
+
+      // default the listener to stdout logger
+      if (listener == null) {
+          listener = ListenerFactory.getListener(System.out);
+      }
+
+      if (extraParams != null && extraParams.length() > 0) {
+          procArgs.addAll(tokenizeCommand(extraParams));
+      }
+
+      if (debug) {
+          System.out.println(" procArgs: " +  procArgs);
+      }
+
+      // execute the ansible process
+      ProcessBuilder processBuilder = new ProcessBuilder()
+        .command(procArgs)
+        .directory(baseDirectory.toFile()); // set cwd
+
+      Map<String, String> processEnvironment = processBuilder.environment();
+
+      if (configFile != null && configFile.length() > 0) {
+        if (debug) {
+          System.out.println(" ANSIBLE_CONFIG: "+configFile);
+        }
+
+        processEnvironment.put("ANSIBLE_CONFIG", configFile);
+      }
+
+      for (String optionName : this.options.keySet()) {
+          processEnvironment.put(optionName, this.options.get(optionName));
+      }
+
+      if(sshUseAgent && sshAgent!=null){
+        processEnvironment.put("SSH_AUTH_SOCK", this.sshAgent.getSocketPath());
+      }
+
       proc = processBuilder.start();
       OutputStream stdin = proc.getOutputStream();
       OutputStreamWriter stdinw = new OutputStreamWriter(stdin);
