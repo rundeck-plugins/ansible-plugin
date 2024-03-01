@@ -94,6 +94,8 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
 
   protected String becamePasswordStoragePath;
 
+  protected boolean encryptTempFiles = false;
+
 
   public AnsibleResourceModelSource(final Framework framework) {
       this.framework = framework;
@@ -191,6 +193,9 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     vaultPasswordPath = (String) resolveProperty(AnsibleDescribable.ANSIBLE_BECOME_PASSWORD_STORAGE_PATH,null,configuration,executionDataContext);
 
     becamePasswordStoragePath = (String) resolveProperty(AnsibleDescribable.ANSIBLE_BECOME_PASSWORD_STORAGE_PATH,null,configuration,executionDataContext);
+
+    encryptTempFiles = "true".equals(resolveProperty(AnsibleDescribable.ENCRYPT_TEMP_FILES,"false",configuration,executionDataContext));
+
   }
 
   public AnsibleRunner buildAnsibleRunner() throws ResourceModelSourceException{
@@ -336,8 +341,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
       runner.extraParams(extraParameters);
     }
 
-
-
+    runner.encryptTemporaryFiles(encryptTempFiles);
 
     return runner;
   }

@@ -156,6 +156,8 @@ public interface AnsibleDescribable extends Describable {
     public static final String PROJ_PROP_PREFIX = "project.";
     public static final String FWK_PROP_PREFIX = "framework.";
 
+    public static final String ENCRYPT_TEMP_FILES = "ansible-encrypt-temp-files";
+
     public static Property PLAYBOOK_PATH_PROP = PropertyUtil.string(
     			ANSIBLE_PLAYBOOK_PATH,
               "Playbook",
@@ -518,5 +520,12 @@ public interface AnsibleDescribable extends Describable {
             .required(false)
             .title("Ansible binaries directory path")
             .description("Set ansible binaries directory path.")
+            .build();
+
+    public static final Property CONFIG_ENCRYPT_TEMP_FILES = PropertyBuilder.builder()
+            .booleanType(ENCRYPT_TEMP_FILES)
+            .required(false)
+            .title("Encrypt temporary files.")
+            .description("Encrypt temporary files used for authentication and extra vars.")
             .build();
 }

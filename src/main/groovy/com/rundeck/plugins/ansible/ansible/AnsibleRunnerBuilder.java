@@ -843,6 +843,11 @@ public class AnsibleRunnerBuilder {
             runner = runner.ansibleBinariesDirectory(binariesFilePath);
         }
 
+        boolean encryptTempFiles = encryptTempFiles();
+        if(encryptTempFiles){
+            runner = runner.encryptTemporaryFiles(true);
+        }
+
         return runner;
     }
 
@@ -938,6 +943,9 @@ public class AnsibleRunnerBuilder {
     }
     
     public String getPassphraseStorageData(String storagePath) throws ConfigurationException {
+        if(storagePath == null){
+            return null;
+        }
 
         Path path = PathUtil.asPath(storagePath);
         try {
@@ -950,5 +958,16 @@ public class AnsibleRunnerBuilder {
             throw new ConfigurationException("Failed to read the ssh Passphrase for " +
                     "storage path: " + storagePath + ": " + e.getMessage());
         }
+    }
+
+    public boolean encryptTempFiles() throws ConfigurationException {
+        return PropertyResolver.resolveBooleanProperty(
+                AnsibleDescribable.ENCRYPT_TEMP_FILES,
+                false,
+                getFrameworkProject(),
+                getFramework(),
+                getNode(),
+                getjobConf()
+        );
     }
 }

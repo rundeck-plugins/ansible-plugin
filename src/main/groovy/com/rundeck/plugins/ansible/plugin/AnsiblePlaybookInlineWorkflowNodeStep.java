@@ -55,6 +55,7 @@ public class AnsiblePlaybookInlineWorkflowNodeStep implements NodeStepPlugin, An
         builder.property(BECOME_AUTH_TYPE_PROP);
         builder.property(BECOME_USER_PROP);
         builder.property(BECOME_PASSWORD_STORAGE_PROP);
+        builder.property(CONFIG_ENCRYPT_TEMP_FILES);
 
         DESC=builder.build();
     }

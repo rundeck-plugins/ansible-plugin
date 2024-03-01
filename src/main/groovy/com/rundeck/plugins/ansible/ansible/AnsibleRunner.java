@@ -109,7 +109,7 @@ public class AnsibleRunner {
 
   private String generatedVaultPassword;
 
-  private boolean encryptVarsFiles = false;
+  private boolean encryptTempFiles = false;
 
   private AnsibleRunner(AnsibleCommand type) {
     this.type = type;
@@ -341,6 +341,11 @@ public class AnsibleRunner {
     return this;
   }
 
+  public AnsibleRunner encryptTemporaryFiles(boolean encryptVarsFiles){
+    this.encryptTempFiles = encryptVarsFiles;
+    return this;
+  }
+
   public void deleteTempDirectory(Path tempDirectory) throws IOException {
       Files.walkFileTree(tempDirectory, new SimpleFileVisitor<Path>() {
         @Override
@@ -376,6 +381,16 @@ public class AnsibleRunner {
     File tempVarsFile = null;
 
     List<String> procArgs = new ArrayList<>();
+
+    if(encryptTempFiles){
+      UUID uuid = UUID.randomUUID();
+      generatedVaultPassword = uuid.toString();
+
+      tempVaultFile = File.createTempFile("ansible-runner", "internal-vault");
+      Files.write(tempVaultFile.toPath(), generatedVaultPassword.getBytes());
+      procArgs.add("--vault-password-file" + "=" + tempVaultFile.getAbsolutePath());
+    }
+
     String ansibleCommand = type.command;
     if (ansibleBinariesDirectory != null) {
       ansibleCommand = Paths.get(ansibleBinariesDirectory.toFile().getAbsolutePath(), ansibleCommand).toFile().getAbsolutePath();
@@ -429,7 +444,7 @@ public class AnsibleRunner {
     }
 
     if (extraVars != null && extraVars.length() > 0) {
-    	tempVarsFile = this.createTemporaryFile("id_rsa",extraVars  , true);
+    	tempVarsFile = this.createTemporaryFile("extra-vars",extraVars  , encryptTempFiles);
                 //File.createTempFile("ansible-runner", "extra-vars");
     	//Files.write(tempVarsFile.toPath(), extraVars.getBytes());
         procArgs.add("--extra-vars" + "=" + "@" + tempVarsFile.getAbsolutePath());
@@ -444,21 +459,22 @@ public class AnsibleRunner {
     if (sshPrivateKey != null && sshPrivateKey.length() > 0) {
 
       String privateKeyData = sshPrivateKey.replaceAll("\r\n","\n");
-      tempPkFile = this.createTemporaryFile("id_rsa",privateKeyData  , true);
+      tempPkFile = this.createTemporaryFile("id_rsa",privateKeyData  , false);
 
-      //File.createTempFile("ansible-runner", "id_rsa");
       // Only the owner can read and write
       Set<PosixFilePermission> perms = new HashSet<PosixFilePermission>();
       perms.add(PosixFilePermission.OWNER_READ);
       perms.add(PosixFilePermission.OWNER_WRITE);
       Files.setPosixFilePermissions(tempPkFile.toPath(), perms);
 
-      //Files.write(tempPkFile.toPath(), sshPrivateKey.replaceAll("\r\n","\n").getBytes());
-      procArgs.add("--private-key" + "=" + tempPkFile.toPath());
-
       if(sshUseAgent){
-      registerKeySshAgent(tempPkFile.getAbsolutePath());
+        registerKeySshAgent(tempPkFile.getAbsolutePath());
       }
+
+      if(encryptTempFiles){
+        encryptFileAnsibleVault(tempPkFile);
+      }
+      procArgs.add("--private-key" + "=" + tempPkFile.toPath());
     }
 
     if (sshUser != null && sshUser.length() > 0) {
@@ -499,12 +515,6 @@ public class AnsibleRunner {
 
     if (debug) {
         System.out.println(" procArgs: " +  procArgs);
-    }
-
-    if(encryptVarsFiles){
-      tempVaultFile = File.createTempFile("ansible-runner", "vault");
-      Files.write(tempVaultFile.toPath(), generatedVaultPassword.getBytes());
-      procArgs.add("--vault-password-file" + "=" + tempVaultFile.getAbsolutePath());
     }
 
     // execute the ansible process
@@ -731,7 +741,7 @@ public class AnsibleRunner {
 
 
   public File createTemporaryFile(String suffix, String data, boolean encrypt) throws IOException {
-    File tempVarsFile = File.createTempFile("ansible-runner", "extra-vars");
+    File tempVarsFile = File.createTempFile("ansible-runner", suffix);
     Files.write(tempVarsFile.toPath(), data.getBytes());
 
     if(encrypt){
@@ -742,7 +752,7 @@ public class AnsibleRunner {
 
   }
 
-  public void encryptFileAnsibleVault(File file) throws IOException {
+  public void encryptFileAnsibleVault(File file){
 
     List<String> procArgs = new ArrayList<>();
     procArgs.add("ansible-vault");
