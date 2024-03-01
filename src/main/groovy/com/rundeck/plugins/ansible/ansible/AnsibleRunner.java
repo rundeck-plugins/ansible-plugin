@@ -107,9 +107,14 @@ public class AnsibleRunner {
 
   private Listener listener;
 
+  private String generatedVaultPassword;
+
+  private boolean encryptVarsFiles = false;
+
   private AnsibleRunner(AnsibleCommand type) {
     this.type = type;
   }
+
 
   public AnsibleRunner setInventory(String inv) {
     if (inv != null && inv.length() > 0) {
@@ -424,8 +429,9 @@ public class AnsibleRunner {
     }
 
     if (extraVars != null && extraVars.length() > 0) {
-    	tempVarsFile = File.createTempFile("ansible-runner", "extra-vars");
-    	Files.write(tempVarsFile.toPath(), extraVars.getBytes());
+    	tempVarsFile = this.createTemporaryFile("id_rsa",extraVars  , true);
+                //File.createTempFile("ansible-runner", "extra-vars");
+    	//Files.write(tempVarsFile.toPath(), extraVars.getBytes());
         procArgs.add("--extra-vars" + "=" + "@" + tempVarsFile.getAbsolutePath());
     }
 
@@ -436,19 +442,23 @@ public class AnsibleRunner {
     }
 
     if (sshPrivateKey != null && sshPrivateKey.length() > 0) {
-       tempPkFile = File.createTempFile("ansible-runner", "id_rsa");
-       // Only the owner can read and write
-       Set<PosixFilePermission> perms = new HashSet<PosixFilePermission>();
-       perms.add(PosixFilePermission.OWNER_READ);
-       perms.add(PosixFilePermission.OWNER_WRITE);
-       Files.setPosixFilePermissions(tempPkFile.toPath(), perms);
 
-       Files.write(tempPkFile.toPath(), sshPrivateKey.replaceAll("\r\n","\n").getBytes());
-       procArgs.add("--private-key" + "=" + tempPkFile.toPath());
+      String privateKeyData = sshPrivateKey.replaceAll("\r\n","\n");
+      tempPkFile = this.createTemporaryFile("id_rsa",privateKeyData  , true);
 
-       if(sshUseAgent){
-         registerKeySshAgent(tempPkFile.getAbsolutePath());
-       }
+      //File.createTempFile("ansible-runner", "id_rsa");
+      // Only the owner can read and write
+      Set<PosixFilePermission> perms = new HashSet<PosixFilePermission>();
+      perms.add(PosixFilePermission.OWNER_READ);
+      perms.add(PosixFilePermission.OWNER_WRITE);
+      Files.setPosixFilePermissions(tempPkFile.toPath(), perms);
+
+      //Files.write(tempPkFile.toPath(), sshPrivateKey.replaceAll("\r\n","\n").getBytes());
+      procArgs.add("--private-key" + "=" + tempPkFile.toPath());
+
+      if(sshUseAgent){
+      registerKeySshAgent(tempPkFile.getAbsolutePath());
+      }
     }
 
     if (sshUser != null && sshUser.length() > 0) {
@@ -489,6 +499,12 @@ public class AnsibleRunner {
 
     if (debug) {
         System.out.println(" procArgs: " +  procArgs);
+    }
+
+    if(encryptVarsFiles){
+      tempVaultFile = File.createTempFile("ansible-runner", "vault");
+      Files.write(tempVaultFile.toPath(), generatedVaultPassword.getBytes());
+      procArgs.add("--vault-password-file" + "=" + tempVaultFile.getAbsolutePath());
     }
 
     // execute the ansible process
@@ -711,6 +727,64 @@ public class AnsibleRunner {
     }
 
     return true;
+  }
+
+
+  public File createTemporaryFile(String suffix, String data, boolean encrypt) throws IOException {
+    File tempVarsFile = File.createTempFile("ansible-runner", "extra-vars");
+    Files.write(tempVarsFile.toPath(), data.getBytes());
+
+    if(encrypt){
+        encryptFileAnsibleVault(tempVarsFile);
+    }
+
+    return tempVarsFile;
+
+  }
+
+  public void encryptFileAnsibleVault(File file) throws IOException {
+
+    List<String> procArgs = new ArrayList<>();
+    procArgs.add("ansible-vault");
+    procArgs.add("encrypt");
+    procArgs.add(file.getAbsolutePath());
+
+    // execute the ssh-agent add process
+    ProcessBuilder processBuilder = new ProcessBuilder()
+            .command(procArgs)
+            .directory(baseDirectory.toFile());
+    Process proc = null;
+
+    try {
+      proc = processBuilder.start();
+
+      OutputStream stdin = proc.getOutputStream();
+      OutputStreamWriter stdinw = new OutputStreamWriter(stdin);
+
+      try {
+        stdinw.write(generatedVaultPassword + "\n");
+        stdinw.write(generatedVaultPassword + "\n");
+        stdinw.flush();
+      } catch (Exception e) {
+        System.err.println("error encryptFileAnsibleVault file " + e.getMessage());
+      }
+
+      int exitCode = proc.waitFor();
+
+      if (exitCode != 0) {
+        throw new AnsibleException("ERROR: encryptFileAnsibleVault:" + procArgs.toString(),
+                AnsibleException.AnsibleFailureReason.AnsibleNonZero);
+      }
+
+
+    } catch (Exception e) {
+      System.err.println("error encryptFileAnsibleVault file " + e.getMessage());
+    }finally {
+        // Make sure to always cleanup on failure and success
+        if(proc!=null) {
+            proc.destroy();
+        }
+    }
   }
 
 }
