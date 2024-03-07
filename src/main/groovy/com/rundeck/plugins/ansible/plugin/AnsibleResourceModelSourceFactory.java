@@ -72,7 +72,7 @@ public class AnsibleResourceModelSourceFactory implements ResourceModelSourceFac
         builder.mapping(ANSIBLE_VAULT_PATH,PROJ_PROP_PREFIX + ANSIBLE_VAULT_PATH);
         builder.frameworkMapping(ANSIBLE_VAULT_PATH,FWK_PROP_PREFIX + ANSIBLE_VAULT_PATH);
 
-        builder.property(CONFIG_ENCRYPT_TEMP_FILES);
+        builder.property(CONFIG_ENCRYPT_EXTRA_VARS);
 
         DESC=builder.build();
     }

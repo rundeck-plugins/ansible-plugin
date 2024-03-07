@@ -94,7 +94,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
 
   protected String becamePasswordStoragePath;
 
-  protected boolean encryptTempFiles = false;
+  protected boolean encryptExtraVars = false;
 
 
   public AnsibleResourceModelSource(final Framework framework) {
@@ -194,22 +194,22 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
 
     becamePasswordStoragePath = (String) resolveProperty(AnsibleDescribable.ANSIBLE_BECOME_PASSWORD_STORAGE_PATH,null,configuration,executionDataContext);
 
-    encryptTempFiles = "true".equals(resolveProperty(AnsibleDescribable.ENCRYPT_TEMP_FILES,"false",configuration,executionDataContext));
+    encryptExtraVars = "true".equals(resolveProperty(AnsibleDescribable.ANSIBLE_ENCRYPT_EXTRA_VARS,"false",configuration,executionDataContext));
 
   }
 
-  public AnsibleRunner buildAnsibleRunner() throws ResourceModelSourceException{
+  public AnsibleRunner.AnsibleRunnerBuilder buildAnsibleRunner() throws ResourceModelSourceException{
 
-    AnsibleRunner runner = AnsibleRunner.playbookPath("gather-hosts.yml");
+    AnsibleRunner.AnsibleRunnerBuilder runnerBuilder = AnsibleRunner.playbookPath("gather-hosts.yml");
 
     if ("true".equals(System.getProperty("ansible.debug"))) {
-      runner.debug();
+      runnerBuilder.debug(true);
     }
 
     if (limit != null && limit.length() > 0) {
       List<String> limitList = new ArrayList<>();
       limitList.add(limit);
-      runner.limit(limitList);
+      runnerBuilder.limits(limitList);
     }
 
     StorageTree storageTree = services.getService(KeyStorageTree.class);
@@ -223,25 +223,25 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
         } catch (IOException e) {
           throw new ResourceModelSourceException("Could not read privatekey file " + sshPrivateKeyFile,e);
         }
-        runner = runner.sshPrivateKey(sshPrivateKey);
+        runnerBuilder.sshPrivateKey(sshPrivateKey);
       }
 
       if(sshPrivateKeyPath !=null && !sshPrivateKeyPath.isEmpty()){
         try {
           String sshPrivateKey = getStorageContentString(sshPrivateKeyPath, storageTree);
-          runner = runner.sshPrivateKey(sshPrivateKey);
+          runnerBuilder.sshPrivateKey(sshPrivateKey);
         } catch (ConfigurationException e) {
           throw new ResourceModelSourceException("Could not read private key from storage path " + sshPrivateKeyPath,e);
         }
       }
 
       if(sshAgent != null && sshAgent.equalsIgnoreCase("true")) {
-        runner = runner.sshUseAgent(Boolean.TRUE);
+        runnerBuilder.sshUseAgent(Boolean.TRUE);
 
         if(sshPassphraseStoragePath != null && !sshPassphraseStoragePath.isEmpty()) {
           try {
             String sshPassphrase = getStorageContentString(sshPassphraseStoragePath, storageTree);
-            runner = runner.sshPassphrase(sshPassphrase);
+            runnerBuilder.sshPassphrase(sshPassphrase);
           } catch (ConfigurationException e) {
             throw new ResourceModelSourceException("Could not read passphrase from storage path " + sshPassphraseStoragePath,e);
           }
@@ -250,13 +250,13 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
 
     } else if ( sshAuthType.equalsIgnoreCase(AuthenticationType.password.name()) ) {
       if (sshPassword != null) {
-        runner = runner.sshUsePassword(Boolean.TRUE).sshPass(sshPassword);
+        runnerBuilder.sshUsePassword(Boolean.TRUE).sshPass(sshPassword);
       }
 
       if(sshPasswordPath !=null && !sshPasswordPath.isEmpty()){
         try {
           sshPassword = getStorageContentString(sshPasswordPath, storageTree);
-          runner = runner.sshUsePassword(Boolean.TRUE).sshPass(sshPassword);
+          runnerBuilder.sshUsePassword(Boolean.TRUE).sshPass(sshPassword);
         } catch (ConfigurationException e) {
           throw new ResourceModelSourceException("Could not read password from storage path " + sshPasswordPath,e);
         }
@@ -264,51 +264,51 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     }
 
     if (inventory != null) {
-      runner = runner.setInventory(inventory);
+      runnerBuilder.inventory(inventory);
     }
 
     if (ignoreErrors == true) {
-      runner = runner.ignoreErrors(ignoreErrors);
+      runnerBuilder.ignoreErrors(ignoreErrors);
     }
 
     if (sshUser != null) {
-      runner = runner.sshUser(sshUser);
+      runnerBuilder.sshUser(sshUser);
     }
     if (sshTimeout != null) {
-      runner = runner.sshTimeout(sshTimeout);
+      runnerBuilder.sshTimeout(sshTimeout);
     }
 
     if (become != null) {
-      runner = runner.become(become);
+      runnerBuilder.become(become);
     }
 
     if (becomeUser != null) {
-      runner = runner.becomeUser(becomeUser);
+      runnerBuilder.becomeUser(becomeUser);
     }
 
     if (becomeMethod != null) {
-      runner = runner.becomeMethod(becomeMethod);
+      runnerBuilder.becomeMethod(becomeMethod);
     }
 
     if (becomePassword != null) {
-      runner = runner.becomePassword(becomePassword);
+      runnerBuilder.becomePassword(becomePassword);
     }
 
     if(becamePasswordStoragePath != null && !becamePasswordStoragePath.isEmpty()){
       try {
         becomePassword = getStorageContentString(becamePasswordStoragePath, storageTree);
-        runner = runner.becomePassword(becomePassword);
+        runnerBuilder.becomePassword(becomePassword);
       } catch (Exception e) {
         throw new ResourceModelSourceException("Could not read becomePassword from storage path " + becamePasswordStoragePath,e);
       }
     }
 
     if (configFile != null) {
-      runner = runner.configFile(configFile);
+      runnerBuilder.configFile(configFile);
     }
 
     if(vaultPassword!=null) {
-      runner.vaultPass(vaultPassword);
+      runnerBuilder.vaultPass(vaultPassword);
     }
 
     if(vaultPasswordPath!=null && !vaultPasswordPath.isEmpty()){
@@ -317,7 +317,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
       } catch (Exception e) {
         throw new ResourceModelSourceException("Could not read vaultPassword " + vaultPasswordPath,e);
       }
-      runner = runner.vaultPass(vaultPassword);
+      runnerBuilder.vaultPass(vaultPassword);
     }
 
     if (vaultFile != null) {
@@ -327,23 +327,23 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
       } catch (IOException e) {
         throw new ResourceModelSourceException("Could not read vault file " + vaultFile,e);
       }
-      runner.vaultPass(vaultPassword);
+      runnerBuilder.vaultPass(vaultPassword);
     }
     if (baseDirectoryPath != null) {
-        runner.baseDirectory(baseDirectoryPath);
+        runnerBuilder.baseDirectory(java.nio.file.Path.of(baseDirectoryPath));
     }
 
     if (ansibleBinariesDirectoryPath != null) {
-      runner.ansibleBinariesDirectory(ansibleBinariesDirectoryPath);
+      runnerBuilder.ansibleBinariesDirectory(java.nio.file.Path.of(ansibleBinariesDirectoryPath));
     }
 
     if (extraParameters != null){
-      runner.extraParams(extraParameters);
+      runnerBuilder.extraParams(extraParameters);
     }
 
-    runner.encryptTemporaryFiles(encryptTempFiles);
+    runnerBuilder.encryptExtraVars(encryptExtraVars);
 
-    return runner;
+    return runnerBuilder;
   }
 
 
@@ -366,9 +366,10 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
         throw new ResourceModelSourceException("Error copying files.");
     }
 
-    AnsibleRunner runner = buildAnsibleRunner();
+    AnsibleRunner.AnsibleRunnerBuilder runnerBuilder = buildAnsibleRunner();
 
-    runner.tempDirectory(tempDirectory).retainTempDirectory();
+    runnerBuilder.tempDirectory(tempDirectory);
+    runnerBuilder.retainTempDirectory(true);
 
     StringBuilder args = new StringBuilder();
     args.append("facts: ")
@@ -378,12 +379,12 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
         .append(tempDirectory.toFile().getAbsolutePath())
         .append("'");
 
-    runner.extraVars(args.toString());
+    runnerBuilder.extraVars(args.toString());
+
+    AnsibleRunner runner = runnerBuilder.build();
 
     try {
         runner.run();
-    } catch (AnsibleException e) {
-        throw new ResourceModelSourceException(e.getMessage(), e);
     } catch (Exception e) {
         throw new ResourceModelSourceException(e.getMessage(),e);
     }

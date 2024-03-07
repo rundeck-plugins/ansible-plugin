@@ -5,9 +5,12 @@ import com.dtolabs.rundeck.core.execution.proxy.DefaultSecretBundle;
 import com.dtolabs.rundeck.core.execution.proxy.SecretBundle;
 import com.dtolabs.rundeck.core.plugins.configuration.Property;
 import com.rundeck.plugins.ansible.ansible.AnsibleDescribable;
-import com.rundeck.plugins.ansible.ansible.AnsibleRunnerBuilder;
+import com.rundeck.plugins.ansible.ansible.AnsibleRunnerContextBuilder;
 import com.rundeck.plugins.ansible.plugin.AnsibleNodeExecutor;
 
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -16,7 +19,7 @@ import java.util.stream.Collectors;
 
 public class AnsibleUtil {
 
-    public static SecretBundle createBundle(AnsibleRunnerBuilder builder){
+    public static SecretBundle createBundle(AnsibleRunnerContextBuilder builder){
 
         DefaultSecretBundle secretBundle = new DefaultSecretBundle();
 
@@ -49,7 +52,7 @@ public class AnsibleUtil {
         }
     }
 
-    public static List<String> getSecretsPath(AnsibleRunnerBuilder builder){
+    public static List<String> getSecretsPath(AnsibleRunnerContextBuilder builder){
         List<String> secretPaths = new ArrayList<>();
         if(builder.getPasswordStoragePath()!=null){
             secretPaths.add(
@@ -102,5 +105,14 @@ public class AnsibleUtil {
         });
         return filterProperties;
     }
+
+
+
+    public static File createTemporaryFile(String suffix, String data) throws IOException {
+        File tempVarsFile = File.createTempFile("ansible-runner", suffix);
+        Files.write(tempVarsFile.toPath(), data.getBytes());
+        return tempVarsFile;
+    }
+
 
 }

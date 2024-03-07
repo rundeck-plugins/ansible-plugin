@@ -5,7 +5,7 @@ import com.dtolabs.rundeck.core.execution.proxy.ProxyRunnerPlugin;
 import com.rundeck.plugins.ansible.ansible.AnsibleDescribable;
 import com.rundeck.plugins.ansible.ansible.AnsibleException;
 import com.rundeck.plugins.ansible.ansible.AnsibleRunner;
-import com.rundeck.plugins.ansible.ansible.AnsibleRunnerBuilder;
+import com.rundeck.plugins.ansible.ansible.AnsibleRunnerContextBuilder;
 import com.dtolabs.rundeck.core.common.INodeEntry;
 import com.dtolabs.rundeck.core.execution.workflow.steps.node.NodeStepException;
 import com.dtolabs.rundeck.core.plugins.Plugin;
@@ -19,8 +19,6 @@ import com.rundeck.plugins.ansible.util.AnsibleUtil;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
-import java.util.stream.Collectors;
 
 @Plugin(name = AnsiblePlaybookWorflowNodeStep.SERVICE_PROVIDER_NAME, service = ServiceNameConstants.WorkflowNodeStep)
 public class AnsiblePlaybookWorflowNodeStep implements NodeStepPlugin, AnsibleDescribable, ProxyRunnerPlugin {
@@ -39,6 +37,7 @@ public class AnsiblePlaybookWorflowNodeStep implements NodeStepPlugin, AnsibleDe
         builder.property(BASE_DIR_PROP);
         builder.property(PLAYBOOK_PATH_PROP);
         builder.property(EXTRA_VARS_PROP);
+        builder.property(CONFIG_ENCRYPT_EXTRA_VARS);
         builder.property(VAULT_KEY_FILE_PROP);
         builder.property(VAULT_KEY_STORAGE_PROP);
         builder.property(EXTRA_ATTRS_PROP);
@@ -55,7 +54,6 @@ public class AnsiblePlaybookWorflowNodeStep implements NodeStepPlugin, AnsibleDe
         builder.property(BECOME_AUTH_TYPE_PROP);
         builder.property(BECOME_USER_PROP);
         builder.property(BECOME_PASSWORD_STORAGE_PROP);
-        builder.property(CONFIG_ENCRYPT_TEMP_FILES);
 
         DESC=builder.build();
     }
@@ -80,11 +78,11 @@ public class AnsiblePlaybookWorflowNodeStep implements NodeStepPlugin, AnsibleDe
             configuration.put(AnsibleDescribable.ANSIBLE_DEBUG,"False");
         }
 
-        AnsibleRunnerBuilder
-                builder = new AnsibleRunnerBuilder(context.getExecutionContext(), context.getFramework(), context.getNodes(), configuration);
+        AnsibleRunnerContextBuilder
+                contextBuilder = new AnsibleRunnerContextBuilder(context.getExecutionContext(), context.getFramework(), context.getNodes(), configuration);
 
         try {
-            runner = builder.buildAnsibleRunner();
+            runner = AnsibleRunner.buildAnsibleRunner(contextBuilder);
         } catch (ConfigurationException e) {
             throw new NodeStepException("Error configuring Ansible runner: "+e.getMessage(), AnsibleException.AnsibleFailureReason.ParseArgumentsError,e.getMessage());
         }
@@ -98,12 +96,12 @@ public class AnsiblePlaybookWorflowNodeStep implements NodeStepPlugin, AnsibleDe
             throw new NodeStepException(e.getMessage(),AnsibleException.AnsibleFailureReason.AnsibleError,e.getMessage());
         }
 
-        builder.cleanupTempFiles();
+        contextBuilder.cleanupTempFiles();
     }
 
     @Override
     public List<String> listSecretsPathWorkflowNodeStep(ExecutionContext context, INodeEntry node, Map<String, Object> configuration) {
-        AnsibleRunnerBuilder builder = new AnsibleRunnerBuilder(node, context, context.getFramework(), configuration);
+        AnsibleRunnerContextBuilder builder = new AnsibleRunnerContextBuilder(node, context, context.getFramework(), configuration);
         return AnsibleUtil.getSecretsPath(builder);
     }
 

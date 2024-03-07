@@ -5,7 +5,7 @@ import com.dtolabs.rundeck.core.execution.proxy.ProxyRunnerPlugin;
 import com.rundeck.plugins.ansible.ansible.AnsibleDescribable;
 import com.rundeck.plugins.ansible.ansible.AnsibleException;
 import com.rundeck.plugins.ansible.ansible.AnsibleRunner;
-import com.rundeck.plugins.ansible.ansible.AnsibleRunnerBuilder;
+import com.rundeck.plugins.ansible.ansible.AnsibleRunnerContextBuilder;
 import com.dtolabs.rundeck.core.execution.workflow.steps.StepException;
 import com.dtolabs.rundeck.core.plugins.Plugin;
 import com.dtolabs.rundeck.core.plugins.configuration.ConfigurationException;
@@ -19,7 +19,6 @@ import com.rundeck.plugins.ansible.util.AnsibleUtil;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @Plugin(name = AnsiblePlaybookWorkflowStep.SERVICE_PROVIDER_NAME, service = ServiceNameConstants.WorkflowStep)
 public class AnsiblePlaybookWorkflowStep implements StepPlugin, AnsibleDescribable, ProxyRunnerPlugin {
@@ -38,6 +37,7 @@ public class AnsiblePlaybookWorkflowStep implements StepPlugin, AnsibleDescribab
         builder.property(BASE_DIR_PROP);
         builder.property(PLAYBOOK_PATH_PROP);
         builder.property(EXTRA_VARS_PROP);
+        builder.property(CONFIG_ENCRYPT_EXTRA_VARS);
         builder.property(INVENTORY_INLINE_PROP);
         builder.property(VAULT_KEY_FILE_PROP);
         builder.property(VAULT_KEY_STORAGE_PROP);
@@ -56,7 +56,6 @@ public class AnsiblePlaybookWorkflowStep implements StepPlugin, AnsibleDescribab
         builder.property(BECOME_USER_PROP);
         builder.property(BECOME_PASSWORD_STORAGE_PROP);
         builder.property(DISABLE_LIMIT_PROP);
-        builder.property(CONFIG_ENCRYPT_TEMP_FILES);
 
         DESC = builder.build();
     }
@@ -83,10 +82,10 @@ public class AnsiblePlaybookWorkflowStep implements StepPlugin, AnsibleDescribab
             configuration.put(AnsibleDescribable.ANSIBLE_DEBUG, "False");
         }
 
-        AnsibleRunnerBuilder builder = new AnsibleRunnerBuilder(context.getExecutionContext(), context.getFramework(), context.getNodes(), configuration);
+        AnsibleRunnerContextBuilder contextBuilder = new AnsibleRunnerContextBuilder(context.getExecutionContext(), context.getFramework(), context.getNodes(), configuration);
 
         try {
-            runner = builder.buildAnsibleRunner();
+            runner = AnsibleRunner.buildAnsibleRunner(contextBuilder);
         } catch (ConfigurationException e) {
             throw new StepException("Error configuring Ansible runner: " + e.getMessage(), e, AnsibleException.AnsibleFailureReason.ParseArgumentsError);
         }
@@ -97,18 +96,18 @@ public class AnsiblePlaybookWorkflowStep implements StepPlugin, AnsibleDescribab
         } catch (AnsibleException e) {
             Map<String, Object> failureData = new HashMap<>();
             failureData.put("message", e.getMessage());
-            failureData.put("ansible-config", builder.getConfigFile());
+            failureData.put("ansible-config", contextBuilder.getConfigFile());
 
             throw new StepException(e.getMessage(), e, e.getFailureReason(), failureData);
         } catch (Exception e) {
             Map<String, Object> failureData = new HashMap<>();
             failureData.put("message", e.getMessage());
-            failureData.put("ansible-config", builder.getConfigFile());
+            failureData.put("ansible-config", contextBuilder.getConfigFile());
 
             throw new StepException(e.getMessage(), e, AnsibleException.AnsibleFailureReason.AnsibleError, failureData);
         }
 
-        builder.cleanupTempFiles();
+        contextBuilder.cleanupTempFiles();
     }
 
     @Override
@@ -118,7 +117,7 @@ public class AnsiblePlaybookWorkflowStep implements StepPlugin, AnsibleDescribab
 
     @Override
     public List<String> listSecretsPathWorkflowStep(ExecutionContext context, Map<String, Object> configuration) {
-        AnsibleRunnerBuilder builder = new AnsibleRunnerBuilder(context, context.getFramework(), context.getNodes(), configuration);
+        AnsibleRunnerContextBuilder builder = new AnsibleRunnerContextBuilder(context, context.getFramework(), context.getNodes(), configuration);
         return AnsibleUtil.getSecretsPath(builder);
     }
     @Override

@@ -1,14 +1,15 @@
 package com.rundeck.plugins.ansible.plugin;
 
+import com.dtolabs.rundeck.core.execution.impl.common.DefaultFileCopierUtil;
+import com.dtolabs.rundeck.core.execution.impl.common.FileCopierUtil;
 import com.dtolabs.rundeck.core.execution.proxy.ProxyRunnerPlugin;
 import com.rundeck.plugins.ansible.ansible.AnsibleDescribable;
 import com.rundeck.plugins.ansible.ansible.AnsibleException.AnsibleFailureReason;
 import com.rundeck.plugins.ansible.ansible.AnsibleRunner;
-import com.rundeck.plugins.ansible.ansible.AnsibleRunnerBuilder;
+import com.rundeck.plugins.ansible.ansible.AnsibleRunnerContextBuilder;
 import com.dtolabs.rundeck.core.common.INodeEntry;
 import com.dtolabs.rundeck.core.common.IRundeckProject;
 import com.dtolabs.rundeck.core.execution.ExecutionContext;
-import com.dtolabs.rundeck.core.execution.impl.jsch.JschScpFileCopier;
 import com.dtolabs.rundeck.core.execution.service.FileCopier;
 import com.dtolabs.rundeck.core.execution.service.FileCopierException;
 import com.dtolabs.rundeck.core.plugins.Plugin;
@@ -30,7 +31,7 @@ public class AnsibleFileCopier implements FileCopier, AnsibleDescribable, ProxyR
   public static final String SERVICE_PROVIDER_NAME = "com.batix.rundeck.plugins.AnsibleFileCopier";
 
   public static Description DESC = null;
-
+    private static FileCopierUtil util = new DefaultFileCopierUtil();
   static {
         DescriptionBuilder builder = DescriptionBuilder.builder();
         builder.name(SERVICE_PROVIDER_NAME);
@@ -54,7 +55,6 @@ public class AnsibleFileCopier implements FileCopier, AnsibleDescribable, ProxyR
         builder.property(BECOME_PASSWORD_STORAGE_PROP);
         builder.property(VAULT_KEY_FILE_PROP);
         builder.property(VAULT_KEY_STORAGE_PROP);
-        builder.property(CONFIG_ENCRYPT_TEMP_FILES);
 
         builder.mapping(ANSIBLE_CONFIG_FILE_PATH,PROJ_PROP_PREFIX + ANSIBLE_CONFIG_FILE_PATH);
         builder.frameworkMapping(ANSIBLE_CONFIG_FILE_PATH,FWK_PROP_PREFIX + ANSIBLE_CONFIG_FILE_PATH);
@@ -68,8 +68,6 @@ public class AnsibleFileCopier implements FileCopier, AnsibleDescribable, ProxyR
         builder.frameworkMapping(ANSIBLE_SSH_PASSPHRASE_OPTION,FWK_PROP_PREFIX + ANSIBLE_SSH_PASSPHRASE_OPTION);
         builder.mapping(ANSIBLE_SSH_USE_AGENT,PROJ_PROP_PREFIX + ANSIBLE_SSH_USE_AGENT);
         builder.frameworkMapping(ANSIBLE_SSH_USE_AGENT,FWK_PROP_PREFIX + ANSIBLE_SSH_USE_AGENT);
-        builder.mapping(ENCRYPT_TEMP_FILES,PROJ_PROP_PREFIX + ENCRYPT_TEMP_FILES);
-        builder.frameworkMapping(ENCRYPT_TEMP_FILES,FWK_PROP_PREFIX + ENCRYPT_TEMP_FILES);
 
         DESC=builder.build();
   }
@@ -115,7 +113,7 @@ public class AnsibleFileCopier implements FileCopier, AnsibleDescribable, ProxyR
       String identity = (context.getDataContext() != null && context.getDataContext().get("job") != null) ?
                         context.getDataContext().get("job").get("execid") : null;
 
-      destinationPath = JschScpFileCopier.generateRemoteFilepathForNode(
+      destinationPath = util.generateRemoteFilepathForNode(
         node,
         project,
         context.getFramework(),
@@ -126,7 +124,7 @@ public class AnsibleFileCopier implements FileCopier, AnsibleDescribable, ProxyR
     }
 
     File localTempFile = scriptFile != null ?
-      scriptFile : JschScpFileCopier.writeTempFile(context, null, input, script);
+      scriptFile : util.writeTempFile(context, null, input, script);
 
     String cmdArgs = "src='" + localTempFile.getAbsolutePath() + "' dest='" + destinationPath + "'";
 
@@ -147,11 +145,10 @@ public class AnsibleFileCopier implements FileCopier, AnsibleDescribable, ProxyR
       jobConf.put(AnsibleDescribable.ANSIBLE_DEBUG,"False");
     }
 
-    AnsibleRunnerBuilder builder = new AnsibleRunnerBuilder(node, context, context.getFramework(), jobConf);
-
+    AnsibleRunnerContextBuilder contextBuilder = new AnsibleRunnerContextBuilder(node, context, context.getFramework(), jobConf);
 
     try {
-        runner = builder.buildAnsibleRunner();
+        runner = AnsibleRunner.buildAnsibleRunner(contextBuilder);
     } catch (ConfigurationException e) {
           throw new FileCopierException("Error configuring Ansible.",AnsibleFailureReason.ParseArgumentsError, e);
     }
@@ -162,7 +159,7 @@ public class AnsibleFileCopier implements FileCopier, AnsibleDescribable, ProxyR
           throw new FileCopierException("Error running Ansible.", AnsibleFailureReason.AnsibleError, e);
     }
 
-    builder.cleanupTempFiles();
+    contextBuilder.cleanupTempFiles();
 
     return destinationPath;
   }
@@ -176,7 +173,7 @@ public class AnsibleFileCopier implements FileCopier, AnsibleDescribable, ProxyR
     public List<String> listSecretsPath(ExecutionContext context, INodeEntry node) {
         Map<String, Object> jobConf = new HashMap<>();
         jobConf.put(AnsibleDescribable.ANSIBLE_LIMIT,node.getNodename());
-        AnsibleRunnerBuilder builder = new AnsibleRunnerBuilder(node, context, context.getFramework(), jobConf);
+        AnsibleRunnerContextBuilder builder = new AnsibleRunnerContextBuilder(node, context, context.getFramework(), jobConf);
 
         return AnsibleUtil.getSecretsPath(builder);
     }
