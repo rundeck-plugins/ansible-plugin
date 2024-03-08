@@ -262,7 +262,7 @@ public class AnsibleRunner {
     private Path ansibleBinariesDirectory;
     private boolean usingTempDirectory;
     private boolean retainTempDirectory;
-    private List<String> limits = new ArrayList<>();
+    private List<String> limits;
     private int result;
     @Builder.Default
     private Map<String, String> options = new HashMap<>();
@@ -338,6 +338,8 @@ public class AnsibleRunner {
         File tempFile = null;
         File tempPkFile = null;
         File tempVarsFile = null;
+        File tempInternalVaultFile = null;
+        File tempVaultFile = null;
 
         List<String> procArgs = new ArrayList<>();
 
@@ -370,8 +372,9 @@ public class AnsibleRunner {
         if (encryptExtraVars) {
             UUID uuid = UUID.randomUUID();
             generatedVaultPassword = uuid.toString();
+            tempInternalVaultFile = AnsibleUtil.createTemporaryFile("interal-vault", generatedVaultPassword);
             procArgs.add("--vault-id");
-            procArgs.add("interval-encypt@prompt");
+            procArgs.add("interval-encypt@" + tempInternalVaultFile.getAbsolutePath());
         }
 
         if (inventory != null && !inventory.isEmpty()) {
@@ -401,21 +404,18 @@ public class AnsibleRunner {
             String addeExtraVars = extraVars;
 
             if (encryptExtraVars) {
-                addeExtraVars = encryptExtraVarsKey(extraVars);
+                addeExtraVars = encryptExtraVarsKey(extraVars, tempInternalVaultFile);
             }
-
-            System.out.println(addeExtraVars);
 
             tempVarsFile = AnsibleUtil.createTemporaryFile("extra-vars", addeExtraVars);
             procArgs.add("--extra-vars" + "=" + "@" + tempVarsFile.getAbsolutePath());
         }
 
         if (vaultPass != null && !vaultPass.isEmpty()) {
-            //tempVaultFile = File.createTempFile("ansible-runner", "vault");
-            //Files.write(tempVaultFile.toPath(), vaultPass.getBytes());
             //procArgs.add("--vault-password-file" + "=" + tempVaultFile.getAbsolutePath());
+            tempVaultFile = AnsibleUtil.createTemporaryFile("vault", vaultPass);
             procArgs.add("--vault-id");
-            procArgs.add("prompt");
+            procArgs.add(tempVaultFile.getAbsolutePath());
         }
 
         if (sshPrivateKey != null && !sshPrivateKey.isEmpty()) {
@@ -685,18 +685,16 @@ public class AnsibleRunner {
         return true;
     }
 
-    protected String encryptVariable(String content) throws IOException {
+    protected String encryptVariable(String content, File vaultPassword) throws IOException {
 
         List<String> procArgs = new ArrayList<>();
         procArgs.add("ansible-vault");
         procArgs.add("encrypt_string");
         procArgs.add("--vault-id");
-        procArgs.add("interval-encypt@prompt");
+        procArgs.add("interval-encypt@" + vaultPassword.getAbsolutePath());
 
         //send values to STDIN in order
         List<String> stdinVariables = new ArrayList<>();
-        stdinVariables.add(generatedVaultPassword + "\n");
-        stdinVariables.add(generatedVaultPassword + "\n");
         stdinVariables.add(content);
 
         Process proc = null;
@@ -705,7 +703,7 @@ public class AnsibleRunner {
             proc = ProcessExecutor.builder().procArgs(procArgs)
                     .baseDirectory(baseDirectory.toFile())
                     .stdinVariables(stdinVariables)
-                    //.redirectErrorStream(true)
+                    .redirectErrorStream(true)
                     .build().run();
 
             StringBuilder stringBuilder = new StringBuilder();
@@ -744,7 +742,7 @@ public class AnsibleRunner {
     }
 
 
-    public String encryptExtraVarsKey(String extraVars) throws Exception {
+    public String encryptExtraVarsKey(String extraVars, File vaultPasswordFile) throws Exception {
         Map<String, String> extraVarsMap = null;
         Map<String, String> encryptedExtraVarsMap = new HashMap<>();
         try {
@@ -767,7 +765,7 @@ public class AnsibleRunner {
 
         extraVarsMap.forEach((key, value) -> {
             try {
-                String encryptedKey = encryptVariable(value);
+                String encryptedKey = encryptVariable(value, vaultPasswordFile);
                 if (encryptedKey != null) {
                     encryptedExtraVarsMap.put(key, encryptedKey);
                 }
