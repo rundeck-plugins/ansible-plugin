@@ -1,6 +1,7 @@
 package com.rundeck.plugins.ansible.ansible;
 
 import com.dtolabs.rundeck.core.plugins.configuration.ConfigurationException;
+import com.dtolabs.rundeck.core.resources.ResourceModelSourceException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.rundeck.plugins.ansible.util.*;
 import com.dtolabs.rundeck.core.utils.SSHAgentProcess;
@@ -11,13 +12,10 @@ import lombok.Data;
 
 
 import java.io.*;
-import java.nio.file.FileVisitResult;
-import java.nio.file.Files;
+import java.nio.file.*;
 import java.nio.file.attribute.PosixFilePermission;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.*;
 
 @Builder
@@ -340,6 +338,8 @@ public class AnsibleRunner {
         File tempVarsFile = null;
         File tempInternalVaultFile = null;
         File tempVaultFile = null;
+        File tempSshVarsFile = null;
+
 
         List<String> procArgs = new ArrayList<>();
 
@@ -372,7 +372,18 @@ public class AnsibleRunner {
         if (encryptExtraVars) {
             UUID uuid = UUID.randomUUID();
             generatedVaultPassword = uuid.toString();
-            tempInternalVaultFile = AnsibleUtil.createTemporaryFile("interal-vault", generatedVaultPassword);
+            tempInternalVaultFile = File.createTempFile("ansible-runner", "-client.py");
+
+            try {
+                Files.copy(this.getClass().getClassLoader().getResourceAsStream("vault-client.py"), tempInternalVaultFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            } catch (IOException e) {
+                System.err.println("error copying vault-client.py " + e.getMessage());
+            }
+
+            Set<PosixFilePermission> perms = PosixFilePermissions.fromString("rwxr-xr-x");
+            Files.setPosixFilePermissions(tempInternalVaultFile.toPath(), perms);
+
+
             procArgs.add("--vault-id");
             procArgs.add("interval-encypt@" + tempInternalVaultFile.getAbsolutePath());
         }
@@ -439,7 +450,16 @@ public class AnsibleRunner {
         }
 
         if (sshUsePassword) {
-            procArgs.add("--ask-pass");
+            String extraVarsPassword = "ansible_ssh_password: " + sshPass;
+            String finalextraVarsPassword = extraVarsPassword;
+            if (encryptExtraVars) {
+                finalextraVarsPassword = encryptExtraVarsKey(extraVarsPassword, tempInternalVaultFile);
+            }
+
+            tempSshVarsFile = AnsibleUtil.createTemporaryFile("ssh-extra-vars", finalextraVarsPassword);
+            procArgs.add("--extra-vars" + "=" + "@" + tempSshVarsFile.getAbsolutePath());
+
+            //procArgs.add("--ask-pass");
         }
 
         if (sshTimeout != null && sshTimeout > 0) {
@@ -501,6 +521,10 @@ public class AnsibleRunner {
             processEnvironment.put("SSH_AUTH_SOCK", this.sshAgent.getSocketPath());
         }
 
+        if (encryptExtraVars) {
+            processEnvironment.put("VAULT_ID_SECRET", generatedVaultPassword);
+        }
+
         processExecutorBuilder.environmentVariables(processEnvironment);
 
         //set STDIN variables
@@ -515,10 +539,6 @@ public class AnsibleRunner {
             if (becomePassword != null && !becomePassword.isEmpty()) {
                 stdinVariables.add(becomePassword + "\n");
             }
-        }
-
-        if (encryptExtraVars) {
-            stdinVariables.add(generatedVaultPassword + "\n");
         }
 
         if (vaultPass != null && !vaultPass.isEmpty()) {
@@ -587,6 +607,9 @@ public class AnsibleRunner {
             }
             if (tempPlaybook != null && !tempPlaybook.delete()) {
                 tempPlaybook.deleteOnExit();
+            }
+            if (tempSshVarsFile != null && !tempSshVarsFile.delete()){
+                tempSshVarsFile.deleteOnExit();
             }
 
             if (usingTempDirectory && !retainTempDirectory) {
@@ -697,6 +720,9 @@ public class AnsibleRunner {
         List<String> stdinVariables = new ArrayList<>();
         stdinVariables.add(content);
 
+        Map<String, String> env = new HashMap<>();
+        env.put("VAULT_ID_SECRET", generatedVaultPassword);
+
         Process proc = null;
 
         try {
@@ -704,6 +730,7 @@ public class AnsibleRunner {
                     .baseDirectory(baseDirectory.toFile())
                     .stdinVariables(stdinVariables)
                     .redirectErrorStream(true)
+                    .environmentVariables(env)
                     .build().run();
 
             StringBuilder stringBuilder = new StringBuilder();
