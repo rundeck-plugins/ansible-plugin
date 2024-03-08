@@ -11,10 +11,11 @@ import com.rundeck.plugins.ansible.plugin.AnsibleNodeExecutor;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.PosixFilePermissions;
+import java.security.SecureRandom;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public class AnsibleUtil {
@@ -107,11 +108,35 @@ public class AnsibleUtil {
     }
 
 
-
     public static File createTemporaryFile(String suffix, String data) throws IOException {
         File tempVarsFile = File.createTempFile("ansible-runner", suffix);
         Files.write(tempVarsFile.toPath(), data.getBytes());
         return tempVarsFile;
+    }
+
+
+    public static String randomString(){
+        byte[] bytes = new byte[32];
+        new SecureRandom().nextBytes(bytes);
+        return Base64.getEncoder().encodeToString(bytes);
+
+    }
+
+    public static File createVaultScriptAuth(String suffix) throws IOException {
+        File tempInternalVaultFile = File.createTempFile("ansible-runner", suffix + "-client.py");
+
+        try {
+            Files.copy(AnsibleUtil.class.getClassLoader().getResourceAsStream("vault-client.py"),
+                       tempInternalVaultFile.toPath(),
+                       StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException e) {
+            throw new IOException("Failed to copy vault-client.py", e);
+        }
+
+        Set<PosixFilePermission> perms = PosixFilePermissions.fromString("rwxr-xr-x");
+        Files.setPosixFilePermissions(tempInternalVaultFile.toPath(), perms);
+
+        return tempInternalVaultFile;
     }
 
 
