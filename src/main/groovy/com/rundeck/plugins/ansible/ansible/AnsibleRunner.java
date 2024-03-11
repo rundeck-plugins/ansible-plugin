@@ -630,6 +630,7 @@ public class AnsibleRunner {
     // execute the ssh-agent add process
     ProcessBuilder processBuilder = new ProcessBuilder()
             .command(procArgs)
+            .redirectErrorStream(true)
             .directory(baseDirectory.toFile());
 
     Process proc = null;
@@ -645,7 +646,8 @@ public class AnsibleRunner {
       List<String> passScript = new ArrayList<>();
       passScript.add("read SECRET");
       passScript.add("echo $SECRET");
-      Files.write(tempPassVarsFile.toPath(), passScript);
+
+      Files.write(tempPassVarsFile.toPath(),passScript);
 
       env.put("DISPLAY", "0");
       env.put("SSH_ASKPASS", tempPassVarsFile.getAbsolutePath());
@@ -668,6 +670,9 @@ public class AnsibleRunner {
         }
       }
 
+      stdinw.close();
+      stdin.close();
+
       Thread errthread = Logging.copyStreamThread(proc.getErrorStream(), ListenerFactory.getListener(System.err));
       Thread outthread = Logging.copyStreamThread(proc.getInputStream(), ListenerFactory.getListener(System.out));
       errthread.start();
@@ -685,9 +690,6 @@ public class AnsibleRunner {
                   AnsibleException.AnsibleFailureReason.AnsibleNonZero);
       }
 
-      if(tempPassVarsFile!=null && tempPassVarsFile.exists()){
-        tempPassVarsFile.delete();
-      }
 
     } catch (IOException  e) {
       throw new AnsibleException("ERROR: error adding private key to ssh-agent." + procArgs.toString(), e, AnsibleException.AnsibleFailureReason.Unknown);
@@ -696,11 +698,15 @@ public class AnsibleRunner {
         proc.destroy();
       }
       Thread.currentThread().interrupt();
-      throw new AnsibleException("ERROR: error adding private key to ssh-agen Interrupted.", e, AnsibleException.AnsibleFailureReason.Interrupted);
+      throw new AnsibleException("ERROR: error adding private key to ssh-agent Interrupted.", e, AnsibleException.AnsibleFailureReason.Interrupted);
     }finally {
       // Make sure to always cleanup on failure and success
       if(proc!=null) {
         proc.destroy();
+      }
+
+      if(tempPassVarsFile!=null && !tempPassVarsFile.delete()){
+        tempPassVarsFile.deleteOnExit();
       }
     }
 
