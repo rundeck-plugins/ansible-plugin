@@ -8,8 +8,7 @@ import com.rundeck.plugins.ansible.ansible.AnsibleDescribable;
 import com.rundeck.plugins.ansible.ansible.AnsibleRunnerContextBuilder;
 import com.rundeck.plugins.ansible.plugin.AnsibleNodeExecutor;
 
-import java.io.File;
-import java.io.IOException;
+import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.PosixFilePermission;
@@ -139,5 +138,29 @@ public class AnsibleUtil {
         return tempInternalVaultFile;
     }
 
+
+    public static boolean checkAnsibleVault() {
+        List<String> procArgs = new ArrayList<>();
+        procArgs.add("ansible-vault");
+        procArgs.add("--version");
+
+        Process proc = null;
+
+        try {
+            proc = ProcessExecutor.builder().procArgs(procArgs)
+                    .redirectErrorStream(true)
+                    .build().run();
+
+            int exitCode = proc.waitFor();
+            return exitCode == 0;
+        } catch (IOException | InterruptedException e) {
+            System.err.println("Failed to check ansible-vault: " + e.getMessage());
+            return false;
+        }finally {
+            if (proc != null) {
+                proc.destroy();
+            }
+        }
+    }
 
 }

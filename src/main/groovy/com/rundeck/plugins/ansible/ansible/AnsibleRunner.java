@@ -274,6 +274,9 @@ public class AnsibleRunner {
     @Builder.Default
     private boolean encryptExtraVars = false;
 
+    @Builder.Default
+    private boolean useAnsibleVault = false;
+
     static ObjectMapper mapperYaml = new ObjectMapper(new YAMLFactory());
     static ObjectMapper mapperJson = new ObjectMapper();
 
@@ -358,18 +361,31 @@ public class AnsibleRunner {
             procArgs.add(tempPlaybook.getAbsolutePath());
         }
 
-        if (encryptExtraVars) {
-            generatedVaultPassword = AnsibleUtil.randomString();
+        // use ansible-vault to encrypt extra-vars
+        // 1) if the encryptExtraVars is enabled (user input)
+        // 2) ssh-password is used for node authentication
+        // 3) become-password is used for node authentication
+        if (encryptExtraVars ||
+            sshUsePassword ||
+            (become && becomePassword != null && !becomePassword.isEmpty())) {
 
-            try{
-                tempInternalVaultFile = AnsibleUtil.createVaultScriptAuth("internal");
-            }catch (IOException e){
-                throw new AnsibleException("ERROR: Ansible vault script file for authentication." + e.getMessage(),
-                        AnsibleException.AnsibleFailureReason.AnsibleNonZero);
+            useAnsibleVault = AnsibleUtil.checkAnsibleVault();
+
+            if(useAnsibleVault) {
+                generatedVaultPassword = AnsibleUtil.randomString();
+
+                try {
+                    tempInternalVaultFile = AnsibleUtil.createVaultScriptAuth("internal");
+                } catch (IOException e) {
+                    throw new AnsibleException("ERROR: Ansible vault script file for authentication." + e.getMessage(),
+                            AnsibleException.AnsibleFailureReason.AnsibleNonZero);
+                }
+
+                procArgs.add("--vault-id");
+                procArgs.add("internal-encrypt@" + tempInternalVaultFile.getAbsolutePath());
+            }else{
+                System.err.println("WARN: ansible-vault is not installed, extra-vars will not be encrypted.");
             }
-
-            procArgs.add("--vault-id");
-            procArgs.add("internal-encrypt@" + tempInternalVaultFile.getAbsolutePath());
         }
 
         if (inventory != null && !inventory.isEmpty()) {
@@ -398,7 +414,7 @@ public class AnsibleRunner {
         if (extraVars != null && !extraVars.isEmpty()) {
             String addeExtraVars = extraVars;
 
-            if (encryptExtraVars) {
+            if (encryptExtraVars && useAnsibleVault) {
                 addeExtraVars = encryptExtraVarsKey(extraVars, tempInternalVaultFile);
             }
 
@@ -442,7 +458,7 @@ public class AnsibleRunner {
             String extraVarsPassword = "ansible_ssh_password: " + sshPass;
             String finalextraVarsPassword = extraVarsPassword;
 
-            if (encryptExtraVars) {
+            if(useAnsibleVault){
                 finalextraVarsPassword = encryptExtraVarsKey(extraVarsPassword, tempInternalVaultFile);
             }
 
@@ -461,7 +477,7 @@ public class AnsibleRunner {
                 String extraVarsPassword = "ansible_become_password: " + becomePassword;
                 String finalextraVarsPassword = extraVarsPassword;
 
-                if (encryptExtraVars) {
+                if (useAnsibleVault) {
                     finalextraVarsPassword = encryptExtraVarsKey(extraVarsPassword, tempInternalVaultFile);
                 }
 
@@ -523,7 +539,7 @@ public class AnsibleRunner {
         //set STDIN variables
         List<String> stdinVariables = new ArrayList<>();
 
-        if (encryptExtraVars) {
+        if (useAnsibleVault) {
             stdinVariables.add(generatedVaultPassword + "\n");
         }
 
@@ -773,6 +789,12 @@ public class AnsibleRunner {
                 System.err.println("error encryptExtraVars  " + e2.getMessage());
                 return null;
             }
+        }
+
+        boolean checkAnsibleVault = AnsibleUtil.checkAnsibleVault();
+        if(!checkAnsibleVault){
+            System.err.println("error encryptExtraVars, ansible-vault is not installed.");
+            return null;
         }
 
         if (extraVarsMap == null || extraVarsMap.isEmpty()) {
