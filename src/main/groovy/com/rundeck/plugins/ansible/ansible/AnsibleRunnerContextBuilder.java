@@ -24,10 +24,7 @@ import java.nio.file.Paths;
 import lombok.Getter;
 import org.rundeck.storage.api.Path;
 
-import java.util.Collection;
-import java.util.Collections;
-import java.util.LinkedList;
-import java.util.Map;
+import java.util.*;
 
 import org.rundeck.storage.api.PathUtil;
 import org.rundeck.storage.api.StorageException;
@@ -819,5 +816,19 @@ public class AnsibleRunnerContextBuilder {
                 getNode(),
                 getJobConf()
         );
+    }
+
+    public Map<String,String> getListOptions(){
+        Map<String, String> options = new HashMap<>();
+        Map<String, String> optionsContext = context.getDataContext().get("option");
+        Map<String, String> secureOptionContext = context.getDataContext().get("secureOption");
+        if (optionsContext != null) {
+            optionsContext.forEach((option, value) -> {
+                if(!secureOptionContext.containsKey(option)){
+                    options.put(option, value);
+                }
+            });
+        }
+        return options;
     }
 }

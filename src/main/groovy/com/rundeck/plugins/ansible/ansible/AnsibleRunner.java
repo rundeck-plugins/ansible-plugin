@@ -1,7 +1,6 @@
 package com.rundeck.plugins.ansible.ansible;
 
 import com.dtolabs.rundeck.core.plugins.configuration.ConfigurationException;
-import com.dtolabs.rundeck.core.resources.ResourceModelSourceException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.rundeck.plugins.ansible.util.*;
 import com.dtolabs.rundeck.core.utils.SSHAgentProcess;
@@ -15,7 +14,6 @@ import java.io.*;
 import java.nio.file.*;
 import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.nio.file.attribute.PosixFilePermissions;
 import java.util.*;
 
 @Builder
@@ -119,10 +117,10 @@ public class AnsibleRunner {
         }
 
         // set rundeck options as environment variables
-//        Map<String,String> options = context.getDataContext().get("option");
-//        if (options != null) {
-//            runner = runner.options(options);
-//        }
+        Map<String,String> options = contextBuilder.getListOptions();
+        if (options != null) {
+            ansibleRunnerBuilder.options(options);
+        }
 
         String inventory = contextBuilder.getInventory();
         if (inventory != null) {
@@ -280,14 +278,6 @@ public class AnsibleRunner {
     static ObjectMapper mapperJson = new ObjectMapper();
 
 
-    /**
-     * Add options passed as Environment variables to ansible
-     */
-//  public AnsibleRunner options(Map<String, String> options) {
-//    this.options.putAll(options);
-//    return this;
-//  }
-
     public void deleteTempDirectory(Path tempDirectory) throws IOException {
         Files.walkFileTree(tempDirectory, new SimpleFileVisitor<Path>() {
             @Override
@@ -412,7 +402,7 @@ public class AnsibleRunner {
                 addeExtraVars = encryptExtraVarsKey(extraVars, tempInternalVaultFile);
             }
 
-            tempVarsFile = AnsibleUtil.createTemporaryFile("extra-vars", addeExtraVars);
+             tempVarsFile = AnsibleUtil.createTemporaryFile("extra-vars", addeExtraVars);
             procArgs.add("--extra-vars" + "=" + "@" + tempVarsFile.getAbsolutePath());
         }
 
@@ -520,9 +510,9 @@ public class AnsibleRunner {
             processEnvironment.put("ANSIBLE_CONFIG", configFile);
         }
 
-//    for (String optionName : this.options.keySet()) {
-//      processEnvironment.put(optionName, this.options.get(optionName));
-//    }
+        for (String optionName : this.options.keySet()) {
+            processEnvironment.put(optionName, this.options.get(optionName));
+        }
 
         if (sshUseAgent && sshAgent != null) {
             processEnvironment.put("SSH_AUTH_SOCK", this.sshAgent.getSocketPath());
