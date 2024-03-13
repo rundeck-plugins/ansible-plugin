@@ -256,4 +256,99 @@ class AnsibleRunnerSpec extends Specification{
 
 
     }
+
+    def "test password authentication with encrypted extra vars "(){
+        given:
+
+        String playbook = "test"
+
+        def runnerBuilder = AnsibleRunner.playbookInline(playbook)
+        runnerBuilder.sshPass("123456")
+        runnerBuilder.sshUser("user")
+        runnerBuilder.sshUsePassword(true)
+
+        def process = Mock(Process){
+            waitFor() >> 0
+            getInputStream()>> new ByteArrayInputStream("".getBytes())
+            getOutputStream() >> new ByteArrayOutputStream()
+            getErrorStream() >> new ByteArrayInputStream("".getBytes())
+        }
+
+        def processExecutor = Mock(ProcessExecutor){
+            run()>>process
+        }
+
+        def processBuilder = Mock(ProcessExecutor.ProcessExecutorBuilder){
+            build() >> processExecutor
+        }
+
+
+        def ansibleVault = Mock(AnsibleVault){
+            checkAnsibleVault() >> true
+            getVaultPasswordScriptFile() >> new File("vault-script-client.py")
+        }
+
+        runnerBuilder.processExecutorBuilder(processBuilder)
+        runnerBuilder.ansibleVault(ansibleVault)
+
+        when:
+        AnsibleRunner runner = runnerBuilder.build()
+        def result = runner.run()
+
+        then:
+        1 * ansibleVault.encryptVariable(_,_) >> "!vault | value"
+        result == 0
+        !runner.getTempPlaybook().exists()
+        !runner.getTempSshVarsFile().exists()
+    }
+
+    def "test password authentication and became user with encrypted extra vars "(){
+        given:
+
+        String playbook = "test"
+
+        def runnerBuilder = AnsibleRunner.playbookInline(playbook)
+        runnerBuilder.sshPass("123456")
+        runnerBuilder.sshUser("user")
+        runnerBuilder.sshUsePassword(true)
+        runnerBuilder.become(true)
+        runnerBuilder.becomeUser("root")
+        runnerBuilder.becomePassword("123")
+        runnerBuilder.becomeMethod("sudo")
+
+        def process = Mock(Process){
+            waitFor() >> 0
+            getInputStream()>> new ByteArrayInputStream("".getBytes())
+            getOutputStream() >> new ByteArrayOutputStream()
+            getErrorStream() >> new ByteArrayInputStream("".getBytes())
+        }
+
+        def processExecutor = Mock(ProcessExecutor){
+            run()>>process
+        }
+
+        def processBuilder = Mock(ProcessExecutor.ProcessExecutorBuilder){
+            build() >> processExecutor
+        }
+
+
+        def ansibleVault = Mock(AnsibleVault){
+            checkAnsibleVault() >> true
+            getVaultPasswordScriptFile() >> new File("vault-script-client.py")
+        }
+
+        runnerBuilder.processExecutorBuilder(processBuilder)
+        runnerBuilder.ansibleVault(ansibleVault)
+
+        when:
+        AnsibleRunner runner = runnerBuilder.build()
+        def result = runner.run()
+
+        then:
+        2 * ansibleVault.encryptVariable(_,_) >> "!vault | value"
+        result == 0
+        !runner.getTempPlaybook().exists()
+        !runner.getTempSshVarsFile().exists()
+        !runner.getTempBecameVarsFile().exists()
+    }
 }

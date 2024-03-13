@@ -289,7 +289,7 @@ public class AnsibleRunner {
     File tempInternalVaultFile;
     File tempVaultFile ;
     File tempSshVarsFile ;
-
+    File tempBecameVarsFile ;
 
     public void deleteTempDirectory(Path tempDirectory) throws IOException {
         Files.walkFileTree(tempDirectory, new SimpleFileVisitor<Path>() {
@@ -483,8 +483,8 @@ public class AnsibleRunner {
                         finalextraVarsPassword = encryptExtraVarsKey(extraVarsPassword, tempInternalVaultFile);
                     }
 
-                    tempSshVarsFile = AnsibleUtil.createTemporaryFile("become-extra-vars", finalextraVarsPassword);
-                    procArgs.add("--extra-vars" + "=" + "@" + tempSshVarsFile.getAbsolutePath());
+                    tempBecameVarsFile = AnsibleUtil.createTemporaryFile("become-extra-vars", finalextraVarsPassword);
+                    procArgs.add("--extra-vars" + "=" + "@" + tempBecameVarsFile.getAbsolutePath());
                 }
             }
 
@@ -616,6 +616,10 @@ public class AnsibleRunner {
             }
             if (tempSshVarsFile != null && !tempSshVarsFile.delete()){
                 tempSshVarsFile.deleteOnExit();
+            }
+
+            if (tempBecameVarsFile != null && !tempBecameVarsFile.delete()){
+                tempBecameVarsFile.deleteOnExit();
             }
 
             if (tempInternalVaultFile != null && !tempInternalVaultFile.delete()){
