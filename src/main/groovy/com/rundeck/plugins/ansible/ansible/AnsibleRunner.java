@@ -269,8 +269,6 @@ public class AnsibleRunner {
 
     private Listener listener;
 
-    private String generatedVaultPassword;
-
     @Builder.Default
     private boolean encryptExtraVars = false;
 
@@ -279,6 +277,18 @@ public class AnsibleRunner {
 
     static ObjectMapper mapperYaml = new ObjectMapper(new YAMLFactory());
     static ObjectMapper mapperJson = new ObjectMapper();
+
+    private ProcessExecutor.ProcessExecutorBuilder processExecutorBuilder;
+    private AnsibleVault ansibleVault;
+
+    //temporary files
+    File tempPlaybook;
+    File tempFile;
+    File tempPkFile;
+    File tempVarsFile;
+    File tempInternalVaultFile;
+    File tempVaultFile ;
+    File tempSshVarsFile ;
 
 
     public void deleteTempDirectory(Path tempDirectory) throws IOException {
@@ -325,231 +335,225 @@ public class AnsibleRunner {
             baseDirectory = Files.createTempDirectory("ansible-rundeck");
         }
 
-        File tempPlaybook = null;
-        File tempFile = null;
-        File tempPkFile = null;
-        File tempVarsFile = null;
-        File tempInternalVaultFile = null;
-        File tempVaultFile = null;
-        File tempSshVarsFile = null;
+        if(ansibleVault==null){
+            tempInternalVaultFile = AnsibleVault.createVaultScriptAuth("ansible-script-vault");
+
+            ansibleVault = AnsibleVault.builder()
+                    .baseDirectory(baseDirectory)
+                    .masterPassword(AnsibleUtil.randomString())
+                    .vaultPasswordScriptFile(tempInternalVaultFile)
+                    .debug(debug).build();
+        }
 
         List<String> procArgs = new ArrayList<>();
+        Process proc = null;
 
-        String ansibleCommand = type.command;
-        if (ansibleBinariesDirectory != null) {
-            ansibleCommand = Paths.get(ansibleBinariesDirectory.toFile().getAbsolutePath(), ansibleCommand).toFile().getAbsolutePath();
-        }
-        procArgs.add(ansibleCommand);
+        try {
 
-        // parse arguments
-        if (type == AnsibleCommand.AdHoc) {
-            procArgs.add("all");
-
-            procArgs.add("-m");
-            procArgs.add(module);
-
-            if (arg != null && !arg.isEmpty()) {
-                procArgs.add("-a");
-                procArgs.add(arg);
+            String ansibleCommand = type.command;
+            if (ansibleBinariesDirectory != null) {
+                ansibleCommand = Paths.get(ansibleBinariesDirectory.toFile().getAbsolutePath(), ansibleCommand).toFile().getAbsolutePath();
             }
-            procArgs.add("-t");
-            procArgs.add(baseDirectory.toFile().getAbsolutePath());
-        } else if (type == AnsibleCommand.PlaybookPath) {
-            procArgs.add(playbook);
-        } else if (type == AnsibleCommand.PlaybookInline) {
-            tempPlaybook = AnsibleUtil.createTemporaryFile("playbook", playbook);
-            procArgs.add(tempPlaybook.getAbsolutePath());
-        }
+            procArgs.add(ansibleCommand);
 
-        // use ansible-vault to encrypt extra-vars
-        // 1) if the encryptExtraVars is enabled (user input)
-        // 2) ssh-password is used for node authentication
-        // 3) become-password is used for node authentication
-        if (encryptExtraVars ||
-            sshUsePassword ||
-            (become && becomePassword != null && !becomePassword.isEmpty())) {
+            // parse arguments
+            if (type == AnsibleCommand.AdHoc) {
+                procArgs.add("all");
 
-            useAnsibleVault = AnsibleUtil.checkAnsibleVault();
+                procArgs.add("-m");
+                procArgs.add(module);
 
-            if(useAnsibleVault) {
-                generatedVaultPassword = AnsibleUtil.randomString();
+                if (arg != null && !arg.isEmpty()) {
+                    procArgs.add("-a");
+                    procArgs.add(arg);
+                }
+                procArgs.add("-t");
+                procArgs.add(baseDirectory.toFile().getAbsolutePath());
+            } else if (type == AnsibleCommand.PlaybookPath) {
+                procArgs.add(playbook);
+            } else if (type == AnsibleCommand.PlaybookInline) {
+                tempPlaybook = AnsibleUtil.createTemporaryFile("playbook", playbook);
+                procArgs.add(tempPlaybook.getAbsolutePath());
+            }
 
-                try {
-                    tempInternalVaultFile = AnsibleUtil.createVaultScriptAuth("internal");
-                } catch (IOException e) {
-                    throw new AnsibleException("ERROR: Ansible vault script file for authentication." + e.getMessage(),
-                            AnsibleException.AnsibleFailureReason.AnsibleNonZero);
+            // use ansible-vault to encrypt extra-vars
+            // 1) if the encryptExtraVars is enabled (user input)
+            // 2) ssh-password is used for node authentication
+            // 3) become-password is used for node authentication
+            if (encryptExtraVars ||
+                sshUsePassword ||
+                (become && becomePassword != null && !becomePassword.isEmpty())) {
+
+                useAnsibleVault = ansibleVault.checkAnsibleVault();
+
+                if(useAnsibleVault) {
+                    tempInternalVaultFile = ansibleVault.getVaultPasswordScriptFile();
+
+                    procArgs.add("--vault-id");
+                    procArgs.add("internal-encrypt@" + tempInternalVaultFile.getAbsolutePath());
+                }else{
+                    System.err.println("WARN: ansible-vault is not installed, extra-vars will not be encrypted.");
+                }
+            }
+
+            if (inventory != null && !inventory.isEmpty()) {
+                procArgs.add("--inventory-file" + "=" + inventory);
+            }
+
+            if (limits != null && limits.size() == 1) {
+                procArgs.add("-l");
+                procArgs.add(limits.get(0));
+
+            } else if (limits != null && limits.size() > 1) {
+                StringBuilder sb = new StringBuilder();
+                for (String limit : limits) {
+                    sb.append(limit).append("\n");
+                }
+                tempFile = AnsibleUtil.createTemporaryFile("targets", sb.toString());
+
+                procArgs.add("-l");
+                procArgs.add("@" + tempFile.getAbsolutePath());
+            }
+
+            if (debug == Boolean.TRUE) {
+                procArgs.add("-vvv");
+            }
+
+            if (extraVars != null && !extraVars.isEmpty()) {
+                String addeExtraVars = extraVars;
+
+                if (encryptExtraVars && useAnsibleVault) {
+                    addeExtraVars = encryptExtraVarsKey(extraVars, tempInternalVaultFile);
                 }
 
+                tempVarsFile = AnsibleUtil.createTemporaryFile("extra-vars", addeExtraVars);
+                procArgs.add("--extra-vars" + "=" + "@" + tempVarsFile.getAbsolutePath());
+            }
+
+            if (vaultPass != null && !vaultPass.isEmpty()) {
+                tempVaultFile = ansibleVault.getVaultPasswordScriptFile();
                 procArgs.add("--vault-id");
-                procArgs.add("internal-encrypt@" + tempInternalVaultFile.getAbsolutePath());
-            }else{
-                System.err.println("WARN: ansible-vault is not installed, extra-vars will not be encrypted.");
-            }
-        }
-
-        if (inventory != null && !inventory.isEmpty()) {
-            procArgs.add("--inventory-file" + "=" + inventory);
-        }
-
-        if (limits != null && limits.size() == 1) {
-            procArgs.add("-l");
-            procArgs.add(limits.get(0));
-
-        } else if (limits != null && limits.size() > 1) {
-            StringBuilder sb = new StringBuilder();
-            for (String limit : limits) {
-                sb.append(limit).append("\n");
-            }
-            tempFile = AnsibleUtil.createTemporaryFile("targets", sb.toString());
-
-            procArgs.add("-l");
-            procArgs.add("@" + tempFile.getAbsolutePath());
-        }
-
-        if (debug == Boolean.TRUE) {
-            procArgs.add("-vvv");
-        }
-
-        if (extraVars != null && !extraVars.isEmpty()) {
-            String addeExtraVars = extraVars;
-
-            if (encryptExtraVars && useAnsibleVault) {
-                addeExtraVars = encryptExtraVarsKey(extraVars, tempInternalVaultFile);
+                procArgs.add(tempVaultFile.getAbsolutePath());
             }
 
-             tempVarsFile = AnsibleUtil.createTemporaryFile("extra-vars", addeExtraVars);
-            procArgs.add("--extra-vars" + "=" + "@" + tempVarsFile.getAbsolutePath());
-        }
+            if (sshPrivateKey != null && !sshPrivateKey.isEmpty()) {
+                String privateKeyData = sshPrivateKey.replaceAll("\r\n", "\n");
+                tempPkFile = AnsibleUtil.createTemporaryFile("id_rsa", privateKeyData);
 
-        if (vaultPass != null && !vaultPass.isEmpty()) {
-            try{
-                tempVaultFile = AnsibleUtil.createVaultScriptAuth("user-vault");
-            }catch (IOException e){
-                throw new AnsibleException("ERROR: Ansible vault script file for user authentication." + e.getMessage(),
-                        AnsibleException.AnsibleFailureReason.AnsibleNonZero);
+                // Only the owner can read and write
+                Set<PosixFilePermission> perms = new HashSet<PosixFilePermission>();
+                perms.add(PosixFilePermission.OWNER_READ);
+                perms.add(PosixFilePermission.OWNER_WRITE);
+                Files.setPosixFilePermissions(tempPkFile.toPath(), perms);
+
+                if (sshUseAgent) {
+                    registerKeySshAgent(tempPkFile.getAbsolutePath());
+                }
+                procArgs.add("--private-key" + "=" + tempPkFile.toPath());
             }
 
-            procArgs.add("--vault-id");
-            procArgs.add(tempVaultFile.getAbsolutePath());
-        }
-
-        if (sshPrivateKey != null && !sshPrivateKey.isEmpty()) {
-            String privateKeyData = sshPrivateKey.replaceAll("\r\n", "\n");
-            tempPkFile = AnsibleUtil.createTemporaryFile("id_rsa", privateKeyData);
-
-            // Only the owner can read and write
-            Set<PosixFilePermission> perms = new HashSet<PosixFilePermission>();
-            perms.add(PosixFilePermission.OWNER_READ);
-            perms.add(PosixFilePermission.OWNER_WRITE);
-            Files.setPosixFilePermissions(tempPkFile.toPath(), perms);
-
-            if (sshUseAgent) {
-                registerKeySshAgent(tempPkFile.getAbsolutePath());
-            }
-            procArgs.add("--private-key" + "=" + tempPkFile.toPath());
-        }
-
-        if (sshUser != null && sshUser.length() > 0) {
-            procArgs.add("--user" + "=" + sshUser);
-        }
-
-        if (sshUsePassword) {
-            String extraVarsPassword = "ansible_ssh_password: " + sshPass;
-            String finalextraVarsPassword = extraVarsPassword;
-
-            if(useAnsibleVault){
-                finalextraVarsPassword = encryptExtraVarsKey(extraVarsPassword, tempInternalVaultFile);
+            if (sshUser != null && sshUser.length() > 0) {
+                procArgs.add("--user" + "=" + sshUser);
             }
 
-            tempSshVarsFile = AnsibleUtil.createTemporaryFile("ssh-extra-vars", finalextraVarsPassword);
-            procArgs.add("--extra-vars" + "=" + "@" + tempSshVarsFile.getAbsolutePath());
-        }
-
-        if (sshTimeout != null && sshTimeout > 0) {
-            procArgs.add("--timeout" + "=" + sshTimeout);
-        }
-
-        if (become) {
-            procArgs.add("--become");
-
-            if (becomePassword != null && !becomePassword.isEmpty()) {
-                String extraVarsPassword = "ansible_become_password: " + becomePassword;
+            if (sshUsePassword) {
+                String extraVarsPassword = "ansible_ssh_password: " + sshPass;
                 String finalextraVarsPassword = extraVarsPassword;
 
-                if (useAnsibleVault) {
+                if(useAnsibleVault){
                     finalextraVarsPassword = encryptExtraVarsKey(extraVarsPassword, tempInternalVaultFile);
                 }
 
-                tempSshVarsFile = AnsibleUtil.createTemporaryFile("become-extra-vars", finalextraVarsPassword);
+                tempSshVarsFile = AnsibleUtil.createTemporaryFile("ssh-extra-vars", finalextraVarsPassword);
                 procArgs.add("--extra-vars" + "=" + "@" + tempSshVarsFile.getAbsolutePath());
             }
-        }
 
-        if (becomeMethod != null && !becomeMethod.isEmpty()) {
-            procArgs.add("--become-method" + "=" + becomeMethod);
-        }
-
-        if (becomeUser != null && !becomeUser.isEmpty()) {
-            procArgs.add("--become-user" + "=" + becomeUser);
-        }
-
-        // default the listener to stdout logger
-        if (listener == null) {
-            listener = ListenerFactory.getListener(System.out);
-        }
-
-        if (extraParams != null && !extraParams.isEmpty()) {
-            procArgs.addAll(tokenizeCommand(extraParams));
-        }
-
-        if (debug) {
-            System.out.println(" procArgs: " + procArgs);
-        }
-
-        ProcessExecutor.ProcessExecutorBuilder processExecutorBuilder = ProcessExecutor.builder()
-                .procArgs(procArgs);
-
-        if (baseDirectory != null) {
-            processExecutorBuilder.baseDirectory(baseDirectory.toFile());
-        }
-        Process proc = null;
-
-        //SET env variables
-        Map<String, String> processEnvironment = new HashMap<>();
-
-        if (configFile != null && !configFile.isEmpty()) {
-            if (debug) {
-                System.out.println(" ANSIBLE_CONFIG: " + configFile);
+            if (sshTimeout != null && sshTimeout > 0) {
+                procArgs.add("--timeout" + "=" + sshTimeout);
             }
 
-            processEnvironment.put("ANSIBLE_CONFIG", configFile);
-        }
+            if (become) {
+                procArgs.add("--become");
 
-        for (String optionName : this.options.keySet()) {
-            processEnvironment.put(optionName, this.options.get(optionName));
-        }
+                if (becomePassword != null && !becomePassword.isEmpty()) {
+                    String extraVarsPassword = "ansible_become_password: " + becomePassword;
+                    String finalextraVarsPassword = extraVarsPassword;
 
-        if (sshUseAgent && sshAgent != null) {
-            processEnvironment.put("SSH_AUTH_SOCK", this.sshAgent.getSocketPath());
-        }
+                    if (useAnsibleVault) {
+                        finalextraVarsPassword = encryptExtraVarsKey(extraVarsPassword, tempInternalVaultFile);
+                    }
 
-        processExecutorBuilder.environmentVariables(processEnvironment);
+                    tempSshVarsFile = AnsibleUtil.createTemporaryFile("become-extra-vars", finalextraVarsPassword);
+                    procArgs.add("--extra-vars" + "=" + "@" + tempSshVarsFile.getAbsolutePath());
+                }
+            }
 
-        //set STDIN variables
-        List<String> stdinVariables = new ArrayList<>();
+            if (becomeMethod != null && !becomeMethod.isEmpty()) {
+                procArgs.add("--become-method" + "=" + becomeMethod);
+            }
 
-        if (useAnsibleVault) {
-            stdinVariables.add(generatedVaultPassword + "\n");
-        }
+            if (becomeUser != null && !becomeUser.isEmpty()) {
+                procArgs.add("--become-user" + "=" + becomeUser);
+            }
 
-        if (vaultPass != null && !vaultPass.isEmpty()) {
-            stdinVariables.add(vaultPass + "\n");
-        }
+            // default the listener to stdout logger
+            if (listener == null) {
+                listener = ListenerFactory.getListener(System.out);
+            }
 
-        processExecutorBuilder.stdinVariables(stdinVariables);
+            if (extraParams != null && !extraParams.isEmpty()) {
+                procArgs.addAll(tokenizeCommand(extraParams));
+            }
 
-        try {
+            if (debug) {
+                System.out.println(" procArgs: " + procArgs);
+            }
+
+            if(processExecutorBuilder==null){
+                processExecutorBuilder = ProcessExecutor.builder();
+            }
+
+            //set main process command
+            processExecutorBuilder.procArgs(procArgs);
+
+            if (baseDirectory != null) {
+                processExecutorBuilder.baseDirectory(baseDirectory.toFile());
+            }
+
+            //SET env variables
+            Map<String, String> processEnvironment = new HashMap<>();
+
+            if (configFile != null && !configFile.isEmpty()) {
+                if (debug) {
+                    System.out.println(" ANSIBLE_CONFIG: " + configFile);
+                }
+
+                processEnvironment.put("ANSIBLE_CONFIG", configFile);
+            }
+
+            for (String optionName : this.options.keySet()) {
+                processEnvironment.put(optionName, this.options.get(optionName));
+            }
+
+            if (sshUseAgent && sshAgent != null) {
+                processEnvironment.put("SSH_AUTH_SOCK", this.sshAgent.getSocketPath());
+            }
+
+            processExecutorBuilder.environmentVariables(processEnvironment);
+
+            //set STDIN variables
+            List<String> stdinVariables = new ArrayList<>();
+
+            if (useAnsibleVault) {
+                stdinVariables.add(ansibleVault.getMasterPassword() + "\n");
+            }
+
+            if (vaultPass != null && !vaultPass.isEmpty()) {
+                stdinVariables.add(vaultPass + "\n");
+            }
+
+            processExecutorBuilder.stdinVariables(stdinVariables);
+
             proc = processExecutorBuilder.build().run();
 
             Thread errthread = Logging.copyStreamThread(proc.getErrorStream(), listener);
@@ -612,6 +616,10 @@ public class AnsibleRunner {
             }
             if (tempSshVarsFile != null && !tempSshVarsFile.delete()){
                 tempSshVarsFile.deleteOnExit();
+            }
+
+            if (tempInternalVaultFile != null && !tempInternalVaultFile.delete()){
+                tempInternalVaultFile.deleteOnExit();
             }
 
             if (usingTempDirectory && !retainTempDirectory) {
@@ -710,70 +718,6 @@ public class AnsibleRunner {
         return true;
     }
 
-    protected String encryptVariable(String key, String content, File vaultPassword) throws IOException {
-
-        List<String> procArgs = new ArrayList<>();
-        procArgs.add("ansible-vault");
-        procArgs.add("encrypt_string");
-        procArgs.add("--vault-id");
-        procArgs.add("internal-encrypt@" + vaultPassword.getAbsolutePath());
-
-        if(debug){
-            System.out.println("encryptVariable " + key + ": " + procArgs);
-        }
-
-        //send values to STDIN in order
-        List<String> stdinVariables = new ArrayList<>();
-        stdinVariables.add(content);
-
-        Map<String, String> env = new HashMap<>();
-        env.put("VAULT_ID_SECRET", generatedVaultPassword);
-
-        Process proc = null;
-
-        try {
-            proc = ProcessExecutor.builder().procArgs(procArgs)
-                    .baseDirectory(baseDirectory.toFile())
-                    .stdinVariables(stdinVariables)
-                    .redirectErrorStream(true)
-                    .environmentVariables(env)
-                    .build().run();
-
-            StringBuilder stringBuilder = new StringBuilder();
-
-            final InputStream stdoutInputStream = proc.getInputStream();
-            final BufferedReader stdoutReader = new BufferedReader(new InputStreamReader(stdoutInputStream));
-
-            String line1 = null;
-            boolean capture = false;
-            while ((line1 = stdoutReader.readLine()) != null) {
-                if (line1.toLowerCase().contains("!vault")) {
-                    capture = true;
-                }
-                if (capture) {
-                    stringBuilder.append(line1).append("\n");
-                }
-            }
-
-            int exitCode = proc.waitFor();
-
-            if (exitCode != 0) {
-                System.err.println("ERROR: encryptFileAnsibleVault:" + procArgs);
-                return null;
-            }
-            return stringBuilder.toString();
-
-        } catch (Exception e) {
-            System.err.println("error encryptFileAnsibleVault file " + e.getMessage());
-            return null;
-        } finally {
-            // Make sure to always cleanup on failure and success
-            if (proc != null) {
-                proc.destroy();
-            }
-        }
-    }
-
 
     public String encryptExtraVarsKey(String extraVars, File vaultPasswordFile) throws Exception {
         Map<String, String> extraVarsMap = null;
@@ -781,37 +725,25 @@ public class AnsibleRunner {
         try {
             extraVarsMap = mapperYaml.readValue(extraVars, new TypeReference<Map<String, String>>() {
             });
+
+            for (Map.Entry<String, String> entry : extraVarsMap.entrySet()) {
+                String key = entry.getKey();
+                String value = entry.getValue();
+                String encryptedKey = ansibleVault.encryptVariable(key, value);
+                if (encryptedKey != null) {
+                    encryptedExtraVarsMap.put(key, encryptedKey);
+                }
+            }
+
         } catch (Exception e) {
             try {
                 extraVarsMap = mapperJson.readValue(extraVars, new TypeReference<Map<String, String>>() {
                 });
             } catch (Exception e2) {
-                System.err.println("error encryptExtraVars  " + e2.getMessage());
-                return null;
+                throw new AnsibleException("ERROR: cannot parse extra var values: " + e2.getMessage(),
+                        AnsibleException.AnsibleFailureReason.AnsibleNonZero);
             }
         }
-
-        boolean checkAnsibleVault = AnsibleUtil.checkAnsibleVault();
-        if(!checkAnsibleVault){
-            System.err.println("error encryptExtraVars, ansible-vault is not installed.");
-            return null;
-        }
-
-        if (extraVarsMap == null || extraVarsMap.isEmpty()) {
-            System.err.println("error encryptExtraVars, the given vars cannot be mapped to a valid map.");
-            return null;
-        }
-
-        extraVarsMap.forEach((key, value) -> {
-            try {
-                String encryptedKey = encryptVariable(key, value, vaultPasswordFile);
-                if (encryptedKey != null) {
-                    encryptedExtraVarsMap.put(key, encryptedKey);
-                }
-            } catch (IOException e) {
-                System.out.println(e.getMessage());
-            }
-        });
 
         StringBuilder stringBuilder = new StringBuilder();
         encryptedExtraVarsMap.forEach((key, value) -> {
@@ -820,44 +752,6 @@ public class AnsibleRunner {
         });
 
         return stringBuilder.toString();
-    }
-
-    public void encryptFileAnsibleVault(File file) {
-
-        List<String> procArgs = new ArrayList<>();
-        procArgs.add("ansible-vault");
-        procArgs.add("encrypt");
-        procArgs.add(file.getAbsolutePath());
-
-        List<String> stdinVariables = new ArrayList<>();
-        stdinVariables.add(generatedVaultPassword + "\n");
-
-        Process proc = null;
-
-        try {
-
-            proc = ProcessExecutor.builder().procArgs(procArgs)
-                    .baseDirectory(baseDirectory.toFile())
-                    .stdinVariables(stdinVariables)
-                    .redirectErrorStream(true)
-                    .build().run();
-
-            int exitCode = proc.waitFor();
-
-            if (exitCode != 0) {
-                throw new AnsibleException("ERROR: encryptFileAnsibleVault:" + procArgs,
-                        AnsibleException.AnsibleFailureReason.AnsibleNonZero);
-            }
-
-
-        } catch (Exception e) {
-            System.err.println("error encryptFileAnsibleVault file " + e.getMessage());
-        } finally {
-            // Make sure to always cleanup on failure and success
-            if (proc != null) {
-                proc.destroy();
-            }
-        }
     }
 
 }

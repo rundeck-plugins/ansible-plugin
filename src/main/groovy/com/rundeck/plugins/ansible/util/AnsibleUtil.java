@@ -10,9 +10,6 @@ import com.rundeck.plugins.ansible.plugin.AnsibleNodeExecutor;
 
 import java.io.*;
 import java.nio.file.Files;
-import java.nio.file.StandardCopyOption;
-import java.nio.file.attribute.PosixFilePermission;
-import java.nio.file.attribute.PosixFilePermissions;
 import java.security.SecureRandom;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -121,46 +118,5 @@ public class AnsibleUtil {
 
     }
 
-    public static File createVaultScriptAuth(String suffix) throws IOException {
-        File tempInternalVaultFile = File.createTempFile("ansible-runner", suffix + "-client.py");
-
-        try {
-            Files.copy(AnsibleUtil.class.getClassLoader().getResourceAsStream("vault-client.py"),
-                       tempInternalVaultFile.toPath(),
-                       StandardCopyOption.REPLACE_EXISTING);
-        } catch (IOException e) {
-            throw new IOException("Failed to copy vault-client.py", e);
-        }
-
-        Set<PosixFilePermission> perms = PosixFilePermissions.fromString("rwxr-xr-x");
-        Files.setPosixFilePermissions(tempInternalVaultFile.toPath(), perms);
-
-        return tempInternalVaultFile;
-    }
-
-
-    public static boolean checkAnsibleVault() {
-        List<String> procArgs = new ArrayList<>();
-        procArgs.add("ansible-vault");
-        procArgs.add("--version");
-
-        Process proc = null;
-
-        try {
-            proc = ProcessExecutor.builder().procArgs(procArgs)
-                    .redirectErrorStream(true)
-                    .build().run();
-
-            int exitCode = proc.waitFor();
-            return exitCode == 0;
-        } catch (IOException | InterruptedException e) {
-            System.err.println("Failed to check ansible-vault: " + e.getMessage());
-            return false;
-        }finally {
-            if (proc != null) {
-                proc.destroy();
-            }
-        }
-    }
 
 }
