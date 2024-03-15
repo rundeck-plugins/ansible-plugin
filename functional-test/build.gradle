@@ -34,7 +34,7 @@ tasks.register('functionalTest', Test) {
     description = "Run Ansible integration tests"
 }
 
-tasks.register('copyJar', Copy) {
+tasks.register('copyPluginArtifact', Copy) {
     from("$rootDir/build/libs/"){
         include '**/*.jar'
     }
