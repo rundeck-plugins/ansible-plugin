@@ -11,9 +11,9 @@
     </dispatch>
     <executionEnabled>true</executionEnabled>
     <group>Ansible</group>
-    <id>4ecd6b86-b437-4792-a37e-af1fa5a2ca0c</id>
+    <id>6a49e380-bfdf-4bfd-b075-a4321ff78836</id>
     <loglevel>INFO</loglevel>
-    <name>simple-inline-playbook</name>
+    <name>simple-inline-playbook-became-sudo</name>
     <nodeFilterEditable>false</nodeFilterEditable>
     <nodefilters>
       <filter>name: ssh-node </filter>
@@ -26,18 +26,21 @@
         <node-step-plugin type='com.batix.rundeck.plugins.AnsiblePlaybookInlineWorkflowNodeStep'>
           <configuration>
             <entry key='ansible-base-dir-path' value='/home/rundeck/ansible' />
-            <entry key='ansible-become' value='false' />
+            <entry key='ansible-become' value='true' />
+            <entry key='ansible-become-method' value='sudo' />
+            <entry key='ansible-become-password-storage-path' value='keys/project/ansible-test/ssh-node.pass' />
+            <entry key='ansible-encrypt-extra-vars' value='false' />
             <entry key='ansible-extra-vars' value='token: 1234&#10;test: "demo"' />
-            <entry key='ansible-playbook-inline' value='- hosts: all&#10;  gather_facts: false&#10;  tasks:&#10;&#10;    - name: Hello World!&#10;      debug:&#10;        msg: "Hello World!"&#10;    - name: Get Disk Space&#10;      shell: "df -h"&#10;      register: sh_output&#10;&#10;    - debug: var=sh_output.stdout_lines&#10;    - debug: msg="{{ token }}"&#10;    - debug: msg="{{ test }}" ' />
-            <entry key='ansible-ssh-auth-type' value='privateKey' />
-            <entry key='ansible-ssh-key-storage-path' value='keys/project/ansible-test/ssh-node.key' />
+            <entry key='ansible-playbook-inline' value='- hosts: all&#10;  gather_facts: false&#10;  tasks:&#10;&#10;    - name: Who am I ?&#10;      shell: "whoami"&#10;      register: ps&#10;      &#10;    - debug: msg={{ ps.stdout }}&#10;&#10;    - debug: var=ps&#10;    &#10;    - debug: msg="{{ token }}"&#10;    - debug: msg="{{ test }}" ' />
+            <entry key='ansible-ssh-auth-type' value='password' />
             <entry key='ansible-ssh-passphrase-option' value='option.password' />
+            <entry key='ansible-ssh-password-storage-path' value='keys/project/ansible-test/ssh-node.pass' />
             <entry key='ansible-ssh-use-agent' value='false' />
             <entry key='ansible-ssh-user' value='rundeck' />
           </configuration>
         </node-step-plugin>
       </command>
     </sequence>
-    <uuid>4ecd6b86-b437-4792-a37e-af1fa5a2ca0c</uuid>
+    <uuid>6a49e380-bfdf-4bfd-b075-a4321ff78836</uuid>
   </job>
 </joblist>

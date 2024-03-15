@@ -27,7 +27,6 @@
           <configuration>
             <entry key='ansible-base-dir-path' value='/home/rundeck/ansible' />
             <entry key='ansible-become' value='false' />
-            <entry key='ansible-encrypt-extra-vars' value='true' />
             <entry key='ansible-extra-vars' value='token: 1234&#10;test: "demo"' />
             <entry key='ansible-playbook-inline' value='- hosts: all&#10;  gather_facts: false&#10;  tasks:&#10;&#10;    - name: Hello World!&#10;      debug:&#10;        msg: "Hello World!"&#10;    - name: Get Disk Space&#10;      shell: "df -h"&#10;      register: sh_output&#10;&#10;    - debug: var=sh_output.stdout_lines&#10;    - debug: msg="{{ token }}"&#10;    - debug: msg="{{ test }}" ' />
             <entry key='ansible-ssh-auth-type' value='privateKey' />

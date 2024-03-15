@@ -28,9 +28,6 @@ RUN ln -s /usr/bin/python3 /usr/bin/python
 
 user rundeck
 
-# add default project
-COPY --chown=rundeck:rundeck project.properties ${PROJECT_BASE}/etc/
-
 # remove embedded rundeck-ansible-plugin
 #RUN zip -d rundeck.war WEB-INF/rundeck/plugins/ansible-plugin-* \
 #  && unzip -C rundeck.war WEB-INF/rundeck/plugins/manifest.properties \

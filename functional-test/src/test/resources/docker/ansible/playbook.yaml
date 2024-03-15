@@ -1,0 +1,15 @@
+---
+- hosts: all
+  tasks:
+  - name: Get Disk Space
+    shell: "df -h && date && env"
+    register: pid
+
+  - debug: var=pid.stdout_lines
+  - debug: msg="{{ username }}"
+  - debug: msg="{{ test }}"
+
+
+
+  
+

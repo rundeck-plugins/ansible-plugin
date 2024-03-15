@@ -20,6 +20,7 @@ class RundeckCompose extends DockerComposeContainer<RundeckCompose> {
     public static final String RUNDECK_IMAGE = System.getenv("RUNDECK_TEST_IMAGE") ?: System.getProperty("RUNDECK_TEST_IMAGE")
     public static final String NODE_USER_PASSWORD = "testpassword123"
     public static final String NODE_KEY_PASSPHRASE = "testpassphrase123"
+    public static final String USER_VAULT_PASSWORD = "vault123"
 
     RundeckCompose(URI composeFilePath) {
         super(new File(composeFilePath))
@@ -70,6 +71,10 @@ class RundeckCompose extends DockerComposeContainer<RundeckCompose> {
         //add node user ssh-password
         requestBody = RequestBody.create(NODE_USER_PASSWORD.getBytes(), Client.MEDIA_TYPE_X_RUNDECK_PASSWORD)
         keyResult = client.apiCall {api-> api.createKeyStorage("project/$projectName/ssh-node.pass", requestBody)}
+
+        //user vault password
+        requestBody = RequestBody.create(USER_VAULT_PASSWORD.getBytes(), Client.MEDIA_TYPE_X_RUNDECK_PASSWORD)
+        keyResult = client.apiCall {api-> api.createKeyStorage("project/$projectName/vault-user.pass", requestBody)}
 
         //create project
         def projList = client.apiCall(api -> api.listProjects())

@@ -9,6 +9,7 @@ mkdir $HOME/.ssh
 chmod 755 $HOME/.ssh
 chown -R $USERNAME $HOME/.ssh
 echo "rundeck:$NODE_USER_PASSWORD"|chpasswd
+echo 'rundeck ALL=(ALL:ALL) ALL' >> /etc/sudoers
 
 # authorize SSH connection with root account
 sed -i "s/.*PasswordAuthentication.*/PasswordAuthentication yes/g" /etc/ssh/sshd_config
