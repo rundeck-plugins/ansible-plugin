@@ -1,16 +1,21 @@
 #!/bin/bash
 
-rm /configuration/id_rsa
-rm /configuration/id_rsa.pub
-rm /configuration/authorized_keys
-rm /configuration/known_hosts
+USERNAME=rundeck
+HOME=/home/rundeck
 
-ssh-keygen -q -t rsa -N '' -f /configuration/id_rsa
+adduser --home $HOME --disabled-password --gecos "rundeck" $USERNAME
 
-touch /configuration/known_hosts
-touch /configuration/authorized_keys
+mkdir $HOME/.ssh
+chmod 755 $HOME/.ssh
+chown -R $USERNAME $HOME/.ssh
+echo "rundeck:$NODE_USER_PASSWORD"|chpasswd
 
-chown agent:root /configuration/id_rsa
-chown agent:root /configuration/id_rsa.pub
-chown agent:root /configuration/known_hosts
-chown agent:root /configuration/authorized_keys
+# authorize SSH connection with root account
+sed -i "s/.*PasswordAuthentication.*/PasswordAuthentication yes/g" /etc/ssh/sshd_config
+
+# authorize SSH connection with rundeck account
+mkdir -p /home/rundeck/.ssh
+chown -R "$USERNAME" $HOME/.ssh
+
+cat /configuration/id_rsa.pub > /home/rundeck/.ssh/authorized_keys
+cat /configuration/id_rsa_passphrase.pub >> /home/rundeck/.ssh/authorized_keys

@@ -1,9 +1,12 @@
 package functional.util
 
+import org.rundeck.client.api.model.ExecLog
+
 import java.text.SimpleDateFormat
 import java.util.jar.JarEntry
 import java.util.jar.JarOutputStream
 import java.util.jar.Manifest
+import java.util.stream.Collectors
 
 class TestUtil {
 
@@ -42,6 +45,24 @@ class TestUtil {
             }
         }
         tempFile
+    }
+
+    static Map<String, Integer> getAnsibleNodeResult(List<ExecLog> logs){
+        String nodeResumeLog = null
+
+        for(ExecLog execLog: logs){
+            if(execLog.log.startsWith("ssh-node") && execLog.log.contains("ok=")){
+                nodeResumeLog = execLog.log
+            }
+        }
+
+        if(nodeResumeLog==null){
+            return null
+        }
+
+        List<String> listNodeResultStatus = nodeResumeLog.split("\\s",-1).findAll{!it.isEmpty() && it.contains("=")}
+
+        return listNodeResultStatus.stream().collect(Collectors.toMap(s -> s.toString().split("=")[0], s -> Integer.valueOf(s.toString().split("=")[1])))
     }
 
 }

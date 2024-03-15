@@ -4,13 +4,14 @@ services:
   ssh-node:
     build:
       context: node
-    image: rundeck-ssh-node:latest
+    environment:
+      NODE_USER_PASSWORD: ${NODE_USER_PASSWORD:-rundeck}
     networks:
       - rundeck
     ports:
       - "2222:22"
     volumes:
-      - ssh-data:/configuration:rw
+      - ${PWD}/keys:/configuration:rw
 
   rundeck:
     build:
@@ -27,7 +28,7 @@ services:
       - "4440:4440"
     volumes:
     - ${PWD}/ansible:/home/rundeck/ansible:rw
-    - ssh-data:/home/rundeck/.ssh:rw
+    #- ssh-data:/home/rundeck/.ssh:rw
 
 volumes:
   rundeck-data:

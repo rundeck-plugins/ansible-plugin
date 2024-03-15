@@ -1,0 +1,5 @@
+src/test/resources/docker/keys/id_rsa
+src/test/resources/docker/keys/id_rsa.pub
+src/test/resources/docker/keys/id_rsa_passphrase
+src/test/resources/docker/keys/id_rsa_passphrase.pub
+src/test/resources/docker/rundeck/plugins
