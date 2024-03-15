@@ -3,7 +3,7 @@ services:
 
   ssh-node:
     build:
-      context: docker/node
+      context: node
     image: rundeck-ssh-node:latest
     networks:
       - rundeck
@@ -14,7 +14,7 @@ services:
 
   rundeck:
     build:
-      context: .
+      context: rundeck
       args:
         RUNDECK_IMAGE: ${RUNDECK_IMAGE:-rundeck/rundeck:SNAPSHOT}
     image: rundeck-ansible-plugin:latest
@@ -26,7 +26,7 @@ services:
     ports:
       - "4440:4440"
     volumes:
-    - ${PWD}/docker/inventory.ini:/home/rundeck/data/inventory.ini:rw
+    - ${PWD}/ansible:/home/rundeck/ansible:rw
     - ssh-data:/home/rundeck/.ssh:rw
 
 volumes:

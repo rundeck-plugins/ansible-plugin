@@ -1,0 +1,43 @@
+plugins {
+    id 'groovy'
+}
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+}
+
+
+group = 'com.github.rundeck-plugins'
+
+configurations {
+    configurations {
+        instrumentedClasspath {
+            canBeConsumed = false
+        }
+    }
+}
+dependencies {
+    testImplementation "org.spockframework:spock-core:2.1-groovy-3.0"
+
+    testImplementation "org.testcontainers:testcontainers:1.17.2"
+    testImplementation "org.testcontainers:spock:1.17.2"
+    testImplementation group: 'org.rundeck.api', name: 'rd-api-client', version: '2.0.8'
+
+
+}
+
+tasks.register('functionalTest', Test) {
+    useJUnitPlatform()
+    systemProperty('TEST_IMAGE', "rundeck/rundeck:SNAPSHOT")
+    systemProperty("COMPOSE_PATH", "docker/compose/oss/docker-compose.yml")
+    //systemProperty('spock.configuration', 'spock-configs/IncludeAPITestsConfig.groovy')
+    description = "Run API tests"
+}
+
+tasks.register('copyJar', Copy) {
+    from("$rootDir/build/libs/"){
+        include '**/*.jar'
+    }
+    into "$projectDir/src/test/resources/docker/rundeck/plugins"
+}
