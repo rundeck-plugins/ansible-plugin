@@ -13,7 +13,7 @@ parser.add_argument('--vault-id', action='store', default='',
 args = parser.parse_args()
 keyname = args.vault_id
 
-secret=os.environ["VAULT_ID_SECRET"]
+secret=os.getenv('VAULT_ID_SECRET', None)
 
 if secret:
     if keyname:
@@ -28,11 +28,12 @@ else:
     secret = sys.stdin.readline().rstrip()
 
 if secret is None:
-    sys.stderr.write('ERROR: VAULT_ID_SECRET is not set\n')
+    sys.stderr.write('ERROR: secret is not set\n')
     sys.exit(1)
 
 if keyname:
     sys.stdout.write('%s/%s\n' % (keyname,secret))
 else:
     sys.stdout.write('%s\n' % (secret))
+
 sys.exit(0)
