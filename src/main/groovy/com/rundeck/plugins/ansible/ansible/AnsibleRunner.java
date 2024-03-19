@@ -424,7 +424,7 @@ public class AnsibleRunner {
                 String addeExtraVars = extraVars;
 
                 if (encryptExtraVars && useAnsibleVault) {
-                    addeExtraVars = encryptExtraVarsKey(extraVars, tempInternalVaultFile);
+                    addeExtraVars = encryptExtraVarsKey(extraVars);
                 }
 
                 tempVarsFile = AnsibleUtil.createTemporaryFile("extra-vars", addeExtraVars);
@@ -462,7 +462,7 @@ public class AnsibleRunner {
                 String finalextraVarsPassword = extraVarsPassword;
 
                 if(useAnsibleVault){
-                    finalextraVarsPassword = encryptExtraVarsKey(extraVarsPassword, tempInternalVaultFile);
+                    finalextraVarsPassword = encryptExtraVarsKey(extraVarsPassword);
                 }
 
                 tempSshVarsFile = AnsibleUtil.createTemporaryFile("ssh-extra-vars", finalextraVarsPassword);
@@ -481,7 +481,7 @@ public class AnsibleRunner {
                     String finalextraVarsPassword = extraVarsPassword;
 
                     if (useAnsibleVault) {
-                        finalextraVarsPassword = encryptExtraVarsKey(extraVarsPassword, tempInternalVaultFile);
+                        finalextraVarsPassword = encryptExtraVarsKey(extraVarsPassword);
                     }
 
                     tempBecameVarsFile = AnsibleUtil.createTemporaryFile("become-extra-vars", finalextraVarsPassword);
@@ -724,21 +724,12 @@ public class AnsibleRunner {
     }
 
 
-    public String encryptExtraVarsKey(String extraVars, File vaultPasswordFile) throws Exception {
-        Map<String, String> extraVarsMap = null;
+    public String encryptExtraVarsKey(String extraVars) throws Exception {
+        Map<String, String> extraVarsMap = new HashMap<>();
         Map<String, String> encryptedExtraVarsMap = new HashMap<>();
         try {
             extraVarsMap = mapperYaml.readValue(extraVars, new TypeReference<Map<String, String>>() {
             });
-
-            for (Map.Entry<String, String> entry : extraVarsMap.entrySet()) {
-                String key = entry.getKey();
-                String value = entry.getValue();
-                String encryptedKey = ansibleVault.encryptVariable(key, value);
-                if (encryptedKey != null) {
-                    encryptedExtraVarsMap.put(key, encryptedKey);
-                }
-            }
 
         } catch (Exception e) {
             try {
@@ -747,6 +738,15 @@ public class AnsibleRunner {
             } catch (Exception e2) {
                 throw new AnsibleException("ERROR: cannot parse extra var values: " + e2.getMessage(),
                         AnsibleException.AnsibleFailureReason.AnsibleNonZero);
+            }
+        }
+
+        for (Map.Entry<String, String> entry : extraVarsMap.entrySet()) {
+            String key = entry.getKey();
+            String value = entry.getValue();
+            String encryptedKey = ansibleVault.encryptVariable(key, value);
+            if (encryptedKey != null) {
+                encryptedExtraVarsMap.put(key, encryptedKey);
             }
         }
 

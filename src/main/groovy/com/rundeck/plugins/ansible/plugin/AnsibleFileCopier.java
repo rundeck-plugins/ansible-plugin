@@ -157,9 +157,9 @@ public class AnsibleFileCopier implements FileCopier, AnsibleDescribable, ProxyR
           runner.run();
     } catch (Exception e) {
           throw new FileCopierException("Error running Ansible.", AnsibleFailureReason.AnsibleError, e);
+    }finally {
+        contextBuilder.cleanupTempFiles();
     }
-
-    contextBuilder.cleanupTempFiles();
 
     return destinationPath;
   }
