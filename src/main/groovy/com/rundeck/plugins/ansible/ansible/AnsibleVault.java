@@ -8,6 +8,7 @@ import lombok.Data;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
@@ -21,12 +22,17 @@ public class AnsibleVault {
     private String masterPassword;
     private boolean debug;
     private Path baseDirectory;
+    private Path ansibleBinariesDirectory;
 
     public final String ANSIBLE_VAULT_COMMAND = "ansible-vault";
 
     public boolean checkAnsibleVault() {
         List<String> procArgs = new ArrayList<>();
-        procArgs.add(ANSIBLE_VAULT_COMMAND);
+        String ansibleCommand = ANSIBLE_VAULT_COMMAND;
+        if (ansibleBinariesDirectory != null) {
+            ansibleCommand = Paths.get(ansibleBinariesDirectory.toFile().getAbsolutePath(), ansibleCommand).toFile().getAbsolutePath();
+        }
+        procArgs.add(ansibleCommand);
         procArgs.add("--version");
 
         Process proc = null;
@@ -52,7 +58,11 @@ public class AnsibleVault {
                                   String content ) throws IOException {
 
         List<String> procArgs = new ArrayList<>();
-        procArgs.add("ansible-vault");
+        String ansibleCommand = ANSIBLE_VAULT_COMMAND;
+        if (ansibleBinariesDirectory != null) {
+            ansibleCommand = Paths.get(ansibleBinariesDirectory.toFile().getAbsolutePath(), ansibleCommand).toFile().getAbsolutePath();
+        }
+        procArgs.add(ansibleCommand);
         procArgs.add("encrypt_string");
         procArgs.add("--vault-id");
         procArgs.add("internal-encrypt@" + vaultPasswordScriptFile.getAbsolutePath());

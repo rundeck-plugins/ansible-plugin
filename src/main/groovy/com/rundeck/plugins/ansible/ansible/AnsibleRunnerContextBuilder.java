@@ -822,12 +822,14 @@ public class AnsibleRunnerContextBuilder {
         Map<String, String> options = new HashMap<>();
         Map<String, String> optionsContext = context.getDataContext().get("option");
         Map<String, String> secureOptionContext = context.getDataContext().get("secureOption");
-        if (optionsContext != null) {
+        if (optionsContext != null && secureOptionContext!=null) {
             optionsContext.forEach((option, value) -> {
                 if(!secureOptionContext.containsKey(option)){
                     options.put(option, value);
                 }
             });
+        }else if (optionsContext != null) {
+            options.putAll(optionsContext);
         }
         return options;
     }

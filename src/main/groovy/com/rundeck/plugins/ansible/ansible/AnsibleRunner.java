@@ -342,6 +342,7 @@ public class AnsibleRunner {
                     .baseDirectory(baseDirectory)
                     .masterPassword(AnsibleUtil.randomString())
                     .vaultPasswordScriptFile(tempInternalVaultFile)
+                    .ansibleBinariesDirectory(ansibleBinariesDirectory)
                     .debug(debug).build();
         }
 
