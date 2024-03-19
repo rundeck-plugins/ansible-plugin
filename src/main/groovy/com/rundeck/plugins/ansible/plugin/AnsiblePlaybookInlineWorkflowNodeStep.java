@@ -102,9 +102,10 @@ public class AnsiblePlaybookInlineWorkflowNodeStep implements NodeStepPlugin, An
             failureData.put("message",e.getMessage());
             failureData.put("ansible-config", configuration);
             throw new NodeStepException(e.getMessage(),e, AnsibleException.AnsibleFailureReason.AnsibleError, failureData, e.getMessage());
+        }finally {
+            contextBuilder.cleanupTempFiles();
         }
 
-        contextBuilder.cleanupTempFiles();
 
     }
 

@@ -178,9 +178,9 @@ public class AnsibleNodeExecutor implements NodeExecutor, AnsibleDescribable, Pr
         runner.run();
     } catch (Exception e) {
         return NodeExecutorResultImpl.createFailure(AnsibleException.AnsibleFailureReason.AnsibleError, e.getMessage(), node);
+    }finally {
+        contextBuilder.cleanupTempFiles();
     }
-
-    contextBuilder.cleanupTempFiles();
 
     return NodeExecutorResultImpl.createSuccess(node);
   }

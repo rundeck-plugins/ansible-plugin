@@ -107,9 +107,9 @@ public class AnsiblePlaybookInlineWorkflowStep implements StepPlugin, AnsibleDes
 
 
             throw new StepException(e.getMessage(), e, AnsibleException.AnsibleFailureReason.AnsibleError, failureData);
+        }finally {
+            contextBuilder.cleanupTempFiles();
         }
-
-        contextBuilder.cleanupTempFiles();
     }
 
 

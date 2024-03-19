@@ -105,9 +105,9 @@ public class AnsiblePlaybookWorkflowStep implements StepPlugin, AnsibleDescribab
             failureData.put("ansible-config", contextBuilder.getConfigFile());
 
             throw new StepException(e.getMessage(), e, AnsibleException.AnsibleFailureReason.AnsibleError, failureData);
+        }finally {
+            contextBuilder.cleanupTempFiles();
         }
-
-        contextBuilder.cleanupTempFiles();
     }
 
     @Override

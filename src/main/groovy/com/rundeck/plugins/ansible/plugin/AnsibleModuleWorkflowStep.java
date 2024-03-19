@@ -93,9 +93,10 @@ public class AnsibleModuleWorkflowStep implements StepPlugin, AnsibleDescribable
             throw new StepException(e.getMessage(), e, e.getFailureReason());
         } catch (Exception e) {
             throw new StepException(e.getMessage(), e, AnsibleException.AnsibleFailureReason.AnsibleError);
+        }finally {
+            contextBuilder.cleanupTempFiles();
         }
 
-        contextBuilder.cleanupTempFiles();
     }
 
     @Override

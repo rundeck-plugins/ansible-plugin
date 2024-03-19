@@ -94,9 +94,9 @@ public class AnsiblePlaybookWorflowNodeStep implements NodeStepPlugin, AnsibleDe
             throw new NodeStepException(e.getMessage(), e.getFailureReason(),e.getMessage());
         } catch (Exception e) {
             throw new NodeStepException(e.getMessage(),AnsibleException.AnsibleFailureReason.AnsibleError,e.getMessage());
+        }finally {
+            contextBuilder.cleanupTempFiles();
         }
-
-        contextBuilder.cleanupTempFiles();
     }
 
     @Override
