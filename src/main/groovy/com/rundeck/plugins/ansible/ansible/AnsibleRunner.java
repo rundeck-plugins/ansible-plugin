@@ -741,13 +741,18 @@ public class AnsibleRunner {
             }
         }
 
-        for (Map.Entry<String, String> entry : extraVarsMap.entrySet()) {
-            String key = entry.getKey();
-            String value = entry.getValue();
-            String encryptedKey = ansibleVault.encryptVariable(key, value);
-            if (encryptedKey != null) {
-                encryptedExtraVarsMap.put(key, encryptedKey);
+        try {
+            for (Map.Entry<String, String> entry : extraVarsMap.entrySet()) {
+                String key = entry.getKey();
+                String value = entry.getValue();
+                String encryptedKey = ansibleVault.encryptVariable(key, value);
+                if (encryptedKey != null) {
+                    encryptedExtraVarsMap.put(key, encryptedKey);
+                }
             }
+        } catch (Exception e) {
+            throw new AnsibleException("ERROR: cannot parse extra var values: " + e.getMessage(),
+                    AnsibleException.AnsibleFailureReason.AnsibleNonZero);
         }
 
         StringBuilder stringBuilder = new StringBuilder();
