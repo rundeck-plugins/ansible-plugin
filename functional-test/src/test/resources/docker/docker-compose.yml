@@ -22,10 +22,12 @@ services:
     command: "-Dansible.debug=false"
     environment:
       RUNDECK_GRAILS_URL: http://localhost:4440
+      RUNDECK_MULTIURL_ENABLED: "true"
+      RUNDECK_SERVER_FORWARDED: "true"
     networks:
       - rundeck
     ports:
-      - "4440:4440"
+      - "4440"
     volumes:
     - ${PWD}/ansible:/home/rundeck/ansible:rw
 

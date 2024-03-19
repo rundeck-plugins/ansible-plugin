@@ -47,7 +47,7 @@ class RundeckCompose extends DockerComposeContainer<RundeckCompose> {
 
         //configure rundeck api
         String address = getServiceHost("rundeck",4440)
-        Integer port = 4440
+        Integer port = getServicePort("rundeck",4440)
         def rdUrl = "http://${address}:${port}/api/41"
         System.err.println("rdUrl: $rdUrl")
         Client<RundeckApi> client = RundeckClient.builder().with {
