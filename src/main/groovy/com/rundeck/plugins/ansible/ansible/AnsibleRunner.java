@@ -14,13 +14,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.Collection;
-import java.util.Map;
-import java.util.HashMap;
+import java.util.*;
 
 public class AnsibleRunner {
 
@@ -636,11 +630,28 @@ public class AnsibleRunner {
     // execute the ssh-agent add process
     ProcessBuilder processBuilder = new ProcessBuilder()
             .command(procArgs)
+            .redirectErrorStream(true)
             .directory(baseDirectory.toFile());
+
     Process proc = null;
 
     Map<String, String> env = processBuilder.environment();
     env.put("SSH_AUTH_SOCK", this.sshAgent.getSocketPath());
+
+    File tempPassVarsFile = null;
+    if (sshPassphrase != null && sshPassphrase.length() > 0) {
+      tempPassVarsFile = File.createTempFile("ansible-runner", "ssh-add-check");
+      tempPassVarsFile.setExecutable(true);
+
+      List<String> passScript = new ArrayList<>();
+      passScript.add("read SECRET");
+      passScript.add("echo $SECRET");
+
+      Files.write(tempPassVarsFile.toPath(),passScript);
+
+      env.put("DISPLAY", "0");
+      env.put("SSH_ASKPASS", tempPassVarsFile.getAbsolutePath());
+    }
 
     try {
       proc = processBuilder.start();
@@ -659,12 +670,26 @@ public class AnsibleRunner {
         }
       }
 
+      stdinw.close();
+      stdin.close();
+
+      Thread errthread = Logging.copyStreamThread(proc.getErrorStream(), ListenerFactory.getListener(System.err));
+      Thread outthread = Logging.copyStreamThread(proc.getInputStream(), ListenerFactory.getListener(System.out));
+      errthread.start();
+      outthread.start();
+
       int exitCode = proc.waitFor();
+
+      outthread.join();
+      errthread.join();
+      System.err.flush();
+      System.out.flush();
 
      if (exitCode != 0) {
           throw new AnsibleException("ERROR: ssh-add returns with non zero code:" + procArgs.toString(),
                   AnsibleException.AnsibleFailureReason.AnsibleNonZero);
       }
+
 
     } catch (IOException  e) {
       throw new AnsibleException("ERROR: error adding private key to ssh-agent." + procArgs.toString(), e, AnsibleException.AnsibleFailureReason.Unknown);
@@ -673,11 +698,15 @@ public class AnsibleRunner {
         proc.destroy();
       }
       Thread.currentThread().interrupt();
-      throw new AnsibleException("ERROR: error adding private key to ssh-agen Interrupted.", e, AnsibleException.AnsibleFailureReason.Interrupted);
+      throw new AnsibleException("ERROR: error adding private key to ssh-agent Interrupted.", e, AnsibleException.AnsibleFailureReason.Interrupted);
     }finally {
       // Make sure to always cleanup on failure and success
       if(proc!=null) {
         proc.destroy();
+      }
+
+      if(tempPassVarsFile!=null && !tempPassVarsFile.delete()){
+        tempPassVarsFile.deleteOnExit();
       }
     }
 
