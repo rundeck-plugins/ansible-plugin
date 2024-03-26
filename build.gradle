@@ -20,10 +20,10 @@ ext.pluginClassNames = [
 
 apply plugin: 'java'
 apply plugin: 'groovy'
-sourceCompatibility = 1.8
+sourceCompatibility = 1.11
 
 scmVersion {
-    ignoreUncommittedChanges = true
+    ignoreUncommittedChanges = false
     tag {
         prefix = 'v'
         versionSeparator = ''
@@ -47,11 +47,19 @@ configurations {
 
 dependencies {
   pluginLibs 'com.google.code.gson:gson:2.10.1'
-  implementation('org.rundeck:rundeck-core:4.17.2-rc1-20231025')
-  implementation 'org.codehaus.groovy:groovy-all:3.0.9'
+  implementation('org.rundeck:rundeck-core:5.1.1-20240305')
+  implementation 'org.codehaus.groovy:groovy-all:3.0.15'
+  pluginLibs group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: '2.16.1'
+  pluginLibs group: 'com.fasterxml.jackson.dataformat', name: 'jackson-dataformat-yaml', version: '2.16.1'
 
-  testImplementation platform("org.spockframework:spock-bom:2.0-groovy-3.0")
-  testImplementation "org.spockframework:spock-core"
+  compileOnly 'org.projectlombok:lombok:1.18.30'
+  annotationProcessor 'org.projectlombok:lombok:1.18.30'
+
+  testCompileOnly 'org.projectlombok:lombok:1.18.30'
+  testAnnotationProcessor 'org.projectlombok:lombok:1.18.30'
+
+  testImplementation "org.spockframework:spock-core:2.1-groovy-3.0"
+
 }
 
 tasks.withType(Test).configureEach {

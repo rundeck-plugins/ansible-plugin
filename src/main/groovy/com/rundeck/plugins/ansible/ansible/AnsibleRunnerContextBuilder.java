@@ -21,26 +21,26 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 
+import lombok.Getter;
 import org.rundeck.storage.api.Path;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.LinkedList;
-import java.util.Map;
+
+import java.util.*;
 
 import org.rundeck.storage.api.PathUtil;
 import org.rundeck.storage.api.StorageException;
 
-public class AnsibleRunnerBuilder {
+@Getter
+public class AnsibleRunnerContextBuilder {
 
-    private ExecutionContext context;
-    private Framework framework;
-    private String frameworkProject;
-    private Map<String, Object> jobConf;
-    private Collection<INodeEntry> nodes;
-    private Collection<File> tempFiles;
+    private final ExecutionContext context;
+    private final Framework framework;
+    private final String frameworkProject;
+    private final Map<String, Object> jobConf;
+    private final Collection<INodeEntry> nodes;
+    private final Collection<File> tempFiles;
 
 
-    public AnsibleRunnerBuilder(final ExecutionContext context, final Framework framework, INodeSet nodes, final Map<String, Object> configuration) {
+    public AnsibleRunnerContextBuilder(final ExecutionContext context, final Framework framework, INodeSet nodes, final Map<String, Object> configuration) {
         this.context = context;
         this.framework = framework;
         this.frameworkProject = context.getFrameworkProject();
@@ -49,7 +49,7 @@ public class AnsibleRunnerBuilder {
         this.tempFiles = new LinkedList<>();
     }
 
-    public AnsibleRunnerBuilder(final INodeEntry node,final ExecutionContext context, final Framework framework, final Map<String, Object> configuration) {
+    public AnsibleRunnerContextBuilder(final INodeEntry node, final ExecutionContext context, final Framework framework, final Map<String, Object> configuration) {
         this.context = context;
         this.framework = framework;
         this.frameworkProject = context.getFrameworkProject();
@@ -75,8 +75,8 @@ public class AnsibleRunnerBuilder {
                 getFrameworkProject(),
                 getFramework(),
                 getNode(),
-                getjobConf()
-                );
+                getJobConf()
+        );
 
         //expand properties in path
         if (path != null && path.contains("${")) {
@@ -87,13 +87,13 @@ public class AnsibleRunnerBuilder {
 
     public String getPrivateKeyStoragePath() {
         String path = PropertyResolver.resolveProperty(
-        		AnsibleDescribable.ANSIBLE_SSH_KEYPATH_STORAGE_PATH,
+                AnsibleDescribable.ANSIBLE_SSH_KEYPATH_STORAGE_PATH,
                 null,
                 getFrameworkProject(),
                 getFramework(),
                 getNode(),
-                getjobConf()
-                );
+                getJobConf()
+        );
         //expand properties in path
         if (path != null && path.contains("${")) {
             path = DataContextUtils.replaceDataReferencesInString(path, context.getDataContext());
@@ -101,7 +101,7 @@ public class AnsibleRunnerBuilder {
         return path;
     }
 
-    public  byte[] getPrivateKeyStorageDataBytes() throws IOException {
+    public byte[] getPrivateKeyStorageDataBytes() throws IOException {
         String privateKeyResourcePath = getPrivateKeyStoragePath();
         return this.loadStoragePathData(privateKeyResourcePath);
     }
@@ -109,26 +109,26 @@ public class AnsibleRunnerBuilder {
     public String getPasswordStoragePath() {
 
         String path = PropertyResolver.resolveProperty(
-        		AnsibleDescribable.ANSIBLE_SSH_PASSWORD_STORAGE_PATH,
+                AnsibleDescribable.ANSIBLE_SSH_PASSWORD_STORAGE_PATH,
                 null,
                 getFrameworkProject(),
                 getFramework(),
                 getNode(),
-                getjobConf()
-                );
+                getJobConf()
+        );
 
         //expand properties in path
         if (path != null && path.contains("${")) {
             path = DataContextUtils.replaceDataReferencesInString(path, context.getDataContext());
         }
-         return path;
+        return path;
     }
 
-    public String getSshPrivateKey()  throws ConfigurationException{
+    public String getSshPrivateKey() throws ConfigurationException {
         //look for storage option
         String storagePath = getPrivateKeyStoragePath();
 
-        if(null!=storagePath){
+        if (null != storagePath) {
             Path path = PathUtil.asPath(storagePath);
             try {
                 ResourceMeta contents = context.getStorageTree().getResource(path)
@@ -148,7 +148,7 @@ public class AnsibleRunnerBuilder {
                     return new String(Files.readAllBytes(Paths.get(path)));
                 } catch (IOException e) {
                     throw new ConfigurationException("Failed to read the ssh private key from path " +
-                                                  path + ": " + e.getMessage());
+                            path + ": " + e.getMessage());
                 }
             } else {
                 return null;
@@ -156,28 +156,28 @@ public class AnsibleRunnerBuilder {
         }
     }
 
-    public String getSshPassword()  throws ConfigurationException{
+    public String getSshPassword() throws ConfigurationException {
 
         //look for option values first
         //typically jobs use secure options to dynamically setup the ssh password
         final String passwordOption = PropertyResolver.resolveProperty(
-                    AnsibleDescribable.ANSIBLE_SSH_PASSWORD_OPTION,
-                    AnsibleDescribable.DEFAULT_ANSIBLE_SSH_PASSWORD_OPTION,
-                    getFrameworkProject(),
-                    getFramework(),
-                    getNode(),
-                    getjobConf()
-                    );
+                AnsibleDescribable.ANSIBLE_SSH_PASSWORD_OPTION,
+                AnsibleDescribable.DEFAULT_ANSIBLE_SSH_PASSWORD_OPTION,
+                getFrameworkProject(),
+                getFramework(),
+                getNode(),
+                getJobConf()
+        );
         String sshPassword = PropertyResolver.evaluateSecureOption(passwordOption, getContext());
 
-        if(null!=sshPassword){
+        if (null != sshPassword) {
             // is true if there is an ssh option defined in the private data context
             return sshPassword;
         } else {
             //look for storage option
             String storagePath = getPasswordStoragePath();
 
-            if(null!=storagePath){
+            if (null != storagePath) {
                 //look up storage value
                 Path path = PathUtil.asPath(storagePath);
                 try {
@@ -198,21 +198,21 @@ public class AnsibleRunnerBuilder {
     }
 
     public Integer getSSHTimeout() throws ConfigurationException {
-    	Integer timeout = null;
+        Integer timeout = null;
         final String stimeout = PropertyResolver.resolveProperty(
-        		    AnsibleDescribable.ANSIBLE_SSH_TIMEOUT,
-                    null,
-                    getFrameworkProject(),
-                    getFramework(),
-                    getNode(),
-                    getjobConf()
-                    );
+                AnsibleDescribable.ANSIBLE_SSH_TIMEOUT,
+                null,
+                getFrameworkProject(),
+                getFramework(),
+                getNode(),
+                getJobConf()
+        );
         if (null != stimeout) {
             try {
-            	timeout = Integer.parseInt(stimeout);
+                timeout = Integer.parseInt(stimeout);
             } catch (NumberFormatException e) {
                 throw new ConfigurationException("Can't parse timeout value" +
-                		timeout + ": " + e.getMessage());
+                        timeout + ": " + e.getMessage());
             }
         }
         return timeout;
@@ -221,13 +221,13 @@ public class AnsibleRunnerBuilder {
     public String getSshUser() {
         final String user;
         user = PropertyResolver.resolveProperty(
-                  AnsibleDescribable.ANSIBLE_SSH_USER,
-                  null,
-                  getFrameworkProject(),
-                  getFramework(),
-                  getNode(),
-                  getjobConf()
-                  );
+                AnsibleDescribable.ANSIBLE_SSH_USER,
+                null,
+                getFrameworkProject(),
+                getFramework(),
+                getNode(),
+                getJobConf()
+        );
 
         if (null != user && user.contains("${")) {
             return DataContextUtils.replaceDataReferencesInString(user, getContext().getDataContext());
@@ -238,16 +238,16 @@ public class AnsibleRunnerBuilder {
 
     public AuthenticationType getSshAuthenticationType() {
         String authType = PropertyResolver.resolveProperty(
-                  AnsibleDescribable.ANSIBLE_SSH_AUTH_TYPE,
-                  null,
-                  getFrameworkProject(),
-                  getFramework(),
-                  getNode(),
-                  getjobConf()
-                  );
+                AnsibleDescribable.ANSIBLE_SSH_AUTH_TYPE,
+                null,
+                getFrameworkProject(),
+                getFramework(),
+                getNode(),
+                getJobConf()
+        );
 
         if (null != authType) {
-             return AuthenticationType.valueOf(authType);
+            return AuthenticationType.valueOf(authType);
         }
         return AuthenticationType.privateKey;
     }
@@ -255,12 +255,12 @@ public class AnsibleRunnerBuilder {
     public String getBecomeUser() {
         final String user;
         user = PropertyResolver.resolveProperty(
-                   AnsibleDescribable.ANSIBLE_BECOME_USER,
-                   null,
-                   getFrameworkProject(),
-                   getFramework(),getNode(),
-                   getjobConf()
-                   );
+                AnsibleDescribable.ANSIBLE_BECOME_USER,
+                null,
+                getFrameworkProject(),
+                getFramework(), getNode(),
+                getJobConf()
+        );
 
         if (null != user && user.contains("${")) {
             return DataContextUtils.replaceDataReferencesInString(user, getContext().getDataContext());
@@ -271,66 +271,66 @@ public class AnsibleRunnerBuilder {
     public Boolean getBecome() {
         Boolean become = null;
         String sbecome = PropertyResolver.resolveProperty(
-                   AnsibleDescribable.ANSIBLE_BECOME,
-                   null,
-                   getFrameworkProject(),
-                   getFramework(),
-                   getNode(),
-                   getjobConf()
-                   );
+                AnsibleDescribable.ANSIBLE_BECOME,
+                null,
+                getFrameworkProject(),
+                getFramework(),
+                getNode(),
+                getJobConf()
+        );
 
         if (null != sbecome) {
-        	become = Boolean.parseBoolean(sbecome);
+            become = Boolean.parseBoolean(sbecome);
         }
         return become;
     }
 
     public String getExtraParams() {
-    	final String extraParams;
-    	extraParams = PropertyResolver.resolveProperty(
-    	            AnsibleDescribable.ANSIBLE_EXTRA_PARAM,
-    	            null,
-    	            getFrameworkProject(),
-    	            getFramework(),
-    	            getNode(),
-    	            getjobConf()
-    	            );
+        final String extraParams;
+        extraParams = PropertyResolver.resolveProperty(
+                AnsibleDescribable.ANSIBLE_EXTRA_PARAM,
+                null,
+                getFrameworkProject(),
+                getFramework(),
+                getNode(),
+                getJobConf()
+        );
 
-    	if (null != extraParams && extraParams.contains("${")) {
-    	     return DataContextUtils.replaceDataReferencesInString(extraParams, getContext().getDataContext());
-    	}
-    	return extraParams;
+        if (null != extraParams && extraParams.contains("${")) {
+            return DataContextUtils.replaceDataReferencesInString(extraParams, getContext().getDataContext());
+        }
+        return extraParams;
     }
 
     public BecomeMethodType getBecomeMethod() {
         String becomeMethod = PropertyResolver.resolveProperty(
-                   AnsibleDescribable.ANSIBLE_BECOME_METHOD,
-                   null,
-                   getFrameworkProject(),
-                   getFramework(),
-                   getNode(),
-                   getjobConf()
-                   );
+                AnsibleDescribable.ANSIBLE_BECOME_METHOD,
+                null,
+                getFrameworkProject(),
+                getFramework(),
+                getNode(),
+                getJobConf()
+        );
 
         if (null != becomeMethod) {
-             return BecomeMethodType.valueOf(becomeMethod);
+            return BecomeMethodType.valueOf(becomeMethod);
         }
         return null;
     }
 
-    public byte[] getPasswordStorageData() throws IOException{
+    public byte[] getPasswordStorageData() throws IOException {
         return loadStoragePathData(getPasswordStoragePath());
     }
 
     public String getBecomePasswordStoragePath() {
         String path = PropertyResolver.resolveProperty(
-        		AnsibleDescribable.ANSIBLE_BECOME_PASSWORD_STORAGE_PATH,
+                AnsibleDescribable.ANSIBLE_BECOME_PASSWORD_STORAGE_PATH,
                 null,
                 getFrameworkProject(),
                 getFramework(),
                 getNode(),
-                getjobConf()
-                );
+                getJobConf()
+        );
         //expand properties in path
         if (path != null && path.contains("${")) {
             path = DataContextUtils.replaceDataReferencesInString(path, context.getDataContext());
@@ -338,39 +338,39 @@ public class AnsibleRunnerBuilder {
         return path;
     }
 
-    public byte[] getBecomePasswordStorageData() throws IOException{
+    public byte[] getBecomePasswordStorageData() throws IOException {
         return loadStoragePathData(getBecomePasswordStoragePath());
     }
 
-    public String getBecomePassword()  throws ConfigurationException{
+    public String getBecomePassword() throws ConfigurationException {
 
         //look for option values first
         //typically jobs use secure options to dynamically setup the become password
         String passwordOption = PropertyResolver.resolveProperty(
-                    AnsibleDescribable.ANSIBLE_BECOME_PASSWORD_OPTION,
-                    AnsibleDescribable.DEFAULT_ANSIBLE_BECOME_PASSWORD_OPTION,
-                    getFrameworkProject(),
-                    getFramework(),
-                    getNode(),
-                    getjobConf()
-                    );
+                AnsibleDescribable.ANSIBLE_BECOME_PASSWORD_OPTION,
+                AnsibleDescribable.DEFAULT_ANSIBLE_BECOME_PASSWORD_OPTION,
+                getFrameworkProject(),
+                getFramework(),
+                getNode(),
+                getJobConf()
+        );
         String becomePassword = PropertyResolver.evaluateSecureOption(passwordOption, getContext());
 
-        if(null!=becomePassword){
+        if (null != becomePassword) {
             // is true if there is a become option defined in the private data context
             return becomePassword;
         } else {
             //look for storage option
             String storagePath = PropertyResolver.resolveProperty(
-                AnsibleDescribable.ANSIBLE_BECOME_PASSWORD_STORAGE_PATH,
-                null,
-                getFrameworkProject(),
-                getFramework(),
-                getNode(),
-                getjobConf()
-                );
+                    AnsibleDescribable.ANSIBLE_BECOME_PASSWORD_STORAGE_PATH,
+                    null,
+                    getFrameworkProject(),
+                    getFramework(),
+                    getNode(),
+                    getJobConf()
+            );
 
-            if(null!=storagePath){
+            if (null != storagePath) {
                 //look up storage value
                 if (storagePath.contains("${")) {
                     storagePath = DataContextUtils.replaceDataReferencesInString(
@@ -404,7 +404,7 @@ public class AnsibleRunnerBuilder {
                 getFrameworkProject(),
                 getFramework(),
                 getNode(),
-                getjobConf()
+                getJobConf()
         );
 
         if(null!=storagePath) {
@@ -443,13 +443,13 @@ public class AnsibleRunnerBuilder {
         } else {
 
             String path = PropertyResolver.resolveProperty(
-            	AnsibleDescribable.ANSIBLE_VAULT_PATH,
-                null,
-                getFrameworkProject(),
-                getFramework(),
-                getNode(),
-                getjobConf()
-                );
+                    AnsibleDescribable.ANSIBLE_VAULT_PATH,
+                    null,
+                    getFrameworkProject(),
+                    getFramework(),
+                    getNode(),
+                    getJobConf()
+            );
 
             //expand properties in path
             if (path != null && path.contains("${")) {
@@ -457,22 +457,22 @@ public class AnsibleRunnerBuilder {
             }
 
             if (path != null) {
-              try {
-				return new String(Files.readAllBytes(Paths.get(path)));
-			} catch (IOException e) {
-                throw new ConfigurationException("Failed to read the ssh private key from path " +
-                		path + ": " + e.getMessage());
-			}
+                try {
+                    return new String(Files.readAllBytes(Paths.get(path)));
+                } catch (IOException e) {
+                    throw new ConfigurationException("Failed to read the ssh private key from path " +
+                            path + ": " + e.getMessage());
+                }
             } else {
-              return null;
+                return null;
             }
         }
     }
 
     public String getPlaybookPath() {
         String playbook = null;
-        if ( getjobConf().containsKey(AnsibleDescribable.ANSIBLE_PLAYBOOK_PATH) ) {
-        	playbook = (String) jobConf.get(AnsibleDescribable.ANSIBLE_PLAYBOOK_PATH);
+        if (getJobConf().containsKey(AnsibleDescribable.ANSIBLE_PLAYBOOK_PATH)) {
+            playbook = (String) jobConf.get(AnsibleDescribable.ANSIBLE_PLAYBOOK_PATH);
         }
 
         if (null != playbook && playbook.contains("${")) {
@@ -482,21 +482,21 @@ public class AnsibleRunnerBuilder {
     }
 
     public String getPlaybookInline() {
-    	 	String playbook = null;
-         if ( getjobConf().containsKey(AnsibleDescribable.ANSIBLE_PLAYBOOK_INLINE) ) {
-         	playbook = (String) jobConf.get(AnsibleDescribable.ANSIBLE_PLAYBOOK_INLINE);
-         }
+        String playbook = null;
+        if (getJobConf().containsKey(AnsibleDescribable.ANSIBLE_PLAYBOOK_INLINE)) {
+            playbook = (String) jobConf.get(AnsibleDescribable.ANSIBLE_PLAYBOOK_INLINE);
+        }
 
-         if (null != playbook && playbook.contains("${")) {
-             return DataContextUtils.replaceDataReferencesInString(playbook, getContext().getDataContext());
-         }
-         return playbook;
+        if (null != playbook && playbook.contains("${")) {
+            return DataContextUtils.replaceDataReferencesInString(playbook, getContext().getDataContext());
+        }
+        return playbook;
     }
 
     public String getModule() {
         String module = null;
-        if ( getjobConf().containsKey(AnsibleDescribable.ANSIBLE_MODULE) ) {
-        	module = (String) jobConf.get(AnsibleDescribable.ANSIBLE_MODULE);
+        if (getJobConf().containsKey(AnsibleDescribable.ANSIBLE_MODULE)) {
+            module = (String) jobConf.get(AnsibleDescribable.ANSIBLE_MODULE);
         }
 
         if (null != module && module.contains("${")) {
@@ -507,8 +507,8 @@ public class AnsibleRunnerBuilder {
 
     public String getModuleArgs() {
         String args = null;
-        if ( getjobConf().containsKey(AnsibleDescribable.ANSIBLE_MODULE_ARGS) ) {
-        	args = (String) jobConf.get(AnsibleDescribable.ANSIBLE_MODULE_ARGS);
+        if (getJobConf().containsKey(AnsibleDescribable.ANSIBLE_MODULE_ARGS)) {
+            args = (String) jobConf.get(AnsibleDescribable.ANSIBLE_MODULE_ARGS);
         }
 
         if (null != args && args.contains("${")) {
@@ -520,13 +520,13 @@ public class AnsibleRunnerBuilder {
     public String getExecutable() {
         final String executable;
         executable = PropertyResolver.resolveProperty(
-                  AnsibleDescribable.ANSIBLE_EXECUTABLE,
-                  null,
-                  getFrameworkProject(),
-                  getFramework(),
-                  getNode(),
-                  getjobConf()
-                  );
+                AnsibleDescribable.ANSIBLE_EXECUTABLE,
+                null,
+                getFrameworkProject(),
+                getFramework(),
+                getNode(),
+                getJobConf()
+        );
 
         if (null != executable && executable.contains("${")) {
             return DataContextUtils.replaceDataReferencesInString(executable, getContext().getDataContext());
@@ -537,13 +537,13 @@ public class AnsibleRunnerBuilder {
     public Boolean getDebug() {
         Boolean debug = Boolean.FALSE;
         String sdebug = PropertyResolver.resolveProperty(
-                  AnsibleDescribable.ANSIBLE_DEBUG,
-                  null,
-                  getFrameworkProject(),
-                  getFramework(),
-                  getNode(),
-                  getjobConf()
-                  );
+                AnsibleDescribable.ANSIBLE_DEBUG,
+                null,
+                getFrameworkProject(),
+                getFramework(),
+                getNode(),
+                getJobConf()
+        );
 
         if (null != sdebug) {
             debug = Boolean.parseBoolean(sdebug);
@@ -554,13 +554,13 @@ public class AnsibleRunnerBuilder {
     public String getExtraVars() {
         final String extraVars;
         extraVars = PropertyResolver.resolveProperty(
-                    AnsibleDescribable.ANSIBLE_EXTRA_VARS,
-                    null,
-                    getFrameworkProject(),
-                    getFramework(),
-                    getNode(),
-                    getjobConf()
-                    );
+                AnsibleDescribable.ANSIBLE_EXTRA_VARS,
+                null,
+                getFrameworkProject(),
+                getFramework(),
+                getNode(),
+                getJobConf()
+        );
 
         if (null != extraVars && extraVars.contains("${")) {
             return DataContextUtils.replaceDataReferencesInString(extraVars, getContext().getDataContext());
@@ -571,16 +571,16 @@ public class AnsibleRunnerBuilder {
     public Boolean generateInventory() {
         Boolean generateInventory = null;
         String sgenerateInventory = PropertyResolver.resolveProperty(
-                  AnsibleDescribable.ANSIBLE_GENERATE_INVENTORY,
-                  null,
-                  getFrameworkProject(),
-                  getFramework(),
-                  getNode(),
-                  getjobConf()
-                  );
+                AnsibleDescribable.ANSIBLE_GENERATE_INVENTORY,
+                null,
+                getFrameworkProject(),
+                getFramework(),
+                getNode(),
+                getJobConf()
+        );
 
         if (null != sgenerateInventory) {
-        	generateInventory = Boolean.parseBoolean(sgenerateInventory);
+            generateInventory = Boolean.parseBoolean(sgenerateInventory);
         }
         return generateInventory;
     }
@@ -588,10 +588,10 @@ public class AnsibleRunnerBuilder {
     public String getInventory() throws ConfigurationException {
         String inventory;
         String inline_inventory;
-        Boolean isGenerated =  generateInventory();
+        Boolean isGenerated = generateInventory();
 
 
-        if (isGenerated !=null && isGenerated) {
+        if (isGenerated != null && isGenerated) {
             File tempInventory = new AnsibleInventoryBuilder(this.nodes).buildInventory();
             tempFiles.add(tempInventory);
             inventory = tempInventory.getAbsolutePath();
@@ -603,7 +603,7 @@ public class AnsibleRunnerBuilder {
                 getFrameworkProject(),
                 getFramework(),
                 getNode(),
-                getjobConf()
+                getJobConf()
         );
 
         if (inline_inventory != null) {
@@ -624,7 +624,7 @@ public class AnsibleRunnerBuilder {
                 getFrameworkProject(),
                 getFramework(),
                 getNode(),
-                getjobConf()
+                getJobConf()
         );
 
         if (null != inventory && inventory.contains("${")) {
@@ -638,26 +638,26 @@ public class AnsibleRunnerBuilder {
         final String limit;
 
         // Return Null if Disabled
-        if(PropertyResolver.resolveBooleanProperty(
-        				AnsibleDescribable.ANSIBLE_DISABLE_LIMIT,
-        				Boolean.valueOf(AnsibleDescribable.DISABLE_LIMIT_PROP.getDefaultValue()),
-    				    getFrameworkProject(),
-                        getFramework(),
-                        getNode(),
-                        getjobConf())){
+        if (PropertyResolver.resolveBooleanProperty(
+                AnsibleDescribable.ANSIBLE_DISABLE_LIMIT,
+                Boolean.valueOf(AnsibleDescribable.DISABLE_LIMIT_PROP.getDefaultValue()),
+                getFrameworkProject(),
+                getFramework(),
+                getNode(),
+                getJobConf())) {
 
-        	return null;
+            return null;
         }
 
         // Get Limit from Rundeck
         limit = PropertyResolver.resolveProperty(
-                     AnsibleDescribable.ANSIBLE_LIMIT,
-                     null,
-                     getFrameworkProject(),
-                     getFramework(),
-                     getNode(),
-                     getjobConf()
-                     );
+                AnsibleDescribable.ANSIBLE_LIMIT,
+                null,
+                getFrameworkProject(),
+                getFramework(),
+                getNode(),
+                getJobConf()
+        );
 
         if (null != limit && limit.contains("${")) {
             return DataContextUtils.replaceDataReferencesInString(limit, getContext().getDataContext());
@@ -674,7 +674,7 @@ public class AnsibleRunnerBuilder {
                 getFrameworkProject(),
                 getFramework(),
                 getNode(),
-                getjobConf()
+                getJobConf()
         );
 
         if (null != configFile && configFile.contains("${")) {
@@ -685,8 +685,8 @@ public class AnsibleRunnerBuilder {
 
     public String getBaseDir() {
         String baseDir = null;
-        if ( getjobConf().containsKey(AnsibleDescribable.ANSIBLE_BASE_DIR_PATH) ) {
-        	baseDir = (String) jobConf.get(AnsibleDescribable.ANSIBLE_BASE_DIR_PATH);
+        if (getJobConf().containsKey(AnsibleDescribable.ANSIBLE_BASE_DIR_PATH)) {
+            baseDir = (String) jobConf.get(AnsibleDescribable.ANSIBLE_BASE_DIR_PATH);
         }
 
         if (null != baseDir && baseDir.contains("${")) {
@@ -697,14 +697,14 @@ public class AnsibleRunnerBuilder {
 
     public String getBinariesFilePath() {
         String binariesFilePathStr;
-	binariesFilePathStr = PropertyResolver.resolveProperty(
-		AnsibleDescribable.ANSIBLE_BINARIES_DIR_PATH,
-		null,
-		getFrameworkProject(),
-		getFramework(),
-		getNode(),
-		getjobConf()
-		);	
+        binariesFilePathStr = PropertyResolver.resolveProperty(
+                AnsibleDescribable.ANSIBLE_BINARIES_DIR_PATH,
+                null,
+                getFrameworkProject(),
+                getFramework(),
+                getNode(),
+                getJobConf()
+        );
         if (null != binariesFilePathStr) {
             if (binariesFilePathStr.contains("${")) {
                 return DataContextUtils.replaceDataReferencesInString(binariesFilePathStr, getContext().getDataContext());
@@ -713,158 +713,10 @@ public class AnsibleRunnerBuilder {
         return binariesFilePathStr;
     }
 
-    public AnsibleRunner buildAnsibleRunner() throws ConfigurationException{
-
-        AnsibleRunner runner = null;
-
-        String playbook;
-        String module;
-
-        if ((playbook = getPlaybookPath()) != null) {
-            runner = AnsibleRunner.playbookPath(playbook);
-        } else if ((playbook = getPlaybookInline()) != null) {
-        		runner = AnsibleRunner.playbookInline(playbook);
-        } else if ((module  = getModule()) != null) {
-            runner = AnsibleRunner.adHoc(module, getModuleArgs());
-        } else {
-            throw new ConfigurationException("Missing module or playbook job arguments");
-        }
-
-        final AuthenticationType authType = getSshAuthenticationType();
-        if (AuthenticationType.privateKey == authType) {
-             final String privateKey = getSshPrivateKey();
-             if (privateKey != null) {
-                runner = runner.sshPrivateKey(privateKey);
-             }
-
-             if(getUseSshAgent()){
-                 runner.sshUseAgent(true);
-
-                 String passphraseOption = getPassphrase();
-                 runner.sshPassphrase(passphraseOption);
-             }
-
-
-
-        } else if (AuthenticationType.password == authType) {
-            final String password = getSshPassword();
-            if (password != null) {
-                runner = runner.sshUsePassword(Boolean.TRUE).sshPass(password);
-            }
-        }
-
-        // set rundeck options as environment variables
-        Map<String,String> options = context.getDataContext().get("option");
-        if (options != null) {
-            runner = runner.options(options);
-        }
-
-        String inventory = getInventory();
-        if (inventory != null) {
-            runner = runner.setInventory(inventory);
-        }
-
-        String limit = getLimit();
-        if (limit != null) {
-            runner = runner.limit(limit);
-        }
-
-        Boolean debug = getDebug();
-        if (debug != null) {
-            if (debug == Boolean.TRUE) {
-               runner = runner.debug(Boolean.TRUE);
-            } else {
-               runner = runner.debug(Boolean.FALSE);
-            }
-        }
-
-        String extraParams = getExtraParams();
-        if (extraParams != null) {
-             runner = runner.extraParams(extraParams);
-        }
-
-        String extraVars = getExtraVars();
-        if (extraVars != null) {
-            runner = runner.extraVars(extraVars);
-        }
-
-        String user = getSshUser();
-        if (user != null) {
-            runner = runner.sshUser(user);
-        }
-
-        String vault = getVaultKey();
-        if (vault != null) {
-            runner = runner.vaultPass(vault);
-        }
-
-        Integer timeout = getSSHTimeout();
-        if (timeout != null) {
-            runner = runner.sshTimeout(timeout);
-        }
-
-        Boolean become = getBecome();
-        if (become != null) {
-            runner = runner.become(become);
-        }
-
-        String become_user = getBecomeUser();
-        if (become_user != null) {
-            runner = runner.becomeUser(become_user);
-        }
-
-        BecomeMethodType become_method = getBecomeMethod();
-        if (become_method != null) {
-            runner = runner.becomeMethod(become_method.name());
-        }
-
-        String become_password = getBecomePassword();
-        if (become_password != null) {
-            runner = runner.becomePassword(become_password);
-        }
-
-        String executable = getExecutable();
-        if (executable != null) {
-            runner = runner.executable(executable);
-        }
-
-        String configFile = getConfigFile();
-        if (configFile != null) {
-            runner = runner.configFile(configFile);
-        }
-
-        String baseDir = getBaseDir();
-        if (baseDir != null) {
-            runner = runner.baseDirectory(baseDir);
-        }
-
-        String binariesFilePath = getBinariesFilePath();
-        if (binariesFilePath != null) {
-            runner = runner.ansibleBinariesDirectory(binariesFilePath);
-        }
-
-        return runner;
-    }
-
-    public ExecutionContext getContext() {
-        return context;
-    }
-
-    public Framework getFramework() {
-        return framework;
-    }
-
     public INodeEntry getNode() {
         return nodes.size() == 1 ? nodes.iterator().next() : null;
     }
 
-    public String getFrameworkProject() {
-        return frameworkProject;
-    }
-
-    public Map<String,Object> getjobConf() {
-        return jobConf;
-    }
 
     public void cleanupTempFiles() {
         for (File temp : tempFiles) {
@@ -883,7 +735,7 @@ public class AnsibleRunnerBuilder {
                 getFrameworkProject(),
                 getFramework(),
                 getNode(),
-                getjobConf()
+                getJobConf()
         );
 
         if (null != sAgent) {
@@ -901,19 +753,19 @@ public class AnsibleRunnerBuilder {
                 getFrameworkProject(),
                 getFramework(),
                 getNode(),
-                getjobConf()
+                getJobConf()
         );
         String sshPassword = PropertyResolver.evaluateSecureOption(passphraseOption, getContext());
 
-        if(null!=sshPassword){
+        if (null != sshPassword) {
             // is true if there is an ssh option defined in the private data context
             return sshPassword;
-        }else{
+        } else {
             return getPassphraseStorageData(getPassphraseStoragePath());
         }
     }
 
-    public String getPassphraseStoragePath(){
+    public String getPassphraseStoragePath() {
 
         String storagePath = PropertyResolver.resolveProperty(
                 AnsibleDescribable.ANSIBLE_SSH_PASSPHRASE,
@@ -921,10 +773,10 @@ public class AnsibleRunnerBuilder {
                 getFrameworkProject(),
                 getFramework(),
                 getNode(),
-                getjobConf()
+                getJobConf()
         );
 
-        if(null!=storagePath) {
+        if (null != storagePath) {
             //expand properties in path
             if (storagePath.contains("${")) {
                 storagePath = DataContextUtils.replaceDataReferencesInString(storagePath, context.getDataContext());
@@ -936,8 +788,11 @@ public class AnsibleRunnerBuilder {
         return null;
 
     }
-    
+
     public String getPassphraseStorageData(String storagePath) throws ConfigurationException {
+        if (storagePath == null) {
+            return null;
+        }
 
         Path path = PathUtil.asPath(storagePath);
         try {
@@ -950,5 +805,32 @@ public class AnsibleRunnerBuilder {
             throw new ConfigurationException("Failed to read the ssh Passphrase for " +
                     "storage path: " + storagePath + ": " + e.getMessage());
         }
+    }
+
+    public boolean encryptExtraVars() throws ConfigurationException {
+        return PropertyResolver.resolveBooleanProperty(
+                AnsibleDescribable.ANSIBLE_ENCRYPT_EXTRA_VARS,
+                false,
+                getFrameworkProject(),
+                getFramework(),
+                getNode(),
+                getJobConf()
+        );
+    }
+
+    public Map<String,String> getListOptions(){
+        Map<String, String> options = new HashMap<>();
+        Map<String, String> optionsContext = context.getDataContext().get("option");
+        Map<String, String> secureOptionContext = context.getDataContext().get("secureOption");
+        if (optionsContext != null && secureOptionContext!=null) {
+            optionsContext.forEach((option, value) -> {
+                if(!secureOptionContext.containsKey(option)){
+                    options.put(option, value);
+                }
+            });
+        }else if (optionsContext != null) {
+            options.putAll(optionsContext);
+        }
+        return options;
     }
 }

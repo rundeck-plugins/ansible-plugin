@@ -2,11 +2,8 @@ package com.rundeck.plugins.ansible.plugin;
 
 import com.dtolabs.rundeck.core.execution.proxy.ProxyRunnerPlugin;
 import com.dtolabs.rundeck.core.plugins.configuration.ConfigurationException;
-import com.rundeck.plugins.ansible.ansible.AnsibleDescribable;
-import com.rundeck.plugins.ansible.ansible.AnsibleException;
-import com.rundeck.plugins.ansible.ansible.AnsibleRunner;
-import com.rundeck.plugins.ansible.ansible.AnsibleRunnerBuilder;
-import com.rundeck.plugins.ansible.ansible.PropertyResolver;
+import com.rundeck.plugins.ansible.ansible.*;
+import com.rundeck.plugins.ansible.ansible.AnsibleRunnerContextBuilder;
 import com.dtolabs.rundeck.core.common.INodeEntry;
 import com.dtolabs.rundeck.core.execution.ExecutionContext;
 import com.dtolabs.rundeck.core.execution.service.NodeExecutor;
@@ -54,6 +51,8 @@ public class AnsibleNodeExecutor implements NodeExecutor, AnsibleDescribable, Pr
         builder.property(BECOME_PASSWORD_STORAGE_PROP);
         builder.property(VAULT_KEY_FILE_PROP);
         builder.property(VAULT_KEY_STORAGE_PROP);
+
+
         builder.mapping(ANSIBLE_BINARIES_DIR_PATH,PROJ_PROP_PREFIX + ANSIBLE_BINARIES_DIR_PATH);
         builder.frameworkMapping(ANSIBLE_BINARIES_DIR_PATH,FWK_PROP_PREFIX + ANSIBLE_BINARIES_DIR_PATH);
         builder.mapping(ANSIBLE_EXECUTABLE,PROJ_PROP_PREFIX + ANSIBLE_EXECUTABLE);
@@ -95,7 +94,7 @@ public class AnsibleNodeExecutor implements NodeExecutor, AnsibleDescribable, Pr
         builder.mapping(ANSIBLE_VAULTSTORE_PATH,PROJ_PROP_PREFIX + ANSIBLE_VAULTSTORE_PATH);
         builder.frameworkMapping(ANSIBLE_VAULTSTORE_PATH,FWK_PROP_PREFIX + ANSIBLE_VAULTSTORE_PATH);
 
-        DESC=builder.build();
+      DESC=builder.build();
   }
 
   @Override
@@ -167,10 +166,10 @@ public class AnsibleNodeExecutor implements NodeExecutor, AnsibleDescribable, Pr
     }
 
 
-    AnsibleRunnerBuilder builder = new AnsibleRunnerBuilder(node, context, context.getFramework(), jobConf);
+    AnsibleRunnerContextBuilder contextBuilder = new AnsibleRunnerContextBuilder(node, context, context.getFramework(), jobConf);
 
     try {
-        runner = builder.buildAnsibleRunner();
+        runner = AnsibleRunner.buildAnsibleRunner(contextBuilder);
     } catch (ConfigurationException e) {
           return NodeExecutorResultImpl.createFailure(AnsibleException.AnsibleFailureReason.ParseArgumentsError, e.getMessage(), node);
     }
@@ -179,9 +178,9 @@ public class AnsibleNodeExecutor implements NodeExecutor, AnsibleDescribable, Pr
         runner.run();
     } catch (Exception e) {
         return NodeExecutorResultImpl.createFailure(AnsibleException.AnsibleFailureReason.AnsibleError, e.getMessage(), node);
+    }finally {
+        contextBuilder.cleanupTempFiles();
     }
-
-    builder.cleanupTempFiles();
 
     return NodeExecutorResultImpl.createSuccess(node);
   }
@@ -195,7 +194,7 @@ public class AnsibleNodeExecutor implements NodeExecutor, AnsibleDescribable, Pr
     public List<String> listSecretsPath(ExecutionContext context, INodeEntry node) {
         Map<String, Object> jobConf = new HashMap<>();
         jobConf.put(AnsibleDescribable.ANSIBLE_LIMIT,node.getNodename());
-        AnsibleRunnerBuilder builder = new AnsibleRunnerBuilder(node, context, context.getFramework(), jobConf);
+        AnsibleRunnerContextBuilder builder = new AnsibleRunnerContextBuilder(node, context, context.getFramework(), jobConf);
 
         return AnsibleUtil.getSecretsPath(builder);
     }

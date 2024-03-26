@@ -1,0 +1,42 @@
+plugins {
+    id 'groovy'
+}
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+}
+
+
+group = 'com.github.rundeck-plugins'
+
+configurations {
+    configurations {
+        instrumentedClasspath {
+            canBeConsumed = false
+        }
+    }
+}
+dependencies {
+    testImplementation "org.spockframework:spock-core:2.1-groovy-3.0"
+
+    testImplementation "org.testcontainers:testcontainers:1.17.2"
+    testImplementation "org.testcontainers:spock:1.17.2"
+    testImplementation group: 'org.rundeck.api', name: 'rd-api-client', version: '2.0.8'
+
+    testImplementation group: 'com.jcraft', name: 'jsch', version: '0.1.55'
+
+}
+
+tasks.register('functionalTest', Test) {
+    useJUnitPlatform()
+    systemProperty('RUNDECK_TEST_IMAGE', "rundeck/rundeck:5.1.1")
+    description = "Run Ansible integration tests"
+}
+
+tasks.register('copyPluginArtifact', Copy) {
+    from("$rootDir/build/libs/"){
+        include '**/*.jar'
+    }
+    into "$projectDir/src/test/resources/docker/rundeck/plugins"
+}

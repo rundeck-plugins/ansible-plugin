@@ -14,14 +14,18 @@ jobs:
       - name: Get Fetch Tags
         run: git -c protocol.version=2 fetch --tags --progress --no-recurse-submodules origin
         if: "!contains(github.ref, 'refs/tags')"
-      - name: Set up JDK 1.8
+      - name: Set up JDK 1.11
         uses: actions/setup-java@v1
         with:
-          java-version: 1.8
+          java-version: 11
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
       - name: Build with Gradle
         run: ./gradlew build
+      - name: Copy Artifact for integration test
+        run: ./gradlew :functional-test:copyPluginArtifact
+      - name: Run integration Test
+        run: ./gradlew :functional-test:functionalTest
       - name: Get Release Version
         id: get_version
         run: VERSION=$(./gradlew currentVersion -q -Prelease.quiet) && echo ::set-output name=VERSION::$VERSION
