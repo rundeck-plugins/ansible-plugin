@@ -526,5 +526,6 @@ public interface AnsibleDescribable extends Describable {
             .required(false)
             .title("Encrypt Extra Vars.")
             .description("Encrypt the value of the extra vars keys.")
+            .defaultValue("true")
             .build();
 }
