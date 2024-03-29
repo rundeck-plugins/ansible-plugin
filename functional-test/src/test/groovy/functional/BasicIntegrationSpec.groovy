@@ -138,10 +138,41 @@ class BasicIntegrationSpec extends Specification {
 
     }
 
-    def "test inline playbook encrypt env vars"(){
+    def "test inline playbook encrypt env vars true"(){
         when:
 
         def jobId = "284e1a6e-bae0-4778-a838-50647fb340e3"
+
+        JobRun request = new JobRun()
+        request.loglevel = 'DEBUG'
+
+        def result = client.apiCall {api-> api.runJob(jobId, request)}
+        def executionId = result.id
+
+        def executionState = waitForJob(executionId)
+
+        def logs = getLogs(executionId)
+        Map<String, Integer> ansibleNodeExecutionStatus = TestUtil.getAnsibleNodeResult(logs)
+
+
+        then:
+        executionState!=null
+        executionState.getExecutionState()=="SUCCEEDED"
+        ansibleNodeExecutionStatus.get("ok")!=0
+        ansibleNodeExecutionStatus.get("unreachable")==0
+        ansibleNodeExecutionStatus.get("failed")==0
+        ansibleNodeExecutionStatus.get("skipped")==0
+        ansibleNodeExecutionStatus.get("ignored")==0
+        logs.findAll {it.log.contains("encryptVariable password")}.size() == 1
+        logs.findAll {it.log.contains("encryptVariable username")}.size() == 1
+        logs.findAll {it.log.contains("\"msg\": \"rundeck\"")}.size() == 1
+        logs.findAll {it.log.contains("\"msg\": \"demo\"")}.size() == 1
+
+    }
+    def "test inline playbook encrypt env vars default true"(){
+        when:
+
+        def jobId = "0f714bfb-a0a4-4668-8279-35a8c4167db9"
 
         JobRun request = new JobRun()
         request.loglevel = 'DEBUG'
