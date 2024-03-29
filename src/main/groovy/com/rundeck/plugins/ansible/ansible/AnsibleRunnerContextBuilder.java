@@ -810,7 +810,7 @@ public class AnsibleRunnerContextBuilder {
     public boolean encryptExtraVars() throws ConfigurationException {
         return PropertyResolver.resolveBooleanProperty(
                 AnsibleDescribable.ANSIBLE_ENCRYPT_EXTRA_VARS,
-                false,
+                true,
                 getFrameworkProject(),
                 getFramework(),
                 getNode(),
