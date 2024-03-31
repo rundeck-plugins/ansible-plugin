@@ -119,6 +119,7 @@ public class AnsibleRunner {
         // set rundeck options as environment variables
         Map<String,String> options = contextBuilder.getListOptions();
         if (options != null) {
+            options.putAll(contextBuilder.getJobOptions());
             ansibleRunnerBuilder.options(options);
         }
 
