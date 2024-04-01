@@ -11,8 +11,8 @@ import com.dtolabs.rundeck.plugins.descriptions.PluginProperty;
 import com.dtolabs.rundeck.plugins.util.DescriptionBuilder;
 
 
-@Plugin(service = ServiceNameConstants.PluginGroup, name = "Ansible Project Configuration")
-@PluginDescription(title = "Ansible", description = "Plugin basic ansible configurations")
+@Plugin(service = ServiceNameConstants.PluginGroup, name = "AnsiblePluginGroup")
+@PluginDescription(title = "Ansible Project Configuration", description = "Plugin basic ansible configurations")
 public class AnsiblePluginGroup implements PluginGroup, Describable {
 
     public String getAnsibleConfigFilePath() {
@@ -43,27 +43,18 @@ public class AnsiblePluginGroup implements PluginGroup, Describable {
             title = "Ansible config file path",
             description = "Set ansible config file path."
     )
-    //@RenderingOptions({
-   //         @RenderingOption(key = StringRenderingConstants.GROUP_NAME, value = "Authentication")
-    //})
     String ansibleConfigFilePath;
 
     @PluginProperty(
             title = "Ansible binaries directory path",
             description = "Set ansible binaries directory path."
     )
-    //@RenderingOptions({
-    //         @RenderingOption(key = StringRenderingConstants.GROUP_NAME, value = "Authentication")
-    //})
     String ansibleBinariesDirPath;
 
     @PluginProperty(
             title = "Encrypt Extra Vars.",
             description = "Encrypt the value of the extra vars keys."
     )
-    //@RenderingOptions({
-    //         @RenderingOption(key = StringRenderingConstants.GROUP_NAME, value = "Authentication")
-    //})
     Boolean encryptExtraVars;
 
     @Override

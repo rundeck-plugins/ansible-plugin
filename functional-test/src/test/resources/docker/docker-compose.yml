@@ -24,6 +24,9 @@ services:
       RUNDECK_GRAILS_URL: http://localhost:4440
       RUNDECK_MULTIURL_ENABLED: "true"
       RUNDECK_SERVER_FORWARDED: "true"
+      RUNDECK_FEATURE_PLUGINGROUPS_ENABLED: "true"
+      RUNDECK_FEATURE_PLUGINGROUPS_NAME: "pluginGroups"
+
     networks:
       - rundeck
     ports:

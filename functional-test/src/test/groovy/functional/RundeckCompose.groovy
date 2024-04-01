@@ -84,7 +84,7 @@ class RundeckCompose extends DockerComposeContainer<RundeckCompose> {
         }
 
         //import project
-        File projectFile = TestUtil.createArchiveJarFile(projectName, new File("src/test/resources/project-import/ansible-test"))
+        File projectFile = TestUtil.createArchiveJarFile(projectName, new File("src/test/resources/project-import/" + projectName))
         RequestBody body = RequestBody.create(projectFile, Client.MEDIA_TYPE_ZIP)
         client.apiCall(api ->
                 api.importProjectArchive(projectName,  "preserve", true, true, true, true, true, true, true, [:], body)
