@@ -1,23 +1,19 @@
 package functional
 
+import functional.base.BaseTestConfiguration
 import functional.util.TestUtil
 import org.rundeck.client.api.model.JobRun
-import spock.lang.Shared
 import org.testcontainers.spock.Testcontainers
 
 
 @Testcontainers
-class BasicIntegrationSpec extends TestConfiguration {
-
-    @Shared
-    public static RundeckCompose rundeckEnvironment = new RundeckCompose(new File("src/test/resources/docker/docker-compose.yml").toURI())
-
+class BasicIntegrationSpec extends BaseTestConfiguration {
 
     static String PROJ_NAME = 'ansible-test'
 
     def setupSpec() {
-        rundeckEnvironment.startCompose()
-        client = rundeckEnvironment.configureRundeck(PROJ_NAME)
+        startCompose()
+        configureRundeck(PROJ_NAME)
     }
 
     def "test simple inline playbook"(){

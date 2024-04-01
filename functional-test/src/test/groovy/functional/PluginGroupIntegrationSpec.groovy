@@ -1,27 +1,19 @@
 package functional
 
+import functional.base.BaseTestConfiguration
 import functional.util.TestUtil
-import org.rundeck.client.api.RundeckApi
 import org.rundeck.client.api.model.JobRun
-import org.rundeck.client.util.Client
 import org.testcontainers.spock.Testcontainers
-import spock.lang.Shared
 
 
 @Testcontainers
-class PluginGroupIntegrationSpec extends TestConfiguration {
-
-    @Shared
-    public static RundeckCompose rundeckEnvironment = new RundeckCompose(new File("src/test/resources/docker/docker-compose.yml").toURI())
-
-    @Shared
-    Client<RundeckApi> client
+class PluginGroupIntegrationSpec extends BaseTestConfiguration {
 
     static String PROJ_NAME = 'ansible-plugin-group-test'
 
     def setupSpec() {
-        rundeckEnvironment.startCompose()
-        client = rundeckEnvironment.configureRundeck(PROJ_NAME)
+        startCompose()
+        configureRundeck(PROJ_NAME)
     }
 
     def "test simple inline playbook"(){
