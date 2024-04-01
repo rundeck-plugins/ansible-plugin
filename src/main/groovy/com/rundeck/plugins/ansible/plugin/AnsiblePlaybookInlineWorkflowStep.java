@@ -2,6 +2,7 @@ package com.rundeck.plugins.ansible.plugin;
 
 import com.dtolabs.rundeck.core.execution.ExecutionContext;
 import com.dtolabs.rundeck.core.execution.proxy.ProxyRunnerPlugin;
+import com.dtolabs.rundeck.plugins.config.ConfiguredBy;
 import com.rundeck.plugins.ansible.ansible.AnsibleDescribable;
 import com.rundeck.plugins.ansible.ansible.AnsibleException;
 import com.rundeck.plugins.ansible.ansible.AnsibleRunner;
@@ -22,14 +23,17 @@ import java.util.Map;
 import java.util.Objects;
 
 @Plugin(name = AnsiblePlaybookInlineWorkflowStep.SERVICE_PROVIDER_NAME, service = ServiceNameConstants.WorkflowStep)
-public class AnsiblePlaybookInlineWorkflowStep implements StepPlugin, AnsibleDescribable, ProxyRunnerPlugin {
+public class AnsiblePlaybookInlineWorkflowStep implements StepPlugin, AnsibleDescribable, ProxyRunnerPlugin, ConfiguredBy<AnsiblePluginGroup> {
 
     public static final String SERVICE_PROVIDER_NAME = "com.batix.rundeck.plugins.AnsiblePlaybookInlineWorkflowStep";
 
     public static Description DESC = null;
 
+    private AnsiblePluginGroup pluginGroup;
+
     static {
         DescriptionBuilder builder = DescriptionBuilder.builder();
+        builder.pluginGroup(AnsiblePluginGroup.class);
         builder.name(SERVICE_PROVIDER_NAME);
         builder.title("Ansible Playbook Inline");
         builder.description("Runs an Inline Ansible Playbook.");
@@ -83,7 +87,11 @@ public class AnsiblePlaybookInlineWorkflowStep implements StepPlugin, AnsibleDes
             configuration.put(AnsibleDescribable.ANSIBLE_DEBUG, "False");
         }
 
-        AnsibleRunnerContextBuilder contextBuilder = new AnsibleRunnerContextBuilder(context.getExecutionContext(), context.getFramework(), context.getNodes(), configuration);
+        AnsibleRunnerContextBuilder contextBuilder = new AnsibleRunnerContextBuilder(context.getExecutionContext(),
+                context.getFramework(),
+                context.getNodes(),
+                configuration,
+                pluginGroup);
 
         try {
             runner = AnsibleRunner.buildAnsibleRunner(contextBuilder);
@@ -134,5 +142,10 @@ public class AnsiblePlaybookInlineWorkflowStep implements StepPlugin, AnsibleDes
     @Override
     public Map<String, String> getRuntimeFrameworkProperties(ExecutionContext context) {
         return AnsibleUtil.getRuntimeProperties(context, AnsibleDescribable.FWK_PROP_PREFIX);
+    }
+
+    @Override
+    public void setPluginGroup(AnsiblePluginGroup ansiblePluginGroup) {
+        this.pluginGroup = ansiblePluginGroup;
     }
 }

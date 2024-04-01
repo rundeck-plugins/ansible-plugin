@@ -381,7 +381,7 @@ public class AnsibleRunner {
             // 1) if the encryptExtraVars is enabled (user input)
             // 2) ssh-password is used for node authentication
             // 3) become-password is used for node authentication
-            if (encryptExtraVars ||
+            if (encryptExtraVars && extraVars != null && !extraVars.isEmpty() ||
                 sshUsePassword ||
                 (become && becomePassword != null && !becomePassword.isEmpty())) {
 

@@ -1,31 +1,19 @@
 package functional
 
+import functional.base.BaseTestConfiguration
 import functional.util.TestUtil
-import org.rundeck.client.api.RundeckApi
-import org.rundeck.client.api.model.ExecLog
-import org.rundeck.client.api.model.ExecOutput
-import org.rundeck.client.api.model.ExecutionStateResponse
 import org.rundeck.client.api.model.JobRun
-import org.rundeck.client.util.Client
-import spock.lang.Shared
-import spock.lang.Specification
 import org.testcontainers.spock.Testcontainers
 
 
 @Testcontainers
-class BasicIntegrationSpec extends Specification {
-
-    @Shared
-    public static RundeckCompose rundeckEnvironment = new RundeckCompose(new File("src/test/resources/docker/docker-compose.yml").toURI())
-
-    @Shared
-    Client<RundeckApi> client
+class BasicIntegrationSpec extends BaseTestConfiguration {
 
     static String PROJ_NAME = 'ansible-test'
 
     def setupSpec() {
-        rundeckEnvironment.startCompose()
-        client = rundeckEnvironment.configureRundeck(PROJ_NAME)
+        startCompose()
+        configureRundeck(PROJ_NAME)
     }
 
     def "test simple inline playbook"(){
@@ -269,56 +257,5 @@ class BasicIntegrationSpec extends Specification {
         logs.findAll {it.log.contains("\"environmentTest\": \"test\"")}.size() == 1
         logs.findAll {it.log.contains("\"token\": 13231232312321321321321")}.size() == 1
     }
-
-    ExecutionStateResponse waitForJob(String executionId){
-        def finalStatus = [
-                'aborted',
-                'failed',
-                'succeeded',
-                'timedout',
-                'other'
-        ]
-
-        while(true) {
-            ExecutionStateResponse result=client.apiCall { api-> api.getExecutionState(executionId)}
-            if (finalStatus.contains(result?.getExecutionState()?.toLowerCase())) {
-                return result
-            } else {
-                sleep (10000)
-            }
-        }
-
-    }
-
-
-    List<ExecLog> getLogs(String executionId){
-        def offset = 0
-        def maxLines = 1000
-        def lastmod = 0
-        boolean isCompleted = false
-
-        List<ExecLog> logs = []
-
-        while (!isCompleted){
-            ExecOutput result = client.apiCall { api -> api.getOutput(executionId, offset,lastmod, maxLines)}
-            isCompleted = result.completed
-            offset = result.offset
-            lastmod = result.lastModified
-
-            logs.addAll(result.entries)
-
-            if(result.unmodified){
-                sleep(5000)
-            }else{
-                sleep(2000)
-            }
-        }
-
-        return logs
-    }
-
-
-
-
 
 }

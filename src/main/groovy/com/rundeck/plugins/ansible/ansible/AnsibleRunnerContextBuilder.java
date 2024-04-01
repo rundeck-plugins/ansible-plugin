@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 
+import com.rundeck.plugins.ansible.plugin.AnsiblePluginGroup;
 import lombok.Getter;
 import org.rundeck.storage.api.Path;
 
@@ -39,6 +40,8 @@ public class AnsibleRunnerContextBuilder {
     private final Collection<INodeEntry> nodes;
     private final Collection<File> tempFiles;
 
+    private AnsiblePluginGroup pluginGroup;
+
 
     public AnsibleRunnerContextBuilder(final ExecutionContext context, final Framework framework, INodeSet nodes, final Map<String, Object> configuration) {
         this.context = context;
@@ -56,6 +59,16 @@ public class AnsibleRunnerContextBuilder {
         this.jobConf = configuration;
         this.nodes = Collections.singleton(node);
         this.tempFiles = new LinkedList<>();
+    }
+
+    public AnsibleRunnerContextBuilder(final ExecutionContext context, final Framework framework, INodeSet nodes, final Map<String, Object> configuration, final AnsiblePluginGroup pluginGroup) {
+        this.context = context;
+        this.framework = framework;
+        this.frameworkProject = context.getFrameworkProject();
+        this.jobConf = configuration;
+        this.nodes = nodes.getNodes();
+        this.tempFiles = new LinkedList<>();
+        this.pluginGroup = pluginGroup;
     }
 
     private byte[] loadStoragePathData(final String passwordStoragePath) throws IOException {
@@ -667,7 +680,7 @@ public class AnsibleRunnerContextBuilder {
 
     public String getConfigFile() {
 
-        final String configFile;
+        String configFile;
         configFile = PropertyResolver.resolveProperty(
                 AnsibleDescribable.ANSIBLE_CONFIG_FILE_PATH,
                 null,
@@ -680,6 +693,18 @@ public class AnsibleRunnerContextBuilder {
         if (null != configFile && configFile.contains("${")) {
             return DataContextUtils.replaceDataReferencesInString(configFile, getContext().getDataContext());
         }
+
+        if(null == configFile || configFile.isEmpty()) {
+            if (this.pluginGroup != null && this.pluginGroup.getAnsibleConfigFilePath() != null && !this.pluginGroup.getAnsibleConfigFilePath().isEmpty()) {
+                this.context.getExecutionLogger().log(
+                        4, "plugin group set getAnsibleConfigFilePath: " + this.pluginGroup.getAnsibleConfigFilePath()
+                );
+
+                configFile = this.pluginGroup.getAnsibleConfigFilePath();
+            }
+        }
+
+
         return configFile;
     }
 
@@ -705,11 +730,21 @@ public class AnsibleRunnerContextBuilder {
                 getNode(),
                 getJobConf()
         );
-        if (null != binariesFilePathStr) {
-            if (binariesFilePathStr.contains("${")) {
-                return DataContextUtils.replaceDataReferencesInString(binariesFilePathStr, getContext().getDataContext());
+
+        if (null != binariesFilePathStr && binariesFilePathStr.contains("${")) {
+            return DataContextUtils.replaceDataReferencesInString(binariesFilePathStr, getContext().getDataContext());
+        }
+
+        if(null == binariesFilePathStr || binariesFilePathStr.isEmpty()){
+            if(this.pluginGroup!=null && this.pluginGroup.getAnsibleBinariesDirPath()!= null &&  !this.pluginGroup.getAnsibleBinariesDirPath().isEmpty()){
+                this.context.getExecutionLogger().log(
+                        4, "plugin group set getAnsibleBinariesDirPath: "+this.pluginGroup.getAnsibleBinariesDirPath()
+                );
+                binariesFilePathStr =  this.pluginGroup.getAnsibleBinariesDirPath();
             }
         }
+
+
         return binariesFilePathStr;
     }
 
@@ -808,7 +843,7 @@ public class AnsibleRunnerContextBuilder {
     }
 
     public boolean encryptExtraVars() throws ConfigurationException {
-        return PropertyResolver.resolveBooleanProperty(
+        boolean encryptExtraVars =  PropertyResolver.resolveBooleanProperty(
                 AnsibleDescribable.ANSIBLE_ENCRYPT_EXTRA_VARS,
                 false,
                 getFrameworkProject(),
@@ -816,6 +851,17 @@ public class AnsibleRunnerContextBuilder {
                 getNode(),
                 getJobConf()
         );
+
+        if(!encryptExtraVars){
+            if(this.pluginGroup!=null && this.pluginGroup.getEncryptExtraVars()!= null &&  this.pluginGroup.getEncryptExtraVars()){
+                this.context.getExecutionLogger().log(
+                        4, "plugin group set getEncryptExtraVars: "+this.pluginGroup.getEncryptExtraVars()
+                );
+                encryptExtraVars =  this.pluginGroup.getEncryptExtraVars();
+            }
+        }
+
+        return encryptExtraVars;
     }
 
     public Map<String,String> getListOptions(){
