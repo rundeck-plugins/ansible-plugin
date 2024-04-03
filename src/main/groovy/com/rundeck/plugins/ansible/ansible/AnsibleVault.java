@@ -73,10 +73,6 @@ public class AnsibleVault {
 
         //send values to STDIN in order
         List<String> stdinVariables = new ArrayList<>();
-        stdinVariables.add(content);
-
-        Map<String, String> env = new HashMap<>();
-        env.put("VAULT_ID_SECRET", masterPassword);
 
         Process proc = null;
 
@@ -85,8 +81,24 @@ public class AnsibleVault {
                     .baseDirectory(baseDirectory.toFile())
                     .stdinVariables(stdinVariables)
                     .redirectErrorStream(true)
-                    .environmentVariables(env)
                     .build().run();
+
+            OutputStream stdin = proc.getOutputStream();
+            BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(stdin));
+
+            //send master password
+            Thread.sleep(1500);
+            writer.write(masterPassword);
+            writer.newLine();
+            writer.flush();
+
+            //send content to encrypt
+            Thread.sleep(1500);
+            writer.write(content);
+            writer.flush();
+
+            writer.close();
+            stdin.close();
 
             StringBuilder stringBuilder = new StringBuilder();
 
