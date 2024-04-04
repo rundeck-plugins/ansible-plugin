@@ -13,6 +13,7 @@ import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.util.*;
+import java.util.concurrent.*;
 
 @Data
 @Builder
@@ -23,6 +24,7 @@ public class AnsibleVault {
     private boolean debug;
     private Path baseDirectory;
     private Path ansibleBinariesDirectory;
+    private String executionId;
 
     public final String ANSIBLE_VAULT_COMMAND = "ansible-vault";
 
@@ -71,23 +73,102 @@ public class AnsibleVault {
             System.out.println("encryptVariable " + key + ": " + procArgs);
         }
 
-        //send values to STDIN in order
-        List<String> stdinVariables = new ArrayList<>();
+        File promptFile = File.createTempFile("vault-prompt", ".log");
+
+        Map<String, String> env = new HashMap<>();
+        env.put("LOG_PATH", promptFile.getAbsolutePath());
 
         Process proc = null;
 
         try {
             proc = ProcessExecutor.builder().procArgs(procArgs)
                     .baseDirectory(baseDirectory.toFile())
-                    .stdinVariables(stdinVariables)
+                    .environmentVariables(env)
                     .redirectErrorStream(true)
                     .build().run();
 
-            OutputStream stdin = proc.getOutputStream();
-            BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(stdin));
+            final InputStream proccesInputStream = proc.getInputStream();
+            final OutputStream processOutputStream = proc.getOutputStream();
 
+            //capture output thread
+            Callable<String> readOutputTask = () -> {
+                return readOutput(proccesInputStream);
+            };
+
+            ExecutorService executor = Executors.newSingleThreadExecutor();
+            Future<String> future = executor.submit(readOutputTask);
+
+            Thread stdinThread = new Thread(() -> sendValuesStdin(processOutputStream, masterPassword, content));
+
+            //wait for prompt
+            boolean promptFound = false;
+            while (!promptFound) {
+                BufferedReader reader = new BufferedReader(new FileReader(promptFile));
+                String currentLine = reader.readLine();
+                if(currentLine!=null && currentLine.contains("Enter Password:")){
+                    promptFound = true;
+
+                    //send password / content
+                    stdinThread.start();
+                    reader.close();
+                }else{
+                    Thread.sleep(1500);
+                }
+            }
+
+            int exitCode = proc.waitFor();
+
+            //get encrypted value
+            String result = future.get();
+            executor.shutdown();
+
+            if (exitCode != 0) {
+                System.err.println("ERROR: encryptFileAnsibleVault:" + procArgs);
+                return null;
+            }
+            return result;
+
+        } catch (Exception e) {
+            System.err.println("error encryptFileAnsibleVault file " + e.getMessage());
+            return null;
+        } finally {
+            // Make sure to always cleanup on failure and success
+            if (proc != null) {
+                proc.destroy();
+            }
+
+            if(promptFile!=null && promptFile.delete()){
+                promptFile.deleteOnExit();
+            }
+        }
+    }
+
+    String readOutput(InputStream proccesInputStream) {
+        try (
+                InputStreamReader isr = new InputStreamReader(proccesInputStream);
+                BufferedReader stdoutReader = new BufferedReader(isr);
+        ) {
+
+            StringBuilder stringBuilder = new StringBuilder();
+            String line1 = null;
+            boolean capture = false;
+            while ((line1 = stdoutReader.readLine()) != null) {
+                if (line1.toLowerCase().contains("!vault")) {
+                    capture = true;
+                }
+                if (capture) {
+                    stringBuilder.append(line1).append("\n");
+                }
+            }
+            return stringBuilder.toString();
+        } catch (Throwable e) {
+            throw new RuntimeException("problem with executing program", e);
+        }
+    }
+
+    void sendValuesStdin(OutputStream stdin, String masterPassword, String content){
+        try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(stdin))) {
             //send master password
-            Thread.sleep(1500);
             writer.write(masterPassword);
             writer.newLine();
             writer.flush();
@@ -100,41 +181,10 @@ public class AnsibleVault {
             writer.close();
             stdin.close();
 
-            StringBuilder stringBuilder = new StringBuilder();
-
-            final InputStream stdoutInputStream = proc.getInputStream();
-            final BufferedReader stdoutReader = new BufferedReader(new InputStreamReader(stdoutInputStream));
-
-            String line1 = null;
-            boolean capture = false;
-            while ((line1 = stdoutReader.readLine()) != null) {
-                if (line1.toLowerCase().contains("!vault")) {
-                    capture = true;
-                }
-                if (capture) {
-                    stringBuilder.append(line1).append("\n");
-                }
-            }
-
-            int exitCode = proc.waitFor();
-
-            if (exitCode != 0) {
-                System.err.println("ERROR: encryptFileAnsibleVault:" + procArgs);
-                return null;
-            }
-            return stringBuilder.toString();
-
-        } catch (Exception e) {
-            System.err.println("error encryptFileAnsibleVault file " + e.getMessage());
-            return null;
-        } finally {
-            // Make sure to always cleanup on failure and success
-            if (proc != null) {
-                proc.destroy();
-            }
+        } catch (Throwable e) {
+            throw new RuntimeException("error sending stdin for ansible-vault", e);
         }
     }
-
 
     public static File createVaultScriptAuth(String suffix) throws IOException {
         File tempInternalVaultFile = File.createTempFile("ansible-runner", suffix + "-client.py");
