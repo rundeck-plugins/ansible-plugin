@@ -90,6 +90,7 @@ public class AnsibleVault {
         env.put("LOG_PATH", promptFile.getAbsolutePath());
 
         Process proc = null;
+        ExecutorService executor = null;
 
         try {
             proc = processExecutorBuilder.procArgs(procArgs)
@@ -106,7 +107,7 @@ public class AnsibleVault {
                 return readOutput(proccesInputStream);
             };
 
-            ExecutorService executor = Executors.newSingleThreadExecutor();
+            executor = Executors.newSingleThreadExecutor();
             Future<String> future = executor.submit(readOutputTask);
 
             Thread stdinThread = new Thread(() -> sendValuesStdin(processOutputStream, masterPassword, content));
@@ -137,7 +138,6 @@ public class AnsibleVault {
 
             //get encrypted value
             String result = future.get();
-            executor.shutdown();
 
             if (exitCode != 0) {
                 throw new RuntimeException("ERROR: encryptFileAnsibleVault:" + procArgs);
@@ -152,8 +152,12 @@ public class AnsibleVault {
                 proc.destroy();
             }
 
-            if(promptFile!=null && promptFile.delete()){
+            if(promptFile!=null && !promptFile.delete()){
                 promptFile.deleteOnExit();
+            }
+
+            if(executor!=null){
+                executor.shutdown();
             }
         }
     }
