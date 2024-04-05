@@ -27,19 +27,26 @@ public class AnsibleVault {
 
     public final String ANSIBLE_VAULT_COMMAND = "ansible-vault";
 
+    private ProcessExecutor.ProcessExecutorBuilder processExecutorBuilder;
+
     public boolean checkAnsibleVault() {
         List<String> procArgs = new ArrayList<>();
         String ansibleCommand = ANSIBLE_VAULT_COMMAND;
         if (ansibleBinariesDirectory != null) {
             ansibleCommand = Paths.get(ansibleBinariesDirectory.toFile().getAbsolutePath(), ansibleCommand).toFile().getAbsolutePath();
         }
+
+        if(processExecutorBuilder==null){
+            processExecutorBuilder = ProcessExecutor.builder();
+        }
+
         procArgs.add(ansibleCommand);
         procArgs.add("--version");
 
         Process proc = null;
 
         try {
-            proc = ProcessExecutor.builder().procArgs(procArgs)
+            proc = processExecutorBuilder.procArgs(procArgs)
                     .redirectErrorStream(true)
                     .build().run();
 
@@ -63,6 +70,11 @@ public class AnsibleVault {
         if (ansibleBinariesDirectory != null) {
             ansibleCommand = Paths.get(ansibleBinariesDirectory.toFile().getAbsolutePath(), ansibleCommand).toFile().getAbsolutePath();
         }
+
+        if(processExecutorBuilder==null){
+            processExecutorBuilder = ProcessExecutor.builder();
+        }
+
         procArgs.add(ansibleCommand);
         procArgs.add("encrypt_string");
         procArgs.add("--vault-id");
@@ -80,7 +92,7 @@ public class AnsibleVault {
         Process proc = null;
 
         try {
-            proc = ProcessExecutor.builder().procArgs(procArgs)
+            proc = processExecutorBuilder.procArgs(procArgs)
                     .baseDirectory(baseDirectory.toFile())
                     .environmentVariables(env)
                     .redirectErrorStream(true)
@@ -99,9 +111,12 @@ public class AnsibleVault {
 
             Thread stdinThread = new Thread(() -> sendValuesStdin(processOutputStream, masterPassword, content));
 
+            long start = System.currentTimeMillis();
+            long end = start + 60 * 1000;
+
             //wait for prompt
             boolean promptFound = false;
-            while (!promptFound) {
+            while (!promptFound && System.currentTimeMillis() < end) {
                 BufferedReader reader = new BufferedReader(new FileReader(promptFile));
                 String currentLine = reader.readLine();
                 if(currentLine!=null && currentLine.contains("Enter Password:")){
@@ -114,6 +129,10 @@ public class AnsibleVault {
                 }
             }
 
+            if(!promptFound){
+                throw new RuntimeException("Failed to find prompt for ansible-vault");
+            }
+
             int exitCode = proc.waitFor();
 
             //get encrypted value
@@ -121,14 +140,12 @@ public class AnsibleVault {
             executor.shutdown();
 
             if (exitCode != 0) {
-                System.err.println("ERROR: encryptFileAnsibleVault:" + procArgs);
-                return null;
+                throw new RuntimeException("ERROR: encryptFileAnsibleVault:" + procArgs);
             }
             return result;
 
         } catch (Exception e) {
-            System.err.println("error encryptFileAnsibleVault file " + e.getMessage());
-            return null;
+            throw new RuntimeException("Failed to encrypt variable: " + e.getMessage());
         } finally {
             // Make sure to always cleanup on failure and success
             if (proc != null) {
