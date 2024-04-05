@@ -24,7 +24,6 @@ public class AnsibleVault {
     private boolean debug;
     private Path baseDirectory;
     private Path ansibleBinariesDirectory;
-    private String executionId;
 
     public final String ANSIBLE_VAULT_COMMAND = "ansible-vault";
 
@@ -107,7 +106,6 @@ public class AnsibleVault {
                 String currentLine = reader.readLine();
                 if(currentLine!=null && currentLine.contains("Enter Password:")){
                     promptFound = true;
-
                     //send password / content
                     stdinThread.start();
                     reader.close();
@@ -162,7 +160,7 @@ public class AnsibleVault {
             }
             return stringBuilder.toString();
         } catch (Throwable e) {
-            throw new RuntimeException("problem with executing program", e);
+            throw new RuntimeException("error reading output from ansible-vault", e);
         }
     }
 
