@@ -65,7 +65,6 @@ public class AnsibleVault {
     public String encryptVariable(String key,
                                   String content ) throws IOException {
 
-        List<String> procArgs = new ArrayList<>();
         String ansibleCommand = ANSIBLE_VAULT_COMMAND;
         if (ansibleBinariesDirectory != null) {
             ansibleCommand = Paths.get(ansibleBinariesDirectory.toFile().getAbsolutePath(), ansibleCommand).toFile().getAbsolutePath();
@@ -75,10 +74,7 @@ public class AnsibleVault {
             processExecutorBuilder = ProcessExecutor.builder();
         }
 
-        procArgs.add(ansibleCommand);
-        procArgs.add("encrypt_string");
-        procArgs.add("--vault-id");
-        procArgs.add("internal-encrypt@" + vaultPasswordScriptFile.getAbsolutePath());
+        List<String> procArgs = List.of(ansibleCommand, "encrypt_string", "--vault-id", "internal-encrypt@" + vaultPasswordScriptFile.getAbsolutePath());
 
         if(debug){
             System.out.println("encryptVariable " + key + ": " + procArgs);
@@ -112,23 +108,21 @@ public class AnsibleVault {
 
             Thread stdinThread = new Thread(() -> sendValuesStdin(processOutputStream, masterPassword, content));
 
-            long start = System.currentTimeMillis();
-            long end = start + 60 * 1000;
-
             //wait for prompt
             boolean promptFound = false;
-            while (!promptFound && System.currentTimeMillis() < end) {
-                BufferedReader reader = new BufferedReader(new FileReader(promptFile));
+            long start = System.currentTimeMillis();
+            long end = start + 60 * 1000;
+            BufferedReader reader = new BufferedReader(new FileReader(promptFile));
+
+            while (!promptFound && System.currentTimeMillis() < end){
                 String currentLine = reader.readLine();
                 if(currentLine!=null && currentLine.contains("Enter Password:")){
                     promptFound = true;
                     //send password / content
                     stdinThread.start();
-                    reader.close();
-                }else{
-                    Thread.sleep(1500);
                 }
             }
+            reader.close();
 
             if(!promptFound){
                 throw new RuntimeException("Failed to find prompt for ansible-vault");
