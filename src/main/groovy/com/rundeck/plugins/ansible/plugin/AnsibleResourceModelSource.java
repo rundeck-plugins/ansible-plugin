@@ -1,5 +1,6 @@
 package com.rundeck.plugins.ansible.plugin;
 
+import com.dtolabs.rundeck.core.common.INodeEntry;
 import com.dtolabs.rundeck.core.execution.proxy.ProxyRunnerPlugin;
 import com.dtolabs.rundeck.core.storage.ResourceMeta;
 import com.dtolabs.rundeck.core.storage.StorageTree;
@@ -35,6 +36,13 @@ import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
 import java.util.Map.Entry;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRunnerPlugin {
 
@@ -349,6 +357,10 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
 
   @Override
   public INodeSet getNodes() throws ResourceModelSourceException {
+
+    System.out.println("::> start Process...");
+    long start = System.currentTimeMillis();
+
     NodeSetImpl nodes = new NodeSetImpl();
     final Gson gson = new Gson();
 
@@ -392,218 +404,20 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     try {
       if (new File(tempDirectory.toFile(), "data").exists()) {
         DirectoryStream<Path> directoryStream = Files.newDirectoryStream(tempDirectory.resolve("data"));
-        for (Path factFile : directoryStream) {
-          NodeEntryImpl node = new NodeEntryImpl();
 
-          BufferedReader bufferedReader = Files.newBufferedReader(factFile, Charset.forName("utf-8"));
-          JsonElement json = new JsonParser().parse(bufferedReader);
-          bufferedReader.close();
-          JsonObject root = json.getAsJsonObject();
+        Stream<Path> directories = Files.list(tempDirectory.resolve("data"));
 
-          String hostname = root.get("inventory_hostname").getAsString();
-          try {
-            if (root.has("ansible_host")) {
-              hostname = root.get("ansible_host").getAsString();
-            } else if (root.has("ansible_ssh_host")) { // deprecated variable
-              hostname = root.get("ansible_ssh_host").getAsString();
-            }
-          }catch(Exception ex){
-            System.out.println("[warn] Problem getting the ansible_host attribute from node " + hostname);
-          }
-          node.setHostname(hostname);
+        ExecutorService executor = Executors.newFixedThreadPool(10);
 
-          String nodename = root.get("inventory_hostname").getAsString();
-          node.setNodename(nodename);
+        List<CompletableFuture<INodeEntry>> futures = directories
+                .map(factFile -> processFile(factFile, gson, executor))
+                .collect(Collectors.toList());
 
-          String username = sshUser; // Use sshUser as default username
-          if (root.has("ansible_user")) {
-            username = root.get("ansible_user").getAsString();
-          } else if (root.has("ansible_ssh_user")) { // deprecated variable
-            username = root.get("ansible_ssh_user").getAsString();
-          } else if (root.has("ansible_user_id")) { // fact
-            username = root.get("ansible_user_id").getAsString();
-          }
-          node.setUsername(username);
+        futures.stream().map(CompletableFuture::join).forEach(nodes::putNode);
 
-          // Add groups as tags, except ignored tag prefix
-          HashSet<String> tags = new HashSet<>();
-          for (JsonElement ele : root.getAsJsonArray("group_names")) {
-            if (ignoreTagPrefix != null && ignoreTagPrefix.length() > 0 && ele.getAsString().startsWith(ignoreTagPrefix)) continue;
-            tags.add(ele.getAsString());
-          }
-          // Add extraTag to node
-          if (extraTag != null && extraTag.length() > 0) {
-            tags.add(extraTag);
-          }
-          node.setTags(tags);
-
-          if (root.has("ansible_lsb") && root.getAsJsonObject("ansible_lsb").has("description")) {
-            node.setDescription(root.getAsJsonObject("ansible_lsb").get("description").getAsString());
-          } else {
-            StringBuilder sb = new StringBuilder();
-
-            if (root.has("ansible_distribution") && !root.get("ansible_distribution").isJsonNull()) {
-              sb.append(root.get("ansible_distribution").getAsString()).append(" ");
-            }
-            if (root.has("ansible_distribution_version")) {
-              sb.append(root.get("ansible_distribution_version").getAsString()).append(" ");
-            }
-
-            if (sb.length() > 0) {
-              node.setDescription(sb.toString().trim());
-            }
-          }
-
-          // ansible_system     = Linux   = osFamily in Rundeck
-          // ansible_os_family  = Debian  = osName in Rundeck
-
-          if (root.has("ansible_os_family")) {
-            node.setOsFamily(root.get("ansible_os_family").getAsString());
-          }
-
-          if (root.has("ansible_os_name") && !root.get("ansible_os_name").isJsonNull()) {
-            node.setOsName(root.get("ansible_os_name").getAsString());
-          }
-
-          if (root.has("ansible_architecture") && !root.get("ansible_architecture").isJsonNull()) {
-            node.setOsArch(root.get("ansible_architecture").getAsString());
-          }
-
-          if (root.has("ansible_kernel")) {
-            node.setOsVersion(root.get("ansible_kernel").getAsString());
-          }
-
-          // Add Ansible interesting vars as node attributes
-          // JSON-Path -> Attribute-Name
-          Map<String, String> interestingItems = new HashMap<>();
-
-          interestingItems.put("ansible_form_factor", "form_factor");
-
-          interestingItems.put("ansible_system_vendor", "system_vendor");
-
-          interestingItems.put("ansible_product_name", "product_name");
-          interestingItems.put("ansible_product_version", "product_version");
-          interestingItems.put("ansible_product_serial", "product_serial");
-
-          interestingItems.put("ansible_bios_version", "bios_version");
-          interestingItems.put("ansible_bios_date", "bios_date");
-
-          interestingItems.put("ansible_machine_id", "machine_id");
-
-          interestingItems.put("ansible_virtualization_type", "virtualization_type");
-          interestingItems.put("ansible_virtualization_role", "virtualization_role");
-
-          interestingItems.put("ansible_selinux", "selinux");
-          interestingItems.put("ansible_fips", "fips");
-
-          interestingItems.put("ansible_service_mgr", "service_mgr");
-          interestingItems.put("ansible_pkg_mgr", "pkg_mgr");
-
-          interestingItems.put("ansible_distribution", "distribution");
-          interestingItems.put("ansible_distribution_version", "distribution_version");
-          interestingItems.put("ansible_distribution_major_version", "distribution_major_version");
-          interestingItems.put("ansible_distribution_release", "distribution_release");
-          interestingItems.put("ansible_lsb.codename", "lsb_codename");
-
-          interestingItems.put("ansible_domain", "domain");
-
-          interestingItems.put("ansible_date_time.tz", "tz");
-          interestingItems.put("ansible_date_time.tz_offset", "tz_offset");
-
-          interestingItems.put("ansible_processor_count", "processor_count");
-          interestingItems.put("ansible_processor_cores", "processor_cores");
-          interestingItems.put("ansible_processor_vcpus", "processor_vcpus");
-          interestingItems.put("ansible_processor_threads_per_core", "processor_threads_per_core");
-
-          interestingItems.put("ansible_userspace_architecture", "userspace_architecture");
-          interestingItems.put("ansible_userspace_bits", "userspace_bits");
-
-          interestingItems.put("ansible_memtotal_mb", "memtotal_mb");
-          interestingItems.put("ansible_swaptotal_mb", "swaptotal_mb");
-          interestingItems.put("ansible_processor.0", "processor0");
-          interestingItems.put("ansible_processor.1", "processor1");
-
-          for (Map.Entry<String, String> item : interestingItems.entrySet()) {
-            String[] itemParts = item.getKey().split("\\.");
-
-            if (itemParts.length > 1) {
-              JsonElement ele = root;
-              for (String itemPart : itemParts) {
-                if (ele.isJsonArray() && itemPart.matches("^\\d+$") && ele.getAsJsonArray().size() > Integer.parseInt(itemPart)) {
-                  ele = ele.getAsJsonArray().get(Integer.parseInt(itemPart));
-                } else if (ele.isJsonObject() && ele.getAsJsonObject().has(itemPart)) {
-                  ele = ele.getAsJsonObject().get(itemPart);
-                } else {
-                  ele = null;
-                  break;
-                }
-              }
-
-              if (ele != null && ele.isJsonPrimitive() && ele.getAsString().length() > 0) {
-                node.setAttribute(item.getValue(), ele.getAsString());
-              }
-            } else {
-              if (root.has(item.getKey())
-                && root.get(item.getKey()).isJsonPrimitive()
-                && root.get(item.getKey()).getAsString().length() > 0) {
-                node.setAttribute(item.getValue(), root.get(item.getKey()).getAsString());
-              }
-            }
-          }
-
-
-          if (importInventoryVars == true) {
-            // Add ALL vars as node attributes, except Ansible Special variables, as of Ansible 2.9
-            // https://docs.ansible.com/ansible/latest/reference_appendices/special_variables.html
-            List<String> specialVarsList = new ArrayList<>();
-            specialVarsList.add("ansible_");  // most ansible vars prefix
-            specialVarsList.add("discovered_interpreter_python");
-            specialVarsList.add("facts");   // rundeck used to gather host_vars
-            specialVarsList.add("gather_subset");
-            specialVarsList.add("group_names");
-            specialVarsList.add("groups");
-            specialVarsList.add("hostvars");
-            specialVarsList.add("inventory_dir");
-            specialVarsList.add("inventory_file");
-            specialVarsList.add("inventory_hostname");
-            specialVarsList.add("inventory_hostname_short");
-            specialVarsList.add("module_setup");
-            specialVarsList.add("omit");
-            specialVarsList.add("play_hosts");
-            specialVarsList.add("playbook_dir");
-            specialVarsList.add("role_name");
-            specialVarsList.add("role_names");
-            specialVarsList.add("role_path");
-            specialVarsList.add("tmpdir");  // rundeck used to gather host_vars
-
-            if (ignoreInventoryVars != null && ignoreInventoryVars.length() > 0) {
-              String[] ignoreInventoryVarsStrings = ignoreInventoryVars.split(",");
-              for (String ignoreInventoryVarsString: ignoreInventoryVarsStrings) {
-                specialVarsList.add(ignoreInventoryVarsString.trim());
-              }
-            }
-
-            // for (String hostVar : root.keySet()) {
-            for (Entry<String, JsonElement> hostVar : root.entrySet()) {
-
-              // skip Ansible special vars
-              if (skipVar(hostVar.getKey(), specialVarsList)) {
-                continue;
-              }
-
-              if (hostVar.getValue() instanceof JsonPrimitive && ((JsonPrimitive) hostVar.getValue()).isString()) {
-                // Keep attribute as String, don't serialize as Json
-                node.setAttribute(hostVar.getKey(), hostVar.getValue().getAsString());
-              } else {
-                // Serialize attribute as Json (JsonArray or JsonObject)
-                node.setAttribute(hostVar.getKey(), gson.toJson(hostVar.getValue()));
-              }
-            }
-          }
-
-          nodes.putNode(node);
-        }
         directoryStream.close();
+
+        System.out.println("::> Seconds: "+ TimeUnit.MILLISECONDS.toSeconds(System.currentTimeMillis() - start));
       }
     } catch (IOException e) {
       throw new ResourceModelSourceException("Error reading facts.", e);
@@ -630,7 +444,226 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     return nodes;
   }
 
+  private CompletableFuture<INodeEntry> processFile(Path factFile, Gson gson, ExecutorService executor) {
+    return CompletableFuture.supplyAsync(()-> {
+      try {
+        return processfactFile(factFile, gson);
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }, executor);
+  }
 
+  private NodeEntryImpl processfactFile(Path factFile, Gson gson) throws IOException {
+    NodeEntryImpl node = new NodeEntryImpl();
+
+    BufferedReader bufferedReader = Files.newBufferedReader(factFile, Charset.forName("utf-8"));
+    JsonElement json = new JsonParser().parse(bufferedReader);
+    bufferedReader.close();
+    JsonObject root = json.getAsJsonObject();
+
+    String hostname = root.get("inventory_hostname").getAsString();
+    try {
+      if (root.has("ansible_host")) {
+        hostname = root.get("ansible_host").getAsString();
+      } else if (root.has("ansible_ssh_host")) { // deprecated variable
+        hostname = root.get("ansible_ssh_host").getAsString();
+      }
+    }catch(Exception ex){
+      System.out.println("[warn] Problem getting the ansible_host attribute from node " + hostname);
+    }
+    node.setHostname(hostname);
+
+    String nodename = root.get("inventory_hostname").getAsString();
+    node.setNodename(nodename);
+
+    String username = sshUser; // Use sshUser as default username
+    if (root.has("ansible_user")) {
+      username = root.get("ansible_user").getAsString();
+    } else if (root.has("ansible_ssh_user")) { // deprecated variable
+      username = root.get("ansible_ssh_user").getAsString();
+    } else if (root.has("ansible_user_id")) { // fact
+      username = root.get("ansible_user_id").getAsString();
+    }
+    node.setUsername(username);
+
+    // Add groups as tags, except ignored tag prefix
+    HashSet<String> tags = new HashSet<>();
+    for (JsonElement ele : root.getAsJsonArray("group_names")) {
+      if (ignoreTagPrefix != null && ignoreTagPrefix.length() > 0 && ele.getAsString().startsWith(ignoreTagPrefix)) continue;
+      tags.add(ele.getAsString());
+    }
+    // Add extraTag to node
+    if (extraTag != null && extraTag.length() > 0) {
+      tags.add(extraTag);
+    }
+    node.setTags(tags);
+
+    if (root.has("ansible_lsb") && root.getAsJsonObject("ansible_lsb").has("description")) {
+      node.setDescription(root.getAsJsonObject("ansible_lsb").get("description").getAsString());
+    } else {
+      StringBuilder sb = new StringBuilder();
+
+      if (root.has("ansible_distribution") && !root.get("ansible_distribution").isJsonNull()) {
+        sb.append(root.get("ansible_distribution").getAsString()).append(" ");
+      }
+      if (root.has("ansible_distribution_version")) {
+        sb.append(root.get("ansible_distribution_version").getAsString()).append(" ");
+      }
+
+      if (sb.length() > 0) {
+        node.setDescription(sb.toString().trim());
+      }
+    }
+
+    // ansible_system     = Linux   = osFamily in Rundeck
+    // ansible_os_family  = Debian  = osName in Rundeck
+
+    if (root.has("ansible_os_family")) {
+      node.setOsFamily(root.get("ansible_os_family").getAsString());
+    }
+
+    if (root.has("ansible_os_name") && !root.get("ansible_os_name").isJsonNull()) {
+      node.setOsName(root.get("ansible_os_name").getAsString());
+    }
+
+    if (root.has("ansible_architecture") && !root.get("ansible_architecture").isJsonNull()) {
+      node.setOsArch(root.get("ansible_architecture").getAsString());
+    }
+
+    if (root.has("ansible_kernel")) {
+      node.setOsVersion(root.get("ansible_kernel").getAsString());
+    }
+
+    // Add Ansible interesting vars as node attributes
+    // JSON-Path -> Attribute-Name
+    Map<String, String> interestingItems = new HashMap<>();
+
+    interestingItems.put("ansible_form_factor", "form_factor");
+
+    interestingItems.put("ansible_system_vendor", "system_vendor");
+
+    interestingItems.put("ansible_product_name", "product_name");
+    interestingItems.put("ansible_product_version", "product_version");
+    interestingItems.put("ansible_product_serial", "product_serial");
+
+    interestingItems.put("ansible_bios_version", "bios_version");
+    interestingItems.put("ansible_bios_date", "bios_date");
+
+    interestingItems.put("ansible_machine_id", "machine_id");
+
+    interestingItems.put("ansible_virtualization_type", "virtualization_type");
+    interestingItems.put("ansible_virtualization_role", "virtualization_role");
+
+    interestingItems.put("ansible_selinux", "selinux");
+    interestingItems.put("ansible_fips", "fips");
+
+    interestingItems.put("ansible_service_mgr", "service_mgr");
+    interestingItems.put("ansible_pkg_mgr", "pkg_mgr");
+
+    interestingItems.put("ansible_distribution", "distribution");
+    interestingItems.put("ansible_distribution_version", "distribution_version");
+    interestingItems.put("ansible_distribution_major_version", "distribution_major_version");
+    interestingItems.put("ansible_distribution_release", "distribution_release");
+    interestingItems.put("ansible_lsb.codename", "lsb_codename");
+
+    interestingItems.put("ansible_domain", "domain");
+
+    interestingItems.put("ansible_date_time.tz", "tz");
+    interestingItems.put("ansible_date_time.tz_offset", "tz_offset");
+
+    interestingItems.put("ansible_processor_count", "processor_count");
+    interestingItems.put("ansible_processor_cores", "processor_cores");
+    interestingItems.put("ansible_processor_vcpus", "processor_vcpus");
+    interestingItems.put("ansible_processor_threads_per_core", "processor_threads_per_core");
+
+    interestingItems.put("ansible_userspace_architecture", "userspace_architecture");
+    interestingItems.put("ansible_userspace_bits", "userspace_bits");
+
+    interestingItems.put("ansible_memtotal_mb", "memtotal_mb");
+    interestingItems.put("ansible_swaptotal_mb", "swaptotal_mb");
+    interestingItems.put("ansible_processor.0", "processor0");
+    interestingItems.put("ansible_processor.1", "processor1");
+
+    for (Map.Entry<String, String> item : interestingItems.entrySet()) {
+      String[] itemParts = item.getKey().split("\\.");
+
+      if (itemParts.length > 1) {
+        JsonElement ele = root;
+        for (String itemPart : itemParts) {
+          if (ele.isJsonArray() && itemPart.matches("^\\d+$") && ele.getAsJsonArray().size() > Integer.parseInt(itemPart)) {
+            ele = ele.getAsJsonArray().get(Integer.parseInt(itemPart));
+          } else if (ele.isJsonObject() && ele.getAsJsonObject().has(itemPart)) {
+            ele = ele.getAsJsonObject().get(itemPart);
+          } else {
+            ele = null;
+            break;
+          }
+        }
+
+        if (ele != null && ele.isJsonPrimitive() && ele.getAsString().length() > 0) {
+          node.setAttribute(item.getValue(), ele.getAsString());
+        }
+      } else {
+        if (root.has(item.getKey())
+                && root.get(item.getKey()).isJsonPrimitive()
+                && root.get(item.getKey()).getAsString().length() > 0) {
+          node.setAttribute(item.getValue(), root.get(item.getKey()).getAsString());
+        }
+      }
+    }
+
+
+    if (importInventoryVars == true) {
+      // Add ALL vars as node attributes, except Ansible Special variables, as of Ansible 2.9
+      // https://docs.ansible.com/ansible/latest/reference_appendices/special_variables.html
+      List<String> specialVarsList = new ArrayList<>();
+      specialVarsList.add("ansible_");  // most ansible vars prefix
+      specialVarsList.add("discovered_interpreter_python");
+      specialVarsList.add("facts");   // rundeck used to gather host_vars
+      specialVarsList.add("gather_subset");
+      specialVarsList.add("group_names");
+      specialVarsList.add("groups");
+      specialVarsList.add("hostvars");
+      specialVarsList.add("inventory_dir");
+      specialVarsList.add("inventory_file");
+      specialVarsList.add("inventory_hostname");
+      specialVarsList.add("inventory_hostname_short");
+      specialVarsList.add("module_setup");
+      specialVarsList.add("omit");
+      specialVarsList.add("play_hosts");
+      specialVarsList.add("playbook_dir");
+      specialVarsList.add("role_name");
+      specialVarsList.add("role_names");
+      specialVarsList.add("role_path");
+      specialVarsList.add("tmpdir");  // rundeck used to gather host_vars
+
+      if (ignoreInventoryVars != null && ignoreInventoryVars.length() > 0) {
+        String[] ignoreInventoryVarsStrings = ignoreInventoryVars.split(",");
+        for (String ignoreInventoryVarsString: ignoreInventoryVarsStrings) {
+          specialVarsList.add(ignoreInventoryVarsString.trim());
+        }
+      }
+
+      // for (String hostVar : root.keySet()) {
+      for (Entry<String, JsonElement> hostVar : root.entrySet()) {
+
+        // skip Ansible special vars
+        if (skipVar(hostVar.getKey(), specialVarsList)) {
+          continue;
+        }
+
+        if (hostVar.getValue() instanceof JsonPrimitive && ((JsonPrimitive) hostVar.getValue()).isString()) {
+          // Keep attribute as String, don't serialize as Json
+          node.setAttribute(hostVar.getKey(), hostVar.getValue().getAsString());
+        } else {
+          // Serialize attribute as Json (JsonArray or JsonObject)
+          node.setAttribute(hostVar.getKey(), gson.toJson(hostVar.getValue()));
+        }
+      }
+    }
+    return node;
+  }
 
   private String getStorageContentString(String storagePath, StorageTree storageTree) throws ConfigurationException {
     return new String(this.getStorageContent(storagePath, storageTree));
