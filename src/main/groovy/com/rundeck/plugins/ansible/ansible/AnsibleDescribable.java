@@ -158,6 +158,8 @@ public interface AnsibleDescribable extends Describable {
 
     public static final String ANSIBLE_ENCRYPT_EXTRA_VARS = "ansible-encrypt-extra-vars";
 
+    String NUMBER_THREADS = "number-threads";
+
     public static Property PLAYBOOK_PATH_PROP = PropertyUtil.string(
     			ANSIBLE_PLAYBOOK_PATH,
               "Playbook",
@@ -526,5 +528,14 @@ public interface AnsibleDescribable extends Describable {
             .required(false)
             .title("Encrypt Extra Vars.")
             .description("Encrypt the value of the extra vars keys.")
+            .build();
+
+    Property NUMBER_THREADS_PROP = PropertyBuilder.builder()
+            .string(NUMBER_THREADS)
+            .required(false)
+            .title("Number of threads")
+            .description("Number of threads used to process nodes coming from Ansible. By default is 1.")
+            .renderingOption(StringRenderingConstants.GROUPING,"SECONDARY")
+            .renderingOption(StringRenderingConstants.GROUP_NAME,"Other")
             .build();
 }

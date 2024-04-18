@@ -74,6 +74,8 @@ public class AnsibleResourceModelSourceFactory implements ResourceModelSourceFac
 
         builder.property(CONFIG_ENCRYPT_EXTRA_VARS);
 
+        builder.property(NUMBER_THREADS_PROP);
+
         DESC=builder.build();
     }
 

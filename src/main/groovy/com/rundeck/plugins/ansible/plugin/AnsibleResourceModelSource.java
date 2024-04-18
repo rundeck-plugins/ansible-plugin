@@ -104,6 +104,8 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
 
   protected boolean encryptExtraVars = false;
 
+  protected String numberThreads;
+
 
   public AnsibleResourceModelSource(final Framework framework) {
       this.framework = framework;
@@ -204,6 +206,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
 
     encryptExtraVars = "true".equals(resolveProperty(AnsibleDescribable.ANSIBLE_ENCRYPT_EXTRA_VARS,"false",configuration,executionDataContext));
 
+    numberThreads = resolveProperty(AnsibleDescribable.NUMBER_THREADS, "1", configuration, executionDataContext);
   }
 
   public AnsibleRunner.AnsibleRunnerBuilder buildAnsibleRunner() throws ResourceModelSourceException{
