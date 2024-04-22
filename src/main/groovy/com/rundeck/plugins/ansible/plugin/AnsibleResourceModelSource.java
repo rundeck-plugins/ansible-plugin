@@ -361,8 +361,6 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
   @Override
   public INodeSet getNodes() throws ResourceModelSourceException {
 
-    System.out.println("::> start Process...");
-    long start = System.currentTimeMillis();
 
     NodeSetImpl nodes = new NodeSetImpl();
     final Gson gson = new Gson();
@@ -406,11 +404,15 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
 
     try {
       if (new File(tempDirectory.toFile(), "data").exists()) {
-        DirectoryStream<Path> directoryStream = Files.newDirectoryStream(tempDirectory.resolve("data"));
+        //DirectoryStream<Path> directoryStream = Files.newDirectoryStream(tempDirectory.resolve("data"));
 
         Stream<Path> directories = Files.list(tempDirectory.resolve("data"));
 
-        ExecutorService executor = Executors.newFixedThreadPool(10);
+        ExecutorService executor = Executors.newFixedThreadPool(Integer.parseInt(numberThreads));
+        System.out.println("::> Number of Threads: "+ numberThreads);
+
+        long start = System.currentTimeMillis();
+        System.out.println("::> start Process...");
 
         List<CompletableFuture<INodeEntry>> futures = directories
                 .map(factFile -> processFile(factFile, gson, executor))
@@ -418,9 +420,13 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
 
         futures.stream().map(CompletableFuture::join).forEach(nodes::putNode);
 
-        directoryStream.close();
+        //directoryStream.close();
 
-        System.out.println("::> Seconds: "+ TimeUnit.MILLISECONDS.toSeconds(System.currentTimeMillis() - start));
+
+        long millisEnd = System.currentTimeMillis() - start;
+        System.out.println("::> Millis: "+ millisEnd);
+        double secondsEnd = millisEnd / 1000d;
+        System.out.println("::> Seconds: "+ secondsEnd);
       }
     } catch (IOException e) {
       throw new ResourceModelSourceException("Error reading facts.", e);
