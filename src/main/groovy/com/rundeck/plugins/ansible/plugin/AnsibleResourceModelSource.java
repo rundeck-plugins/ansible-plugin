@@ -361,6 +361,8 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
   @Override
   public INodeSet getNodes() throws ResourceModelSourceException {
 
+    long start = System.currentTimeMillis();
+    System.out.println("::> start Process...");
 
     NodeSetImpl nodes = new NodeSetImpl();
     final Gson gson = new Gson();
@@ -404,24 +406,17 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
 
     try {
       if (new File(tempDirectory.toFile(), "data").exists()) {
-        //DirectoryStream<Path> directoryStream = Files.newDirectoryStream(tempDirectory.resolve("data"));
 
         Stream<Path> directories = Files.list(tempDirectory.resolve("data"));
 
         ExecutorService executor = Executors.newFixedThreadPool(Integer.parseInt(numberThreads));
         System.out.println("::> Number of Threads: "+ numberThreads);
 
-        long start = System.currentTimeMillis();
-        System.out.println("::> start Process...");
-
         List<CompletableFuture<INodeEntry>> futures = directories
                 .map(factFile -> processFile(factFile, gson, executor))
                 .collect(Collectors.toList());
 
         futures.stream().map(CompletableFuture::join).forEach(nodes::putNode);
-
-        //directoryStream.close();
-
 
         long millisEnd = System.currentTimeMillis() - start;
         System.out.println("::> Millis: "+ millisEnd);
