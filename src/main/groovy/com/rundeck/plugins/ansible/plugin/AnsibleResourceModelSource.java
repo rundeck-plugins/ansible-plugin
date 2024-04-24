@@ -7,7 +7,6 @@ import com.dtolabs.rundeck.core.storage.StorageTree;
 import com.dtolabs.rundeck.core.storage.keys.KeyStorageTree;
 import com.rundeck.plugins.ansible.ansible.AnsibleDescribable;
 import com.rundeck.plugins.ansible.ansible.AnsibleDescribable.AuthenticationType;
-import com.rundeck.plugins.ansible.ansible.AnsibleException;
 import com.rundeck.plugins.ansible.ansible.AnsibleRunner;
 import com.dtolabs.rundeck.core.common.Framework;
 import com.dtolabs.rundeck.core.common.INodeSet;
@@ -26,6 +25,8 @@ import com.google.gson.JsonPrimitive;
 import org.rundeck.app.spi.Services;
 import org.rundeck.storage.api.PathUtil;
 import org.rundeck.storage.api.StorageException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
@@ -37,14 +38,14 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
 import java.util.Map.Entry;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRunnerPlugin {
+
+  static final Logger log = LoggerFactory.getLogger(AnsibleResourceModelSource.class);
 
   private Framework framework;
 
@@ -409,8 +410,8 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
 
         Stream<Path> directories = Files.list(tempDirectory.resolve("data"));
 
+        log.debug("Number of Threads: {}", numberThreads);
         ExecutorService executor = Executors.newFixedThreadPool(Integer.parseInt(numberThreads));
-        System.out.println("::> Number of Threads: "+ numberThreads);
 
         List<CompletableFuture<INodeEntry>> futures = directories
                 .map(factFile -> processFile(factFile, gson, executor))
