@@ -33,6 +33,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
@@ -362,11 +363,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
   @Override
   public INodeSet getNodes() throws ResourceModelSourceException {
 
-    long start = System.currentTimeMillis();
-    System.out.println("::> start Process...");
-
     NodeSetImpl nodes = new NodeSetImpl();
-    final Gson gson = new Gson();
 
     Path tempDirectory;
     try {
@@ -410,19 +407,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
 
         Stream<Path> directories = Files.list(tempDirectory.resolve("data"));
 
-        log.debug("Number of Threads: {}", numberThreads);
-        ExecutorService executor = Executors.newFixedThreadPool(Integer.parseInt(numberThreads));
-
-        List<CompletableFuture<INodeEntry>> futures = directories
-                .map(factFile -> processFile(factFile, gson, executor))
-                .collect(Collectors.toList());
-
-        futures.stream().map(CompletableFuture::join).forEach(nodes::putNode);
-
-        long millisEnd = System.currentTimeMillis() - start;
-        System.out.println("::> Millis: "+ millisEnd);
-        double secondsEnd = millisEnd / 1000d;
-        System.out.println("::> Seconds: "+ secondsEnd);
+        executeFutures(directories, nodes);
       }
     } catch (IOException e) {
       throw new ResourceModelSourceException("Error reading facts.", e);
@@ -449,20 +434,32 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     return nodes;
   }
 
-  private CompletableFuture<INodeEntry> processFile(Path factFile, Gson gson, ExecutorService executor) {
+  public void executeFutures(Stream<Path> directories, NodeSetImpl nodes) {
+    log.debug("Number of Threads: {}", numberThreads);
+    ExecutorService executor = Executors.newFixedThreadPool(Integer.parseInt(numberThreads));
+
+    List<CompletableFuture<INodeEntry>> futures = directories
+            .map(factFile -> processFile(factFile, executor))
+            .collect(Collectors.toList());
+
+    futures.stream().map(CompletableFuture::join).forEach(nodes::putNode);
+  }
+
+  public CompletableFuture<INodeEntry> processFile(Path factFile, ExecutorService executor) {
     return CompletableFuture.supplyAsync(()-> {
       try {
-        return processfactFile(factFile, gson);
+        return processFactFile(factFile);
       } catch (IOException e) {
         throw new RuntimeException(e);
       }
     }, executor);
   }
 
-  private NodeEntryImpl processfactFile(Path factFile, Gson gson) throws IOException {
+  public NodeEntryImpl processFactFile(Path factFile) throws IOException {
     NodeEntryImpl node = new NodeEntryImpl();
+    final Gson gson = new Gson();
 
-    BufferedReader bufferedReader = Files.newBufferedReader(factFile, Charset.forName("utf-8"));
+    BufferedReader bufferedReader = Files.newBufferedReader(factFile, StandardCharsets.UTF_8);
     JsonElement json = new JsonParser().parse(bufferedReader);
     bufferedReader.close();
     JsonObject root = json.getAsJsonObject();
