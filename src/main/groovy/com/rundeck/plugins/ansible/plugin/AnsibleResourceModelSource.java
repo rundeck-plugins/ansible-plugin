@@ -351,6 +351,9 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     NodeSetImpl nodes = new NodeSetImpl();
     final Gson gson = new Gson();
 
+    // ansible-inventory -i inventory.yaml --list
+    // snake yaml
+
     Path tempDirectory;
     try {
       tempDirectory = Files.createTempDirectory("ansible-hosts");

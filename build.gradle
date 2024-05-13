@@ -52,6 +52,7 @@ dependencies {
   implementation 'org.codehaus.groovy:groovy-all:3.0.15'
   pluginLibs group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: '2.16.1'
   pluginLibs group: 'com.fasterxml.jackson.dataformat', name: 'jackson-dataformat-yaml', version: '2.16.1'
+  implementation "org.yaml:snakeyaml:2.0"
 
   compileOnly 'org.projectlombok:lombok:1.18.30'
   annotationProcessor 'org.projectlombok:lombok:1.18.30'
