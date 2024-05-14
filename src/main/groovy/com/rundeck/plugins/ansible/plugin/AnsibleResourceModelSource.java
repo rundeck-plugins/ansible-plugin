@@ -6,7 +6,7 @@ import com.dtolabs.rundeck.core.storage.StorageTree;
 import com.dtolabs.rundeck.core.storage.keys.KeyStorageTree;
 import com.rundeck.plugins.ansible.ansible.AnsibleDescribable;
 import com.rundeck.plugins.ansible.ansible.AnsibleDescribable.AuthenticationType;
-import com.rundeck.plugins.ansible.ansible.AnsibleException;
+import com.rundeck.plugins.ansible.ansible.AnsibleInventoryList;
 import com.rundeck.plugins.ansible.ansible.AnsibleRunner;
 import com.dtolabs.rundeck.core.common.Framework;
 import com.dtolabs.rundeck.core.common.INodeSet;
@@ -25,6 +25,7 @@ import com.google.gson.JsonPrimitive;
 import org.rundeck.app.spi.Services;
 import org.rundeck.storage.api.PathUtil;
 import org.rundeck.storage.api.StorageException;
+import org.yaml.snakeyaml.Yaml;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
@@ -37,6 +38,9 @@ import java.util.*;
 import java.util.Map.Entry;
 
 public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRunnerPlugin {
+
+  public static final String HOST_TPL_J2 = "host-tpl.j2";
+  public static final String GATHER_HOSTS_YML = "gather-hosts.yml";
 
   private Framework framework;
 
@@ -197,9 +201,9 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
 
   }
 
-  public AnsibleRunner.AnsibleRunnerBuilder buildAnsibleRunner() throws ResourceModelSourceException{
+  public AnsibleRunner.AnsibleRunnerBuilder buildAnsibleRunner() throws ResourceModelSourceException {
 
-    AnsibleRunner.AnsibleRunnerBuilder runnerBuilder = AnsibleRunner.playbookPath("gather-hosts.yml");
+    AnsibleRunner.AnsibleRunnerBuilder runnerBuilder = AnsibleRunner.playbookPath(GATHER_HOSTS_YML);
 
     if ("true".equals(System.getProperty("ansible.debug"))) {
       runnerBuilder.debug(true);
@@ -345,50 +349,58 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     return runnerBuilder;
   }
 
-
   @Override
   public INodeSet getNodes() throws ResourceModelSourceException {
     NodeSetImpl nodes = new NodeSetImpl();
-    final Gson gson = new Gson();
 
-    // ansible-inventory -i inventory.yaml --list
+    // ansible-inventory -i inventory.yaml --list -y
     // snake yaml
 
+    if (gatherFacts) {
+      ansibleRunnerByPath(nodes);
+    } else {
+      ansibleInventoryList(nodes);
+    }
+
+    return nodes;
+  }
+
+  public void ansibleRunnerByPath(NodeSetImpl nodes) throws ResourceModelSourceException {
+    AnsibleRunner.AnsibleRunnerBuilder runnerBuilder = buildAnsibleRunner();
+    final Gson gson = new Gson();
     Path tempDirectory;
     try {
       tempDirectory = Files.createTempDirectory("ansible-hosts");
     } catch (IOException e) {
-        throw new ResourceModelSourceException("Error creating temporary directory.", e);
+      throw new ResourceModelSourceException("Error creating temporary directory.", e);
     }
 
     try {
-      Files.copy(this.getClass().getClassLoader().getResourceAsStream("host-tpl.j2"), tempDirectory.resolve("host-tpl.j2"));
-      Files.copy(this.getClass().getClassLoader().getResourceAsStream("gather-hosts.yml"), tempDirectory.resolve("gather-hosts.yml"));
+      Files.copy(this.getClass().getClassLoader().getResourceAsStream(HOST_TPL_J2), tempDirectory.resolve(HOST_TPL_J2));
+      Files.copy(this.getClass().getClassLoader().getResourceAsStream(GATHER_HOSTS_YML), tempDirectory.resolve(GATHER_HOSTS_YML));
     } catch (IOException e) {
-        throw new ResourceModelSourceException("Error copying files.");
+      throw new ResourceModelSourceException("Error copying files.");
     }
-
-    AnsibleRunner.AnsibleRunnerBuilder runnerBuilder = buildAnsibleRunner();
 
     runnerBuilder.tempDirectory(tempDirectory);
     runnerBuilder.retainTempDirectory(true);
 
     StringBuilder args = new StringBuilder();
     args.append("facts: ")
-        .append(gatherFacts ? "True" : "False")
-        .append("\n")
-        .append("tmpdir: '")
-        .append(tempDirectory.toFile().getAbsolutePath())
-        .append("'");
+            .append(gatherFacts ? "True" : "False")
+            .append("\n")
+            .append("tmpdir: '")
+            .append(tempDirectory.toFile().getAbsolutePath())
+            .append("'");
 
     runnerBuilder.extraVars(args.toString());
 
     AnsibleRunner runner = runnerBuilder.build();
 
     try {
-        runner.run();
+      runner.run();
     } catch (Exception e) {
-        throw new ResourceModelSourceException(e.getMessage(),e);
+      throw new ResourceModelSourceException(e.getMessage(),e);
     }
 
     try {
@@ -546,8 +558,8 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
               }
             } else {
               if (root.has(item.getKey())
-                && root.get(item.getKey()).isJsonPrimitive()
-                && root.get(item.getKey()).getAsString().length() > 0) {
+                      && root.get(item.getKey()).isJsonPrimitive()
+                      && root.get(item.getKey()).getAsString().length() > 0) {
                 node.setAttribute(item.getValue(), root.get(item.getKey()).getAsString());
               }
             }
@@ -628,11 +640,22 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     } catch (IOException e) {
       throw new ResourceModelSourceException("Error deleting temporary directory.", e);
     }
-
-    return nodes;
   }
 
+  public void ansibleInventoryList(NodeSetImpl nodes) {
 
+    Yaml yml = new Yaml();
+
+    AnsibleInventoryList inventoryList = AnsibleInventoryList.builder()
+            .inventory(inventory)
+            .debug(debug)
+            .build();
+
+    String listResp = inventoryList.getNodeList();
+    Map<String, Object> nodesYml = yml.load(listResp);
+
+
+  }
 
   private String getStorageContentString(String storagePath, StorageTree storageTree) throws ConfigurationException {
     return new String(this.getStorageContent(storagePath, storageTree));
