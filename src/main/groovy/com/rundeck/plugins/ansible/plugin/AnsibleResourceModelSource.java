@@ -1,27 +1,34 @@
 package com.rundeck.plugins.ansible.plugin;
 
-import com.dtolabs.rundeck.core.execution.proxy.ProxyRunnerPlugin;
-import com.dtolabs.rundeck.core.storage.ResourceMeta;
-import com.dtolabs.rundeck.core.storage.StorageTree;
-import com.dtolabs.rundeck.core.storage.keys.KeyStorageTree;
-import com.rundeck.plugins.ansible.ansible.AnsibleDescribable;
-import com.rundeck.plugins.ansible.ansible.AnsibleDescribable.AuthenticationType;
-import com.rundeck.plugins.ansible.ansible.AnsibleInventoryList;
-import com.rundeck.plugins.ansible.ansible.AnsibleRunner;
+import static com.rundeck.plugins.ansible.ansible.InventoryList.ALL;
+import static com.rundeck.plugins.ansible.ansible.InventoryList.HOSTS;
+import static com.rundeck.plugins.ansible.ansible.InventoryList.CHILDREN;
+import static com.rundeck.plugins.ansible.ansible.InventoryList.ERROR_MISSING_FIELD;
+import static java.lang.String.format;
+
 import com.dtolabs.rundeck.core.common.Framework;
 import com.dtolabs.rundeck.core.common.INodeSet;
 import com.dtolabs.rundeck.core.common.NodeEntryImpl;
 import com.dtolabs.rundeck.core.common.NodeSetImpl;
 import com.dtolabs.rundeck.core.dispatcher.DataContextUtils;
-import com.dtolabs.rundeck.core.resources.ResourceModelSource;
-import com.dtolabs.rundeck.core.resources.ResourceModelSourceException;
+import com.dtolabs.rundeck.core.execution.proxy.ProxyRunnerPlugin;
 import com.dtolabs.rundeck.core.plugins.ScriptDataContextUtil;
 import com.dtolabs.rundeck.core.plugins.configuration.ConfigurationException;
+import com.dtolabs.rundeck.core.resources.ResourceModelSource;
+import com.dtolabs.rundeck.core.resources.ResourceModelSourceException;
+import com.dtolabs.rundeck.core.storage.ResourceMeta;
+import com.dtolabs.rundeck.core.storage.StorageTree;
+import com.dtolabs.rundeck.core.storage.keys.KeyStorageTree;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.google.gson.JsonPrimitive;
+import com.rundeck.plugins.ansible.ansible.AnsibleDescribable;
+import com.rundeck.plugins.ansible.ansible.AnsibleDescribable.AuthenticationType;
+import com.rundeck.plugins.ansible.ansible.AnsibleInventoryList;
+import com.rundeck.plugins.ansible.ansible.AnsibleRunner;
+import com.rundeck.plugins.ansible.ansible.InventoryList;
 import org.rundeck.app.spi.Services;
 import org.rundeck.storage.api.PathUtil;
 import org.rundeck.storage.api.StorageException;
@@ -32,10 +39,23 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.Charset;
-import java.nio.file.*;
+import java.nio.file.DirectoryStream;
+import java.nio.file.FileVisitResult;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Optional;
+import java.util.Properties;
+import java.util.Set;
 
 public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRunnerPlugin {
 
@@ -642,9 +662,10 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     }
   }
 
-  public void ansibleInventoryList(NodeSetImpl nodes) {
+  public void ansibleInventoryList(NodeSetImpl nodes) throws ResourceModelSourceException {
 
-    Yaml yml = new Yaml();
+    NodeEntryImpl node = new NodeEntryImpl();
+    Yaml yaml = new Yaml();
 
     AnsibleInventoryList inventoryList = AnsibleInventoryList.builder()
             .inventory(inventory)
@@ -652,9 +673,32 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
             .build();
 
     String listResp = inventoryList.getNodeList();
-    Map<String, Object> nodesYml = yml.load(listResp);
 
+    //Map<String, Map<String, Map<String, Map<String, Object>>>> allInventory = yaml.load(listResp);
+    Map<String, Object> allInventory = yaml.load(listResp);
 
+    Map<String, Object> all = InventoryList.getField(allInventory, ALL);
+
+    Map<String, Object> children = InventoryList.getField(all, CHILDREN);
+
+    for (Map.Entry<String, Object> pair : children.entrySet()) {
+      String hostGroup = pair.getKey();
+      node.setTags(Set.of(hostGroup));
+      Map<String, Object> hostNames = InventoryList.getMap(pair.getValue());
+      Map<String, Object> hosts = InventoryList.getField(hostNames, HOSTS);
+
+      for (Map.Entry<String, Object> hostNode : hosts.entrySet()) {
+        String hostName = hostNode.getKey();
+        node.setHostname(hostName);
+        Map<String, String> hostValues = InventoryList.getMap(hostNode.getValue());
+
+        Optional.ofNullable(hostValues.get("hostname")).ifPresent(node::setNodename);
+
+        Optional.ofNullable(hostValues.get("username")).ifPresent(node::setUsername);
+
+        nodes.putNode(node);
+      }
+    }
   }
 
   private String getStorageContentString(String storagePath, StorageTree storageTree) throws ConfigurationException {

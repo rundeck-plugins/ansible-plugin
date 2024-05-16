@@ -24,7 +24,7 @@ public class AnsibleInventoryList {
         List<String> procArgs = new ArrayList<>();
 
         procArgs.add(ANSIBLE_INVENTORY);
-        procArgs.add("-i " + inventory);
+        procArgs.add("--inventory-file" + "=" + inventory);
         procArgs.add("--list");
         procArgs.add("-y");
 
