@@ -1,11 +1,5 @@
 package com.rundeck.plugins.ansible.plugin;
 
-import static com.rundeck.plugins.ansible.ansible.InventoryList.ALL;
-import static com.rundeck.plugins.ansible.ansible.InventoryList.HOSTS;
-import static com.rundeck.plugins.ansible.ansible.InventoryList.CHILDREN;
-import static com.rundeck.plugins.ansible.ansible.InventoryList.NodeTag;
-import static java.lang.String.format;
-
 import com.dtolabs.rundeck.core.common.Framework;
 import com.dtolabs.rundeck.core.common.INodeSet;
 import com.dtolabs.rundeck.core.common.NodeEntryImpl;
@@ -54,6 +48,8 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Set;
+
+import static com.rundeck.plugins.ansible.ansible.InventoryList.*;
 
 public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRunnerPlugin {
 
@@ -375,7 +371,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     // snake yaml
 
     if (gatherFacts) {
-      ansibleRunnerByPath(nodes);
+      processWithGatherFacts(nodes);
     } else {
       ansibleInventoryList(nodes);
     }
@@ -383,7 +379,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     return nodes;
   }
 
-  public void ansibleRunnerByPath(NodeSetImpl nodes) throws ResourceModelSourceException {
+  public void processWithGatherFacts(NodeSetImpl nodes) throws ResourceModelSourceException {
     AnsibleRunner.AnsibleRunnerBuilder runnerBuilder = buildAnsibleRunner();
     final Gson gson = new Gson();
     Path tempDirectory;
@@ -672,13 +668,13 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     String listResp = inventoryList.getNodeList();
 
     Map<String, Object> allInventory = yaml.load(listResp);
-    Map<String, Object> all = InventoryList.getField(allInventory, ALL);
-    Map<String, Object> children = InventoryList.getField(all, CHILDREN);
+    Map<String, Object> all = InventoryList.getValue(allInventory, ALL);
+    Map<String, Object> children = InventoryList.getValue(all, CHILDREN);
 
     for (Map.Entry<String, Object> pair : children.entrySet()) {
       String hostGroup = pair.getKey();
       Map<String, Object> hostNames = InventoryList.getMap(pair.getValue());
-      Map<String, Object> hosts = InventoryList.getField(hostNames, HOSTS);
+      Map<String, Object> hosts = InventoryList.getValue(hostNames, HOSTS);
 
       for (Map.Entry<String, Object> hostNode : hosts.entrySet()) {
         NodeEntryImpl node = new NodeEntryImpl();
@@ -686,13 +682,14 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
         String hostName = hostNode.getKey();
         node.setHostname(hostName);
         node.setNodename(hostName);
-        Map<String, String> nodeValues = InventoryList.getMap(hostNode.getValue());
+        Map<String, Object> nodeValues = InventoryList.getMap(hostNode.getValue());
         //InventoryList.tagHandle(NodeTag.HOSTNAME, node, nodeValues);
         InventoryList.tagHandle(NodeTag.USERNAME, node, nodeValues);
         InventoryList.tagHandle(NodeTag.OS_FAMILY, node, nodeValues);
         InventoryList.tagHandle(NodeTag.OS_NAME, node, nodeValues);
         InventoryList.tagHandle(NodeTag.OS_ARCHITECTURE, node, nodeValues);
         InventoryList.tagHandle(NodeTag.OS_VERSION, node, nodeValues);
+        InventoryList.tagHandle(NodeTag.DESCRIPTION, node, nodeValues);
 
         nodes.putNode(node);
       }
