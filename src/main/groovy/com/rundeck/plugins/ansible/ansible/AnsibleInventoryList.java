@@ -22,6 +22,10 @@ public class AnsibleInventoryList {
 
     public static final String ANSIBLE_INVENTORY = "ansible-inventory";
 
+    /**
+     * Executes Ansible command to bring all nodes from inventory
+     * @return output in yaml format
+     */
     public String getNodeList() {
 
         List<String> procArgs = new ArrayList<>();

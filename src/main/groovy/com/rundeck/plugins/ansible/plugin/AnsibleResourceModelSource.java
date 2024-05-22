@@ -653,6 +653,11 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     }
   }
 
+  /**
+   * Process nodes coming from Ansible to convert them to Rundeck node
+   * @param nodes Rundeck nodes
+   * @throws ResourceModelSourceException
+   */
   public void ansibleInventoryList(NodeSetImpl nodes) throws ResourceModelSourceException {
     Yaml yaml = new Yaml();
 
@@ -670,7 +675,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
 
     for (Map.Entry<String, Object> pair : children.entrySet()) {
       String hostGroup = pair.getKey();
-      Map<String, Object> hostNames = InventoryList.getMap(pair.getValue());
+      Map<String, Object> hostNames = InventoryList.getType(pair.getValue());
       Map<String, Object> hosts = InventoryList.getValue(hostNames, HOSTS);
 
       for (Map.Entry<String, Object> hostNode : hosts.entrySet()) {
@@ -679,8 +684,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
         String hostName = hostNode.getKey();
         node.setHostname(hostName);
         node.setNodename(hostName);
-        Map<String, Object> nodeValues = InventoryList.getMap(hostNode.getValue());
-        //InventoryList.tagHandle(NodeTag.HOSTNAME, node, nodeValues);
+        Map<String, Object> nodeValues = InventoryList.getType(hostNode.getValue());
         InventoryList.tagHandle(NodeTag.USERNAME, node, nodeValues);
         InventoryList.tagHandle(NodeTag.OS_FAMILY, node, nodeValues);
         InventoryList.tagHandle(NodeTag.OS_NAME, node, nodeValues);

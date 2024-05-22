@@ -19,46 +19,74 @@ public class InventoryList {
     public static final String ERROR_MISSING_FIELD = "Error: Missing tag '%s'";
     public static final String ERROR_MISSING_TAG = "Error: Not tag found among these searched: '%s'";
 
-    @SuppressWarnings("unchecked")
+    /**
+     * Gets value from a tag from Ansible inventory
+     * @param tag tag from yaml output
+     * @param field field to look for
+     * @return value from tag yaml output
+     * @param <T> type you want to receive
+     */
     public static <T> T getValue(Map<String, Object> tag, final String field) {
         Object obj = null;
         if (Optional.ofNullable(tag.get(field)).isPresent()) {
             obj = tag.get(field);
         }
-        return (T) obj;
+        return getType(obj);
     }
 
+    /**
+     * Casts an object you want to receive
+     * @param obj generic object
+     * @return cast object
+     * @param <T> type you want to receive
+     */
     @SuppressWarnings("unchecked")
-    public static <T> T getMap(Object obj) {
+    public static <T> T getType(Object obj) {
         return (T) obj;
     }
 
-    public static void tagHandle(NodeTag nodetag, NodeEntryImpl node, Map<String, Object> tags)
+    /**
+     * Process an Ansible tag
+     * @param nodeTag Ansible node tag
+     * @param node Rundeck node to build
+     * @param tags tags to evaluate
+     * @throws ResourceModelSourceException
+     */
+    public static void tagHandle(NodeTag nodeTag, NodeEntryImpl node, Map<String, Object> tags)
             throws ResourceModelSourceException {
-        nodetag.handle(node, tags);
+        nodeTag.handle(node, tags);
     }
 
+    /**
+     * Finds a tag if it exists in a map of tags
+     * @param nameTags map of tags to find
+     * @param tags tags from Ansible
+     * @return a value if it exists
+     */
     private static String findTag(List<String> nameTags, Map<String, Object> tags) {
         String found = null;
         for (String nameTag : nameTags) {
             if (tags.containsKey(nameTag)) {
                 Object value = tags.get(nameTag);
-                if (value instanceof String) {
-                    found = (String) value;
-                }
+                found = valueString(value);
                 break;
             }
         }
         return found;
     }
 
+    /**
+     * Casts an object to String
+     * @param obj object to convert
+     * @return a String object
+     */
     private static String valueString(Object obj) {
-        if (obj instanceof String) {
-            return (String) obj;
-        }
-        return null;
+        return getType(obj);
     }
 
+    /**
+     * Enum to manage Ansible tags
+     */
     public enum NodeTag {
 
         HOSTNAME {
@@ -113,7 +141,7 @@ public class InventoryList {
         },
         DESCRIPTION {
             @Override
-            public void handle(NodeEntryImpl node, Map<String, Object> tags) throws ResourceModelSourceException {
+            public void handle(NodeEntryImpl node, Map<String, Object> tags) {
                 Map<String, Object> lsbMap = InventoryList.getValue(tags, "ansible_lsb");
                 if (lsbMap != null) {
                     String desc = InventoryList.valueString(lsbMap.get("description"));
@@ -128,6 +156,12 @@ public class InventoryList {
             }
         };
 
+        /**
+         * Processes an Ansible tag to build a Rundeck tag
+         * @param node Rundeck node
+         * @param tags Ansible tags
+         * @throws ResourceModelSourceException
+         */
         public abstract void handle(NodeEntryImpl node, Map<String, Object> tags) throws ResourceModelSourceException;
     }
 }
