@@ -106,9 +106,9 @@ public class InventoryList {
         OS_VERSION {
             @Override
             public void handle(NodeEntryImpl node, Map<String, Object> tags) {
-                final List<String> versionNames = List.of("osVersion");
+                final List<String> versionNames = List.of("osVersion", "ansible_kernel");
                 String nameTag = InventoryList.findTag(versionNames, tags);
-                Optional.ofNullable(nameTag).ifPresent(node::setOsArch);
+                Optional.ofNullable(nameTag).ifPresent(node::setOsVersion);
             }
         },
         DESCRIPTION {

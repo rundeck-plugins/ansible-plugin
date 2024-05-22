@@ -367,9 +367,6 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
   public INodeSet getNodes() throws ResourceModelSourceException {
     NodeSetImpl nodes = new NodeSetImpl();
 
-    // ansible-inventory -i inventory.yaml --list -y
-    // snake yaml
-
     if (gatherFacts) {
       processWithGatherFacts(nodes);
     } else {
