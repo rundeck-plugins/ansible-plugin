@@ -114,9 +114,14 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
 
   protected boolean encryptExtraVars = false;
 
+  private AnsibleInventoryList.AnsibleInventoryListBuilder ansibleInventoryListBuilder = null;
 
   public AnsibleResourceModelSource(final Framework framework) {
       this.framework = framework;
+  }
+
+  public void setAnsibleInventoryListBuilder(AnsibleInventoryList.AnsibleInventoryListBuilder builder) {
+    this.ansibleInventoryListBuilder = builder;
   }
 
   private static String resolveProperty(
@@ -661,13 +666,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
   public void ansibleInventoryList(NodeSetImpl nodes) throws ResourceModelSourceException {
     Yaml yaml = new Yaml();
 
-    AnsibleInventoryList inventoryList = AnsibleInventoryList.builder()
-            .inventory(inventory)
-            .configFile(configFile)
-            .debug(debug)
-            .build();
-
-    String listResp = inventoryList.getNodeList();
+    String listResp = getNodesFromInventory();
 
     Map<String, Object> allInventory = yaml.load(listResp);
     Map<String, Object> all = InventoryList.getValue(allInventory, ALL);
@@ -695,6 +694,23 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
         nodes.putNode(node);
       }
     }
+  }
+
+  /**
+   * Gets Ansible nodes from inventory
+   * @return Ansible nodes
+   */
+  public String getNodesFromInventory() {
+
+    if (this.ansibleInventoryListBuilder == null) {
+      this.ansibleInventoryListBuilder = AnsibleInventoryList.builder()
+              .inventory(inventory)
+              .configFile(configFile)
+              .debug(debug);
+    }
+    AnsibleInventoryList inventoryList = this.ansibleInventoryListBuilder.build();
+
+    return inventoryList.getNodeList();
   }
 
   private String getStorageContentString(String storagePath, StorageTree storageTree) throws ConfigurationException {
