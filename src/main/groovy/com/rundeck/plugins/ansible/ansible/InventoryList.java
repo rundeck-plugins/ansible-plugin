@@ -100,11 +100,10 @@ public class InventoryList {
         },
         USERNAME {
             @Override
-            public void handle(NodeEntryImpl node, Map<String, Object> tags) throws ResourceModelSourceException {
+            public void handle(NodeEntryImpl node, Map<String, Object> tags) {
                 final List<String> usernames = List.of("username", "ansible_user", "ansible_ssh_user", "ansible_user_id");
                 String nameTag = InventoryList.findTag(usernames, tags);
-                node.setUsername(Optional.ofNullable(nameTag)
-                        .orElseThrow(() -> new ResourceModelSourceException(format(ERROR_MISSING_TAG, usernames))));
+                Optional.ofNullable(nameTag).ifPresent(node::setUsername);
             }
         },
         OS_FAMILY {
