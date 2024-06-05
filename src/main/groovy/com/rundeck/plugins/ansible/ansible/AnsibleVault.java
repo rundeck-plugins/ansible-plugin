@@ -2,6 +2,7 @@ package com.rundeck.plugins.ansible.ansible;
 
 import com.rundeck.plugins.ansible.util.AnsibleUtil;
 import com.rundeck.plugins.ansible.util.ProcessExecutor;
+import com.rundeck.plugins.ansible.util.VaultPrompt;
 import lombok.Builder;
 import lombok.Data;
 
@@ -72,8 +73,11 @@ public class AnsibleVault {
         }
 
         //send values to STDIN in order
-        List<String> stdinVariables = new ArrayList<>();
-        stdinVariables.add(content);
+        List<VaultPrompt> stdinVariables = new ArrayList<>();
+        VaultPrompt vaultPrompt = VaultPrompt.builder()
+                .vaultPassword(content)
+                .build();
+        stdinVariables.add(vaultPrompt);
 
         Map<String, String> env = new HashMap<>();
         env.put("VAULT_ID_SECRET", masterPassword);

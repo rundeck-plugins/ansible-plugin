@@ -290,6 +290,7 @@ public class AnsibleRunner {
     File tempVaultFile ;
     File tempSshVarsFile ;
     File tempBecameVarsFile ;
+    File vaultPromptFile;
 
     public void deleteTempDirectory(Path tempDirectory) throws IOException {
         Files.walkFileTree(tempDirectory, new SimpleFileVisitor<Path>() {
@@ -337,6 +338,7 @@ public class AnsibleRunner {
 
         if(ansibleVault==null){
             tempInternalVaultFile = AnsibleVault.createVaultScriptAuth("ansible-script-vault");
+            vaultPromptFile = File.createTempFile("vault-prompt", ".log");
 
             ansibleVault = AnsibleVault.builder()
                     .baseDirectory(baseDirectory)
@@ -387,12 +389,7 @@ public class AnsibleRunner {
 
                 useAnsibleVault = ansibleVault.checkAnsibleVault();
 
-                if(useAnsibleVault) {
-                    tempInternalVaultFile = ansibleVault.getVaultPasswordScriptFile();
-
-                    procArgs.add("--vault-id");
-                    procArgs.add("internal-encrypt@" + tempInternalVaultFile.getAbsolutePath());
-                }else{
+                if(!useAnsibleVault) {
                     System.err.println("WARN: ansible-vault is not installed, extra-vars will not be encrypted.");
                 }
             }
@@ -429,12 +426,6 @@ public class AnsibleRunner {
 
                 tempVarsFile = AnsibleUtil.createTemporaryFile("extra-vars", addeExtraVars);
                 procArgs.add("--extra-vars" + "=" + "@" + tempVarsFile.getAbsolutePath());
-            }
-
-            if (vaultPass != null && !vaultPass.isEmpty()) {
-                tempVaultFile = ansibleVault.getVaultPasswordScriptFile();
-                procArgs.add("--vault-id");
-                procArgs.add(tempVaultFile.getAbsolutePath());
             }
 
             if (sshPrivateKey != null && !sshPrivateKey.isEmpty()) {
@@ -506,16 +497,17 @@ public class AnsibleRunner {
                 procArgs.addAll(tokenizeCommand(extraParams));
             }
 
-            if (debug) {
-                System.out.println(" procArgs: " + procArgs);
-            }
-
             if(processExecutorBuilder==null){
                 processExecutorBuilder = ProcessExecutor.builder();
             }
 
             //set main process command
             processExecutorBuilder.procArgs(procArgs);
+
+            if (debug) {
+                System.out.println(" procArgs: " + procArgs);
+                processExecutorBuilder.debug(true);
+            }
 
             if (baseDirectory != null) {
                 processExecutorBuilder.baseDirectory(baseDirectory.toFile());
@@ -540,20 +532,45 @@ public class AnsibleRunner {
                 processEnvironment.put("SSH_AUTH_SOCK", this.sshAgent.getSocketPath());
             }
 
-            processExecutorBuilder.environmentVariables(processEnvironment);
-
             //set STDIN variables
-            List<String> stdinVariables = new ArrayList<>();
+            List<VaultPrompt> stdinVariables = new ArrayList<>();
 
             if (useAnsibleVault) {
-                stdinVariables.add(ansibleVault.getMasterPassword() + "\n");
+                VaultPrompt vaultPrompt = VaultPrompt.builder()
+                        .vaultId("internal-encrypt")
+                        .vaultPassword(ansibleVault.getMasterPassword() + "\n")
+                        .build();
+
+                stdinVariables.add(vaultPrompt);
+                processEnvironment.put("LOG_PATH", vaultPromptFile.getAbsolutePath());
+
+                tempInternalVaultFile = ansibleVault.getVaultPasswordScriptFile();
+
+                procArgs.add("--vault-id");
+                procArgs.add("internal-encrypt@" + tempInternalVaultFile.getAbsolutePath());
             }
 
             if (vaultPass != null && !vaultPass.isEmpty()) {
-                stdinVariables.add(vaultPass + "\n");
+                VaultPrompt vaultPrompt = VaultPrompt.builder()
+                        .vaultId("None")
+                        .vaultPassword(vaultPass + "\n")
+                        .build();
+
+                stdinVariables.add(vaultPrompt);
+                processEnvironment.putIfAbsent("LOG_PATH", vaultPromptFile.getAbsolutePath());
+
+                tempVaultFile = ansibleVault.getVaultPasswordScriptFile();
+                procArgs.add("--vault-id");
+                procArgs.add(tempVaultFile.getAbsolutePath());
             }
 
             processExecutorBuilder.stdinVariables(stdinVariables);
+            processExecutorBuilder.environmentVariables(processEnvironment);
+
+            //set vault prompt file
+            if(vaultPromptFile !=null){
+                processExecutorBuilder.promptStdinLogFile(vaultPromptFile);
+            }
 
             proc = processExecutorBuilder.build().run();
 
@@ -627,6 +644,10 @@ public class AnsibleRunner {
                 tempInternalVaultFile.deleteOnExit();
             }
 
+            if(vaultPromptFile != null && !vaultPromptFile.delete()){
+                vaultPromptFile.deleteOnExit();
+            }
+
             if (usingTempDirectory && !retainTempDirectory) {
                 deleteTempDirectory(baseDirectory);
             }
@@ -668,9 +689,13 @@ public class AnsibleRunner {
             env.put("SSH_ASKPASS", tempPassVarsFile.getAbsolutePath());
         }
 
-        List<String> stdinVariables = new ArrayList<>();
+        List<VaultPrompt> stdinVariables = new ArrayList<>();
         if (sshPassphrase != null && !sshPassphrase.isEmpty()) {
-            stdinVariables.add(sshPassphrase + "\n");
+            VaultPrompt sshPassPrompt = VaultPrompt.builder()
+                    .vaultPassword(sshPassphrase + "\n")
+                    .build();
+
+            stdinVariables.add(sshPassPrompt);
         }
 
         ProcessExecutor processExecutor = ProcessExecutor.builder()
