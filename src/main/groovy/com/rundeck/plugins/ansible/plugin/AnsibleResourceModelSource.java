@@ -190,7 +190,6 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
 
     sshAgent = (String) resolveProperty(AnsibleDescribable.ANSIBLE_SSH_USE_AGENT,null,configuration,executionDataContext);
     sshPassphraseStoragePath = (String) resolveProperty(AnsibleDescribable.ANSIBLE_SSH_PASSPHRASE,null,configuration,executionDataContext);
-    vaultPasswordPath = (String) resolveProperty(AnsibleDescribable.ANSIBLE_BECOME_PASSWORD_STORAGE_PATH,null,configuration,executionDataContext);
 
     becamePasswordStoragePath = (String) resolveProperty(AnsibleDescribable.ANSIBLE_BECOME_PASSWORD_STORAGE_PATH,null,configuration,executionDataContext);
 

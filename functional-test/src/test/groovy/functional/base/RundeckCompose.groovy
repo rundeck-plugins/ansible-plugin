@@ -32,6 +32,9 @@ class RundeckCompose extends DockerComposeContainer<RundeckCompose> {
             baseUrl rdUrl
             passwordAuth('admin', 'admin')
             logger(new TestLogger())
+            timeout(300)
+            readTimeout(300)
+            connectTimeout(300)
             build()
         }
         return client
