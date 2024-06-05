@@ -338,8 +338,6 @@ public class AnsibleRunner {
 
         if(ansibleVault==null){
             tempInternalVaultFile = AnsibleVault.createVaultScriptAuth("ansible-script-vault");
-            vaultPromptFile = File.createTempFile("vault-prompt", ".log");
-
             ansibleVault = AnsibleVault.builder()
                     .baseDirectory(baseDirectory)
                     .masterPassword(AnsibleUtil.randomString())
@@ -501,9 +499,6 @@ public class AnsibleRunner {
                 processExecutorBuilder = ProcessExecutor.builder();
             }
 
-            //set main process command
-            processExecutorBuilder.procArgs(procArgs);
-
             if (debug) {
                 System.out.println(" procArgs: " + procArgs);
                 processExecutorBuilder.debug(true);
@@ -535,6 +530,10 @@ public class AnsibleRunner {
             //set STDIN variables
             List<VaultPrompt> stdinVariables = new ArrayList<>();
 
+            if(useAnsibleVault || vaultPass != null ){
+                vaultPromptFile = File.createTempFile("vault-prompt", ".log");
+            }
+
             if (useAnsibleVault) {
                 VaultPrompt vaultPrompt = VaultPrompt.builder()
                         .vaultId("internal-encrypt")
@@ -564,6 +563,8 @@ public class AnsibleRunner {
                 procArgs.add(tempVaultFile.getAbsolutePath());
             }
 
+            //set main process command
+            processExecutorBuilder.procArgs(procArgs);
             processExecutorBuilder.stdinVariables(stdinVariables);
             processExecutorBuilder.environmentVariables(processEnvironment);
 
