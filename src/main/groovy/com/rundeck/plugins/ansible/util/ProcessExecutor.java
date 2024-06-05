@@ -68,7 +68,7 @@ public class ProcessExecutor {
         if(promptStdinLogFile!=null){
             Thread stdinThread = new Thread(() -> {
                 try {
-                    stdinw.write(vaultPrompt.getVaultPassword()+"\n");
+                    stdinw.write(vaultPrompt.getVaultPassword());
                     stdinw.flush();
                 } catch (IOException e) {
                     throw new RuntimeException(e);
