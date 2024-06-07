@@ -2,12 +2,18 @@
 import sys
 import os
 import getpass
+import logging
+from logging import handlers
 
-secret=os.getenv('VAULT_ID_SECRET', None)
+log = logging.getLogger('')
+log.setLevel(logging.DEBUG)
 
-if secret:
-    sys.stdout.write('%s\n' % (secret))
-    sys.exit(0)
+log_path=os.getenv('LOG_PATH', None)
+
+if log_path:
+    fh = handlers.RotatingFileHandler(log_path)
+    log.addHandler(fh)
+    log.info("Enter Password:")
 
 if sys.stdin.isatty():
     secret = getpass.getpass()

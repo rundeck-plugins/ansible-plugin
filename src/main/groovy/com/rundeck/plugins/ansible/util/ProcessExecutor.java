@@ -2,11 +2,8 @@ package com.rundeck.plugins.ansible.util;
 
 import lombok.Builder;
 
-import java.io.IOException;
-import java.io.OutputStream;
-import java.io.OutputStreamWriter;
+import java.io.*;
 import java.util.List;
-import java.io.File;
 import java.util.Map;
 
 @Builder
@@ -42,22 +39,26 @@ public class ProcessExecutor {
 
         Process proc = processBuilder.start();
 
-        OutputStream stdin = proc.getOutputStream();
-        OutputStreamWriter stdinw = new OutputStreamWriter(stdin);
-
-        if (stdinVariables != null) {
+        if (stdinVariables != null && !stdinVariables.isEmpty()){
+            OutputStream stdin = proc.getOutputStream();
+            OutputStreamWriter stdinw = new OutputStreamWriter(stdin);
+            BufferedWriter writer = new BufferedWriter(stdinw);
             try {
 
                 for (String stdinVariable : stdinVariables) {
-                    stdinw.write(stdinVariable);
+                    writer.write(stdinVariable);
+                    writer.newLine();
+                    writer.flush();
                 }
-                stdinw.flush();
+
             } catch (Exception e) {
                 System.err.println("error encryptFileAnsibleVault file " + e.getMessage());
             }
+            writer.close();
+            stdinw.close();
+            stdin.close();
         }
-        stdinw.close();
-        stdin.close();
+
 
         return proc;
     }
