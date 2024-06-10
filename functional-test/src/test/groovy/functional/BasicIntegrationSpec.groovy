@@ -258,4 +258,33 @@ class BasicIntegrationSpec extends BaseTestConfiguration {
         logs.findAll {it.log.contains("\"token\": 13231232312321321321321")}.size() == 1
     }
 
+    def "test use encrypted user file with password authentication"(){
+        when:
+
+        def jobId = "0ea27de5-ef36-4a2f-b09c-1bd548eb78d4"
+
+        JobRun request = new JobRun()
+        request.loglevel = 'DEBUG'
+
+        def result = client.apiCall {api-> api.runJob(jobId, request)}
+        def executionId = result.id
+
+        def executionState = waitForJob(executionId)
+
+        def logs = getLogs(executionId)
+        Map<String, Integer> ansibleNodeExecutionStatus = TestUtil.getAnsibleNodeResult(logs)
+
+        then:
+        executionState!=null
+        executionState.getExecutionState()=="SUCCEEDED"
+        ansibleNodeExecutionStatus.get("ok")!=0
+        ansibleNodeExecutionStatus.get("unreachable")==0
+        ansibleNodeExecutionStatus.get("failed")==0
+        ansibleNodeExecutionStatus.get("skipped")==0
+        ansibleNodeExecutionStatus.get("ignored")==0
+        logs.findAll {it.log.contains("encryptVariable ansible_ssh_password:")}.size() == 1
+        logs.findAll {it.log.contains("\"environmentTest\": \"test\"")}.size() == 1
+        logs.findAll {it.log.contains("\"token\": 13231232312321321321321")}.size() == 1
+    }
+
 }

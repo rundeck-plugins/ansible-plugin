@@ -22,7 +22,7 @@ RUN apt-get -y install sshpass && \
     apt-get -y install sudo && \
     pip3 install --upgrade pip
 
-RUN pip3 install ansible
+RUN pip3 install ansible==9.6.0
 
 RUN ln -s /usr/bin/python3 /usr/bin/python
 
