@@ -26,7 +26,9 @@ import com.rundeck.plugins.ansible.ansible.InventoryList;
 import org.rundeck.app.spi.Services;
 import org.rundeck.storage.api.PathUtil;
 import org.rundeck.storage.api.StorageException;
+import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.constructor.SafeConstructor;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
@@ -664,7 +666,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
    * @throws ResourceModelSourceException
    */
   public void ansibleInventoryList(NodeSetImpl nodes) throws ResourceModelSourceException {
-    Yaml yaml = new Yaml();
+    Yaml yaml = new Yaml(new SafeConstructor(new LoaderOptions()));
 
     String listResp = getNodesFromInventory();
 
@@ -709,6 +711,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
               .debug(debug);
     }
     AnsibleInventoryList inventoryList = this.ansibleInventoryListBuilder.build();
+    //inventoryList.processVault();
 
     return inventoryList.getNodeList();
   }
