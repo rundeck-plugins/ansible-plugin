@@ -1,10 +1,14 @@
 package com.rundeck.plugins.ansible.ansible;
 
+import com.rundeck.plugins.ansible.util.AnsibleUtil;
 import com.rundeck.plugins.ansible.util.ProcessExecutor;
+import com.rundeck.plugins.ansible.util.VaultPrompt;
 import lombok.Builder;
 import lombok.Data;
 
 import java.io.BufferedReader;
+import java.io.File;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
@@ -20,13 +24,19 @@ public class AnsibleInventoryList {
     private String configFile;
     private boolean debug;
 
+    private AnsibleVault ansibleVault;
+    private VaultPrompt vaultPrompt;
+    private File tempInternalVaultFile;
+    private File tempVaultFile;
+    private File vaultPromptFile;
+
     public static final String ANSIBLE_INVENTORY = "ansible-inventory";
 
     /**
      * Executes Ansible command to bring all nodes from inventory
      * @return output in yaml format
      */
-    public String getNodeList() {
+    public String getNodeList() throws Exception {
 
         List<String> procArgs = new ArrayList<>();
         procArgs.add(ANSIBLE_INVENTORY);
@@ -41,6 +51,10 @@ public class AnsibleInventoryList {
             }
             processEnvironment.put("ANSIBLE_CONFIG", configFile);
         }
+        //set STDIN variables
+        List<VaultPrompt> stdinVariables = new ArrayList<>();
+
+        processAnsibleVault(stdinVariables, procArgs);
 
         if(debug){
             System.out.println("getNodeList " + procArgs);
@@ -52,6 +66,7 @@ public class AnsibleInventoryList {
             proc = ProcessExecutor.builder().procArgs(procArgs)
                     .redirectErrorStream(true)
                     .environmentVariables(processEnvironment)
+                    .stdinVariables(stdinVariables)
                     .build().run();
 
             StringBuilder stringBuilder = new StringBuilder();
@@ -79,6 +94,25 @@ public class AnsibleInventoryList {
             if (proc != null) {
                 proc.destroy();
             }
+        }
+    }
+
+    private void processAnsibleVault(List<VaultPrompt> stdinVariables, List<String> procArgs)
+            throws IOException {
+
+        if(ansibleVault == null){
+            tempInternalVaultFile = AnsibleVault.createVaultScriptAuth("ansible-script-vault");
+            ansibleVault = AnsibleVault.builder()
+                    .masterPassword(vaultPrompt.getVaultPassword())
+                    .vaultPasswordScriptFile(tempInternalVaultFile)
+                    .debug(debug).build();
+        }
+
+        if (vaultPrompt != null) {
+            stdinVariables.add(vaultPrompt);
+            tempVaultFile = ansibleVault.getVaultPasswordScriptFile();
+            procArgs.add("--vault-id");
+            procArgs.add(tempVaultFile.getAbsolutePath());
         }
     }
 }

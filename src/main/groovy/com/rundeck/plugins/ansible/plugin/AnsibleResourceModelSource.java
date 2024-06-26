@@ -23,6 +23,7 @@ import com.rundeck.plugins.ansible.ansible.AnsibleDescribable.AuthenticationType
 import com.rundeck.plugins.ansible.ansible.AnsibleInventoryList;
 import com.rundeck.plugins.ansible.ansible.AnsibleRunner;
 import com.rundeck.plugins.ansible.ansible.InventoryList;
+import com.rundeck.plugins.ansible.util.VaultPrompt;
 import org.rundeck.app.spi.Services;
 import org.rundeck.storage.api.PathUtil;
 import org.rundeck.storage.api.StorageException;
@@ -373,18 +374,19 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
   @Override
   public INodeSet getNodes() throws ResourceModelSourceException {
     NodeSetImpl nodes = new NodeSetImpl();
+    AnsibleRunner.AnsibleRunnerBuilder runnerBuilder = buildAnsibleRunner();
 
     if (gatherFacts) {
-      processWithGatherFacts(nodes);
+      processWithGatherFacts(nodes, runnerBuilder);
     } else {
-      ansibleInventoryList(nodes);
+      ansibleInventoryList(nodes, runnerBuilder);
     }
 
     return nodes;
   }
 
-  public void processWithGatherFacts(NodeSetImpl nodes) throws ResourceModelSourceException {
-    AnsibleRunner.AnsibleRunnerBuilder runnerBuilder = buildAnsibleRunner();
+  public void processWithGatherFacts(NodeSetImpl nodes, AnsibleRunner.AnsibleRunnerBuilder runnerBuilder) throws ResourceModelSourceException {
+
     final Gson gson = new Gson();
     Path tempDirectory;
     try {
@@ -665,10 +667,10 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
    * @param nodes Rundeck nodes
    * @throws ResourceModelSourceException
    */
-  public void ansibleInventoryList(NodeSetImpl nodes) throws ResourceModelSourceException {
+  public void ansibleInventoryList(NodeSetImpl nodes, AnsibleRunner.AnsibleRunnerBuilder runnerBuilder) throws ResourceModelSourceException {
     Yaml yaml = new Yaml(new SafeConstructor(new LoaderOptions()));
 
-    String listResp = getNodesFromInventory();
+    String listResp = getNodesFromInventory(runnerBuilder);
 
     Map<String, Object> allInventory = yaml.load(listResp);
     Map<String, Object> all = InventoryList.getValue(allInventory, ALL);
@@ -702,7 +704,9 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
    * Gets Ansible nodes from inventory
    * @return Ansible nodes
    */
-  public String getNodesFromInventory() {
+  public String getNodesFromInventory(AnsibleRunner.AnsibleRunnerBuilder runnerBuilder) throws ResourceModelSourceException {
+
+    AnsibleRunner runner = runnerBuilder.build();
 
     if (this.ansibleInventoryListBuilder == null) {
       this.ansibleInventoryListBuilder = AnsibleInventoryList.builder()
@@ -710,10 +714,22 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
               .configFile(configFile)
               .debug(debug);
     }
-    AnsibleInventoryList inventoryList = this.ansibleInventoryListBuilder.build();
-    //inventoryList.processVault();
 
-    return inventoryList.getNodeList();
+    if(runner.getVaultPass() != null){
+      VaultPrompt vaultPrompt = VaultPrompt.builder()
+              .vaultId("None")
+              .vaultPassword(runner.getVaultPass() + "\n")
+              .build();
+      ansibleInventoryListBuilder.vaultPrompt(vaultPrompt);
+    }
+
+    AnsibleInventoryList inventoryList = this.ansibleInventoryListBuilder.build();
+
+    try {
+        return inventoryList.getNodeList();
+    } catch (Exception e) {
+      throw new ResourceModelSourceException(e.getMessage(),e);
+    }
   }
 
   private String getStorageContentString(String storagePath, StorageTree storageTree) throws ConfigurationException {
