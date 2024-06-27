@@ -1,5 +1,9 @@
 package com.rundeck.plugins.ansible.plugin
 
+import com.dtolabs.rundeck.core.storage.StorageTree
+import com.dtolabs.rundeck.core.storage.keys.KeyStorageTree
+import org.rundeck.app.spi.Services
+
 import static com.rundeck.plugins.ansible.ansible.AnsibleInventoryList.AnsibleInventoryListBuilder
 
 import com.dtolabs.rundeck.core.common.Framework
@@ -35,6 +39,10 @@ class AnsibleResourceModelSourceSpec extends Specification {
         config.put('project', 'project_1')
         config.put(AnsibleDescribable.ANSIBLE_GATHER_FACTS, 'false')
         plugin.configure(config)
+        Services services = Mock(Services) {
+            getService(KeyStorageTree.class) >> Mock(KeyStorageTree)
+        }
+        plugin.setServices(services)
 
         when:
         Map<String, String> nodeData = [:]

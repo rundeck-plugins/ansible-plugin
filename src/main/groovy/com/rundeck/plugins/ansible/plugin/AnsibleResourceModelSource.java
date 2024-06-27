@@ -723,7 +723,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
       ansibleInventoryListBuilder.vaultPrompt(vaultPrompt);
     }
 
-    if (!runner.getLimits().isEmpty()) {
+    if (runner.getLimits() != null) {
       ansibleInventoryListBuilder.limits(runner.getLimits());
     }
 
