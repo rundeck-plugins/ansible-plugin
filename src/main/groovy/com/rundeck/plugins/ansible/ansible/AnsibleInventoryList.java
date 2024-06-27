@@ -26,9 +26,12 @@ public class AnsibleInventoryList {
 
     private AnsibleVault ansibleVault;
     private VaultPrompt vaultPrompt;
+    private List<String> limits;
+
     private File tempInternalVaultFile;
     private File tempVaultFile;
     private File vaultPromptFile;
+    private File tempLimitFile;
 
     public static final String ANSIBLE_INVENTORY = "ansible-inventory";
 
@@ -55,6 +58,7 @@ public class AnsibleInventoryList {
         List<VaultPrompt> stdinVariables = new ArrayList<>();
 
         processAnsibleVault(stdinVariables, procArgs);
+        processLimit(procArgs);
 
         if(debug){
             System.out.println("getNodeList " + procArgs);
@@ -113,6 +117,23 @@ public class AnsibleInventoryList {
             tempVaultFile = ansibleVault.getVaultPasswordScriptFile();
             procArgs.add("--vault-id");
             procArgs.add(tempVaultFile.getAbsolutePath());
+        }
+    }
+
+    private void processLimit(List<String> procArgs) throws IOException {
+        if (limits != null && limits.size() == 1) {
+            procArgs.add("-l");
+            procArgs.add(limits.get(0));
+
+        } else if (limits != null && limits.size() > 1) {
+            StringBuilder sb = new StringBuilder();
+            for (String limit : limits) {
+                sb.append(limit).append("\n");
+            }
+            tempLimitFile = AnsibleUtil.createTemporaryFile("targets", sb.toString());
+
+            procArgs.add("-l");
+            procArgs.add("@" + tempLimitFile.getAbsolutePath());
         }
     }
 }
