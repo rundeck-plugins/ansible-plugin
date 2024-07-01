@@ -421,7 +421,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     try {
       runner.run();
     } catch (Exception e) {
-      throw new ResourceModelSourceException(e.getMessage(),e);
+      throw new ResourceModelSourceException("Failed Ansible Runner execution",e);
     }
 
     try {
