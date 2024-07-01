@@ -20,6 +20,7 @@ import com.google.gson.JsonParser;
 import com.google.gson.JsonPrimitive;
 import com.rundeck.plugins.ansible.ansible.AnsibleDescribable;
 import com.rundeck.plugins.ansible.ansible.AnsibleDescribable.AuthenticationType;
+import com.rundeck.plugins.ansible.ansible.AnsibleException;
 import com.rundeck.plugins.ansible.ansible.AnsibleInventoryList;
 import com.rundeck.plugins.ansible.ansible.AnsibleRunner;
 import com.rundeck.plugins.ansible.ansible.InventoryList;
@@ -399,7 +400,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
       Files.copy(this.getClass().getClassLoader().getResourceAsStream(HOST_TPL_J2), tempDirectory.resolve(HOST_TPL_J2));
       Files.copy(this.getClass().getClassLoader().getResourceAsStream(GATHER_HOSTS_YML), tempDirectory.resolve(GATHER_HOSTS_YML));
     } catch (IOException e) {
-      throw new ResourceModelSourceException("Error copying files.");
+      throw new ResourceModelSourceException("Error copying files.", e);
     }
 
     runnerBuilder.tempDirectory(tempDirectory);
@@ -731,8 +732,8 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
 
     try {
         return inventoryList.getNodeList();
-    } catch (Exception e) {
-      throw new ResourceModelSourceException(e.getMessage(),e);
+    } catch (IOException | AnsibleException e) {
+      throw new ResourceModelSourceException("Failed to get node list from ansible: ", e);
     }
   }
 

@@ -39,7 +39,7 @@ public class AnsibleInventoryList {
      * Executes Ansible command to bring all nodes from inventory
      * @return output in yaml format
      */
-    public String getNodeList() throws Exception {
+    public String getNodeList() throws IOException, AnsibleException {
 
         List<String> procArgs = new ArrayList<>();
         procArgs.add(ANSIBLE_INVENTORY);
@@ -91,11 +91,24 @@ public class AnsibleInventoryList {
             }
             return stringBuilder.toString();
 
+        } catch (IOException e) {
+            throw new AnsibleException("ERROR: Ansible IO failure: " + e.getMessage(), e, AnsibleException.AnsibleFailureReason.IOFailure);
+        } catch (InterruptedException e) {
+            if (proc != null) {
+                proc.destroy();
+            }
+            Thread.currentThread().interrupt();
+            throw new AnsibleException("ERROR: Ansible Execution Interrupted.", e, AnsibleException.AnsibleFailureReason.Interrupted);
         } catch (Exception e) {
-            System.err.println("error getNodeList: " + e.getMessage());
-            return null;
+            if (proc != null) {
+                proc.destroy();
+            }
+            throw new AnsibleException("ERROR: Ansible execution returned with non zero code.", e, AnsibleException.AnsibleFailureReason.Unknown);
         } finally {
             if (proc != null) {
+                proc.getErrorStream().close();
+                proc.getInputStream().close();
+                proc.getOutputStream().close();
                 proc.destroy();
             }
         }
