@@ -393,14 +393,14 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     try {
       tempDirectory = Files.createTempDirectory("ansible-hosts");
     } catch (IOException e) {
-      throw new ResourceModelSourceException("Error creating temporary directory.", e);
+      throw new ResourceModelSourceException("Error creating temporary directory: " + e.getMessage(), e);
     }
 
     try {
       Files.copy(this.getClass().getClassLoader().getResourceAsStream(HOST_TPL_J2), tempDirectory.resolve(HOST_TPL_J2));
       Files.copy(this.getClass().getClassLoader().getResourceAsStream(GATHER_HOSTS_YML), tempDirectory.resolve(GATHER_HOSTS_YML));
     } catch (IOException e) {
-      throw new ResourceModelSourceException("Error copying files.", e);
+      throw new ResourceModelSourceException("Error copying files: " + e.getMessage(), e);
     }
 
     runnerBuilder.tempDirectory(tempDirectory);
