@@ -189,7 +189,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
        try {
           sshTimeout =  Integer.parseInt(str_sshTimeout);
        } catch (NumberFormatException e) {
-          throw new ConfigurationException("Can't parse timeout value : " + e.getMessage());
+          throw new ConfigurationException("Can't parse timeout value : " + e.getMessage(), e);
        }
     }
 
@@ -247,7 +247,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
         try {
           sshPrivateKey = new String(Files.readAllBytes(Paths.get(sshPrivateKeyFile)));
         } catch (IOException e) {
-          throw new ResourceModelSourceException("Could not read privatekey file " + sshPrivateKeyFile,e);
+          throw new ResourceModelSourceException("Could not read privatekey file " + sshPrivateKeyFile +": "+ e.getMessage(),e);
         }
         runnerBuilder.sshPrivateKey(sshPrivateKey);
       }
@@ -257,7 +257,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
           String sshPrivateKey = getStorageContentString(sshPrivateKeyPath, storageTree);
           runnerBuilder.sshPrivateKey(sshPrivateKey);
         } catch (ConfigurationException e) {
-          throw new ResourceModelSourceException("Could not read private key from storage path " + sshPrivateKeyPath,e);
+          throw new ResourceModelSourceException("Could not read private key from storage path " + sshPrivateKeyPath +": "+ e.getMessage(),e);
         }
       }
 
@@ -269,7 +269,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
             String sshPassphrase = getStorageContentString(sshPassphraseStoragePath, storageTree);
             runnerBuilder.sshPassphrase(sshPassphrase);
           } catch (ConfigurationException e) {
-            throw new ResourceModelSourceException("Could not read passphrase from storage path " + sshPassphraseStoragePath,e);
+            throw new ResourceModelSourceException("Could not read passphrase from storage path " + sshPassphraseStoragePath +": "+ e.getMessage(),e);
           }
         }
       }
@@ -284,7 +284,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
           sshPassword = getStorageContentString(sshPasswordPath, storageTree);
           runnerBuilder.sshUsePassword(Boolean.TRUE).sshPass(sshPassword);
         } catch (ConfigurationException e) {
-          throw new ResourceModelSourceException("Could not read password from storage path " + sshPasswordPath,e);
+          throw new ResourceModelSourceException("Could not read password from storage path " + sshPasswordPath +": "+ e.getMessage(),e);
         }
       }
     }
@@ -325,7 +325,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
         becomePassword = getStorageContentString(becamePasswordStoragePath, storageTree);
         runnerBuilder.becomePassword(becomePassword);
       } catch (Exception e) {
-        throw new ResourceModelSourceException("Could not read becomePassword from storage path " + becamePasswordStoragePath,e);
+        throw new ResourceModelSourceException("Could not read becomePassword from storage path " + becamePasswordStoragePath +": "+ e.getMessage(),e);
       }
     }
 
@@ -341,7 +341,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
       try {
         vaultPassword = getStorageContentString(vaultPasswordPath, storageTree);
       } catch (Exception e) {
-        throw new ResourceModelSourceException("Could not read vaultPassword " + vaultPasswordPath,e);
+        throw new ResourceModelSourceException("Could not read vaultPassword " + vaultPasswordPath +": "+ e.getMessage(),e);
       }
       runnerBuilder.vaultPass(vaultPassword);
     }
@@ -351,7 +351,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
       try {
         vaultPassword = new String(Files.readAllBytes(Paths.get(vaultFile)));
       } catch (IOException e) {
-        throw new ResourceModelSourceException("Could not read vault file " + vaultFile,e);
+        throw new ResourceModelSourceException("Could not read vault file " + vaultFile +": "+ e.getMessage(),e);
       }
       runnerBuilder.vaultPass(vaultPassword);
     }
@@ -421,7 +421,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     try {
       runner.run();
     } catch (Exception e) {
-      throw new ResourceModelSourceException("Failed Ansible Runner execution",e);
+      throw new ResourceModelSourceException("Failed Ansible Runner execution: " + e.getMessage(),e);
     }
 
     try {
@@ -641,7 +641,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
         directoryStream.close();
       }
     } catch (IOException e) {
-      throw new ResourceModelSourceException("Error reading facts.", e);
+      throw new ResourceModelSourceException("Error reading facts: " + e.getMessage(), e);
     }
 
     try {
@@ -659,7 +659,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
         }
       });
     } catch (IOException e) {
-      throw new ResourceModelSourceException("Error deleting temporary directory.", e);
+      throw new ResourceModelSourceException("Error deleting temporary directory: " + e.getMessage(), e);
     }
   }
 
@@ -733,7 +733,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     try {
         return inventoryList.getNodeList();
     } catch (IOException | AnsibleException e) {
-      throw new ResourceModelSourceException("Failed to get node list from ansible: ", e);
+      throw new ResourceModelSourceException("Failed to get node list from ansible: " + e.getMessage(), e);
     }
   }
 
@@ -750,10 +750,10 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
       return byteArrayOutputStream.toByteArray();
     } catch (StorageException e) {
       throw new ConfigurationException("Failed to read the ssh private key for " +
-              "storage path: " + storagePath + ": " + e.getMessage());
+              "storage path: " + storagePath + ": " + e.getMessage(), e);
     } catch (IOException e) {
       throw new ConfigurationException("Failed to read the ssh private key for " +
-              "storage path: " + storagePath + ": " + e.getMessage());
+              "storage path: " + storagePath + ": " + e.getMessage(), e);
     }
   }
 

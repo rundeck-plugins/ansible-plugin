@@ -98,12 +98,12 @@ public class AnsibleInventoryList {
                 proc.destroy();
             }
             Thread.currentThread().interrupt();
-            throw new AnsibleException("ERROR: Ansible Execution Interrupted.", e, AnsibleException.AnsibleFailureReason.Interrupted);
+            throw new AnsibleException("ERROR: Ansible Execution Interrupted: " + e.getMessage(), e, AnsibleException.AnsibleFailureReason.Interrupted);
         } catch (Exception e) {
             if (proc != null) {
                 proc.destroy();
             }
-            throw new AnsibleException("ERROR: Ansible execution returned with non zero code.", e, AnsibleException.AnsibleFailureReason.Unknown);
+            throw new AnsibleException("ERROR: Ansible execution returned with non zero code: " + e.getMessage(), e, AnsibleException.AnsibleFailureReason.Unknown);
         } finally {
             if (proc != null) {
                 proc.getErrorStream().close();
