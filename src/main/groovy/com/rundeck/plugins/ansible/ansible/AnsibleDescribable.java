@@ -241,7 +241,7 @@ public interface AnsibleDescribable extends Describable {
     public static Property GATHER_FACTS_PROP = PropertyUtil.bool(
               ANSIBLE_GATHER_FACTS,
               "Gather Facts",
-              "Gather fresh facts before importing? (recommended)",
+              "Gather fresh facts before importing? (Not recommended for large inventories)",
               true,
               "true"
     );
