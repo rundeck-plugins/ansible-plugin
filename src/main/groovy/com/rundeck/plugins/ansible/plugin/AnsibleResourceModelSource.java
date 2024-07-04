@@ -1,42 +1,64 @@
 package com.rundeck.plugins.ansible.plugin;
 
-import com.dtolabs.rundeck.core.execution.proxy.ProxyRunnerPlugin;
-import com.dtolabs.rundeck.core.storage.ResourceMeta;
-import com.dtolabs.rundeck.core.storage.StorageTree;
-import com.dtolabs.rundeck.core.storage.keys.KeyStorageTree;
-import com.rundeck.plugins.ansible.ansible.AnsibleDescribable;
-import com.rundeck.plugins.ansible.ansible.AnsibleDescribable.AuthenticationType;
-import com.rundeck.plugins.ansible.ansible.AnsibleException;
-import com.rundeck.plugins.ansible.ansible.AnsibleRunner;
 import com.dtolabs.rundeck.core.common.Framework;
 import com.dtolabs.rundeck.core.common.INodeSet;
 import com.dtolabs.rundeck.core.common.NodeEntryImpl;
 import com.dtolabs.rundeck.core.common.NodeSetImpl;
 import com.dtolabs.rundeck.core.dispatcher.DataContextUtils;
-import com.dtolabs.rundeck.core.resources.ResourceModelSource;
-import com.dtolabs.rundeck.core.resources.ResourceModelSourceException;
+import com.dtolabs.rundeck.core.execution.proxy.ProxyRunnerPlugin;
 import com.dtolabs.rundeck.core.plugins.ScriptDataContextUtil;
 import com.dtolabs.rundeck.core.plugins.configuration.ConfigurationException;
+import com.dtolabs.rundeck.core.resources.ResourceModelSource;
+import com.dtolabs.rundeck.core.resources.ResourceModelSourceException;
+import com.dtolabs.rundeck.core.storage.ResourceMeta;
+import com.dtolabs.rundeck.core.storage.StorageTree;
+import com.dtolabs.rundeck.core.storage.keys.KeyStorageTree;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.google.gson.JsonPrimitive;
+import com.rundeck.plugins.ansible.ansible.AnsibleDescribable;
+import com.rundeck.plugins.ansible.ansible.AnsibleDescribable.AuthenticationType;
+import com.rundeck.plugins.ansible.ansible.AnsibleException;
+import com.rundeck.plugins.ansible.ansible.AnsibleInventoryList;
+import com.rundeck.plugins.ansible.ansible.AnsibleRunner;
+import com.rundeck.plugins.ansible.ansible.InventoryList;
+import com.rundeck.plugins.ansible.util.VaultPrompt;
 import org.rundeck.app.spi.Services;
 import org.rundeck.storage.api.PathUtil;
 import org.rundeck.storage.api.StorageException;
+import org.yaml.snakeyaml.LoaderOptions;
+import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.constructor.SafeConstructor;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.Charset;
-import java.nio.file.*;
+import java.nio.file.DirectoryStream;
+import java.nio.file.FileVisitResult;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Properties;
+import java.util.Set;
+
+import static com.rundeck.plugins.ansible.ansible.InventoryList.*;
 
 public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRunnerPlugin {
+
+  public static final String HOST_TPL_J2 = "host-tpl.j2";
+  public static final String GATHER_HOSTS_YML = "gather-hosts.yml";
 
   private Framework framework;
 
@@ -96,9 +118,14 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
 
   protected boolean encryptExtraVars = false;
 
+  private AnsibleInventoryList.AnsibleInventoryListBuilder ansibleInventoryListBuilder = null;
 
   public AnsibleResourceModelSource(final Framework framework) {
       this.framework = framework;
+  }
+
+  public void setAnsibleInventoryListBuilder(AnsibleInventoryList.AnsibleInventoryListBuilder builder) {
+    this.ansibleInventoryListBuilder = builder;
   }
 
   private static String resolveProperty(
@@ -162,7 +189,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
        try {
           sshTimeout =  Integer.parseInt(str_sshTimeout);
        } catch (NumberFormatException e) {
-          throw new ConfigurationException("Can't parse timeout value : " + e.getMessage());
+          throw new ConfigurationException("Can't parse timeout value : " + e.getMessage(), e);
        }
     }
 
@@ -197,9 +224,9 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
 
   }
 
-  public AnsibleRunner.AnsibleRunnerBuilder buildAnsibleRunner() throws ResourceModelSourceException{
+  public AnsibleRunner.AnsibleRunnerBuilder buildAnsibleRunner() throws ResourceModelSourceException {
 
-    AnsibleRunner.AnsibleRunnerBuilder runnerBuilder = AnsibleRunner.playbookPath("gather-hosts.yml");
+    AnsibleRunner.AnsibleRunnerBuilder runnerBuilder = AnsibleRunner.playbookPath(GATHER_HOSTS_YML);
 
     if ("true".equals(System.getProperty("ansible.debug"))) {
       runnerBuilder.debug(true);
@@ -220,7 +247,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
         try {
           sshPrivateKey = new String(Files.readAllBytes(Paths.get(sshPrivateKeyFile)));
         } catch (IOException e) {
-          throw new ResourceModelSourceException("Could not read privatekey file " + sshPrivateKeyFile,e);
+          throw new ResourceModelSourceException("Could not read privatekey file " + sshPrivateKeyFile +": "+ e.getMessage(),e);
         }
         runnerBuilder.sshPrivateKey(sshPrivateKey);
       }
@@ -230,7 +257,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
           String sshPrivateKey = getStorageContentString(sshPrivateKeyPath, storageTree);
           runnerBuilder.sshPrivateKey(sshPrivateKey);
         } catch (ConfigurationException e) {
-          throw new ResourceModelSourceException("Could not read private key from storage path " + sshPrivateKeyPath,e);
+          throw new ResourceModelSourceException("Could not read private key from storage path " + sshPrivateKeyPath +": "+ e.getMessage(),e);
         }
       }
 
@@ -242,7 +269,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
             String sshPassphrase = getStorageContentString(sshPassphraseStoragePath, storageTree);
             runnerBuilder.sshPassphrase(sshPassphrase);
           } catch (ConfigurationException e) {
-            throw new ResourceModelSourceException("Could not read passphrase from storage path " + sshPassphraseStoragePath,e);
+            throw new ResourceModelSourceException("Could not read passphrase from storage path " + sshPassphraseStoragePath +": "+ e.getMessage(),e);
           }
         }
       }
@@ -257,7 +284,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
           sshPassword = getStorageContentString(sshPasswordPath, storageTree);
           runnerBuilder.sshUsePassword(Boolean.TRUE).sshPass(sshPassword);
         } catch (ConfigurationException e) {
-          throw new ResourceModelSourceException("Could not read password from storage path " + sshPasswordPath,e);
+          throw new ResourceModelSourceException("Could not read password from storage path " + sshPasswordPath +": "+ e.getMessage(),e);
         }
       }
     }
@@ -298,7 +325,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
         becomePassword = getStorageContentString(becamePasswordStoragePath, storageTree);
         runnerBuilder.becomePassword(becomePassword);
       } catch (Exception e) {
-        throw new ResourceModelSourceException("Could not read becomePassword from storage path " + becamePasswordStoragePath,e);
+        throw new ResourceModelSourceException("Could not read becomePassword from storage path " + becamePasswordStoragePath +": "+ e.getMessage(),e);
       }
     }
 
@@ -314,7 +341,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
       try {
         vaultPassword = getStorageContentString(vaultPasswordPath, storageTree);
       } catch (Exception e) {
-        throw new ResourceModelSourceException("Could not read vaultPassword " + vaultPasswordPath,e);
+        throw new ResourceModelSourceException("Could not read vaultPassword " + vaultPasswordPath +": "+ e.getMessage(),e);
       }
       runnerBuilder.vaultPass(vaultPassword);
     }
@@ -324,7 +351,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
       try {
         vaultPassword = new String(Files.readAllBytes(Paths.get(vaultFile)));
       } catch (IOException e) {
-        throw new ResourceModelSourceException("Could not read vault file " + vaultFile,e);
+        throw new ResourceModelSourceException("Could not read vault file " + vaultFile +": "+ e.getMessage(),e);
       }
       runnerBuilder.vaultPass(vaultPassword);
     }
@@ -345,47 +372,56 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     return runnerBuilder;
   }
 
-
   @Override
   public INodeSet getNodes() throws ResourceModelSourceException {
     NodeSetImpl nodes = new NodeSetImpl();
-    final Gson gson = new Gson();
+    AnsibleRunner.AnsibleRunnerBuilder runnerBuilder = buildAnsibleRunner();
 
+    if (gatherFacts) {
+      processWithGatherFacts(nodes, runnerBuilder);
+    } else {
+      ansibleInventoryList(nodes, runnerBuilder);
+    }
+
+    return nodes;
+  }
+
+  public void processWithGatherFacts(NodeSetImpl nodes, AnsibleRunner.AnsibleRunnerBuilder runnerBuilder) throws ResourceModelSourceException {
+
+    final Gson gson = new Gson();
     Path tempDirectory;
     try {
       tempDirectory = Files.createTempDirectory("ansible-hosts");
     } catch (IOException e) {
-        throw new ResourceModelSourceException("Error creating temporary directory.", e);
+      throw new ResourceModelSourceException("Error creating temporary directory: " + e.getMessage(), e);
     }
 
     try {
-      Files.copy(this.getClass().getClassLoader().getResourceAsStream("host-tpl.j2"), tempDirectory.resolve("host-tpl.j2"));
-      Files.copy(this.getClass().getClassLoader().getResourceAsStream("gather-hosts.yml"), tempDirectory.resolve("gather-hosts.yml"));
+      Files.copy(this.getClass().getClassLoader().getResourceAsStream(HOST_TPL_J2), tempDirectory.resolve(HOST_TPL_J2));
+      Files.copy(this.getClass().getClassLoader().getResourceAsStream(GATHER_HOSTS_YML), tempDirectory.resolve(GATHER_HOSTS_YML));
     } catch (IOException e) {
-        throw new ResourceModelSourceException("Error copying files.");
+      throw new ResourceModelSourceException("Error copying files: " + e.getMessage(), e);
     }
-
-    AnsibleRunner.AnsibleRunnerBuilder runnerBuilder = buildAnsibleRunner();
 
     runnerBuilder.tempDirectory(tempDirectory);
     runnerBuilder.retainTempDirectory(true);
 
     StringBuilder args = new StringBuilder();
     args.append("facts: ")
-        .append(gatherFacts ? "True" : "False")
-        .append("\n")
-        .append("tmpdir: '")
-        .append(tempDirectory.toFile().getAbsolutePath())
-        .append("'");
+            .append(gatherFacts ? "True" : "False")
+            .append("\n")
+            .append("tmpdir: '")
+            .append(tempDirectory.toFile().getAbsolutePath())
+            .append("'");
 
     runnerBuilder.extraVars(args.toString());
 
     AnsibleRunner runner = runnerBuilder.build();
 
     try {
-        runner.run();
+      runner.run();
     } catch (Exception e) {
-        throw new ResourceModelSourceException(e.getMessage(),e);
+      throw new ResourceModelSourceException("Failed Ansible Runner execution: " + e.getMessage(),e);
     }
 
     try {
@@ -543,8 +579,8 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
               }
             } else {
               if (root.has(item.getKey())
-                && root.get(item.getKey()).isJsonPrimitive()
-                && root.get(item.getKey()).getAsString().length() > 0) {
+                      && root.get(item.getKey()).isJsonPrimitive()
+                      && root.get(item.getKey()).getAsString().length() > 0) {
                 node.setAttribute(item.getValue(), root.get(item.getKey()).getAsString());
               }
             }
@@ -605,7 +641,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
         directoryStream.close();
       }
     } catch (IOException e) {
-      throw new ResourceModelSourceException("Error reading facts.", e);
+      throw new ResourceModelSourceException("Error reading facts: " + e.getMessage(), e);
     }
 
     try {
@@ -623,13 +659,83 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
         }
       });
     } catch (IOException e) {
-      throw new ResourceModelSourceException("Error deleting temporary directory.", e);
+      throw new ResourceModelSourceException("Error deleting temporary directory: " + e.getMessage(), e);
     }
-
-    return nodes;
   }
 
+  /**
+   * Process nodes coming from Ansible to convert them to Rundeck node
+   * @param nodes Rundeck nodes
+   * @throws ResourceModelSourceException
+   */
+  public void ansibleInventoryList(NodeSetImpl nodes, AnsibleRunner.AnsibleRunnerBuilder runnerBuilder) throws ResourceModelSourceException {
+    Yaml yaml = new Yaml(new SafeConstructor(new LoaderOptions()));
 
+    String listResp = getNodesFromInventory(runnerBuilder);
+
+    Map<String, Object> allInventory = yaml.load(listResp);
+    Map<String, Object> all = InventoryList.getValue(allInventory, ALL);
+    Map<String, Object> children = InventoryList.getValue(all, CHILDREN);
+
+    for (Map.Entry<String, Object> pair : children.entrySet()) {
+      String hostGroup = pair.getKey();
+      Map<String, Object> hostNames = InventoryList.getType(pair.getValue());
+      Map<String, Object> hosts = InventoryList.getValue(hostNames, HOSTS);
+
+      for (Map.Entry<String, Object> hostNode : hosts.entrySet()) {
+        NodeEntryImpl node = new NodeEntryImpl();
+        node.setTags(Set.of(hostGroup));
+        String hostName = hostNode.getKey();
+        node.setHostname(hostName);
+        node.setNodename(hostName);
+        Map<String, Object> nodeValues = InventoryList.getType(hostNode.getValue());
+        InventoryList.tagHandle(NodeTag.USERNAME, node, nodeValues);
+        InventoryList.tagHandle(NodeTag.OS_FAMILY, node, nodeValues);
+        InventoryList.tagHandle(NodeTag.OS_NAME, node, nodeValues);
+        InventoryList.tagHandle(NodeTag.OS_ARCHITECTURE, node, nodeValues);
+        InventoryList.tagHandle(NodeTag.OS_VERSION, node, nodeValues);
+        InventoryList.tagHandle(NodeTag.DESCRIPTION, node, nodeValues);
+
+        nodes.putNode(node);
+      }
+    }
+  }
+
+  /**
+   * Gets Ansible nodes from inventory
+   * @return Ansible nodes
+   */
+  public String getNodesFromInventory(AnsibleRunner.AnsibleRunnerBuilder runnerBuilder) throws ResourceModelSourceException {
+
+    AnsibleRunner runner = runnerBuilder.build();
+
+    if (this.ansibleInventoryListBuilder == null) {
+      this.ansibleInventoryListBuilder = AnsibleInventoryList.builder()
+              .inventory(inventory)
+              .configFile(configFile)
+              .debug(debug);
+    }
+
+    if(runner.getVaultPass() != null){
+      VaultPrompt vaultPrompt = VaultPrompt.builder()
+              .vaultId("None")
+              .vaultPassword(runner.getVaultPass() + "\n")
+              .build();
+      ansibleInventoryListBuilder.vaultPrompt(vaultPrompt);
+    }
+
+    if (runner.getLimits() != null) {
+      ansibleInventoryListBuilder.limits(runner.getLimits());
+    }
+
+    AnsibleInventoryList inventoryList = this.ansibleInventoryListBuilder.build();
+
+    try {
+        return inventoryList.getNodeList();
+    } catch (IOException | AnsibleException e) {
+      throw new ResourceModelSourceException("Failed to get node list from ansible: " + e.getMessage(), e);
+    }
+  }
 
   private String getStorageContentString(String storagePath, StorageTree storageTree) throws ConfigurationException {
     return new String(this.getStorageContent(storagePath, storageTree));
@@ -644,10 +750,10 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
       return byteArrayOutputStream.toByteArray();
     } catch (StorageException e) {
       throw new ConfigurationException("Failed to read the ssh private key for " +
-              "storage path: " + storagePath + ": " + e.getMessage());
+              "storage path: " + storagePath + ": " + e.getMessage(), e);
     } catch (IOException e) {
       throw new ConfigurationException("Failed to read the ssh private key for " +
-              "storage path: " + storagePath + ": " + e.getMessage());
+              "storage path: " + storagePath + ": " + e.getMessage(), e);
     }
   }
 
