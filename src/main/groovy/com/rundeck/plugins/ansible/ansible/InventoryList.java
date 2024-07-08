@@ -8,8 +8,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import static java.lang.String.format;
-
 @Data
 public class InventoryList {
 
@@ -91,11 +89,10 @@ public class InventoryList {
 
         HOSTNAME {
             @Override
-            public void handle(NodeEntryImpl node, Map<String, Object> tags) throws ResourceModelSourceException{
+            public void handle(NodeEntryImpl node, Map<String, Object> tags) {
                 final List<String> hostnames = List.of("hostname", "ansible_host", "ansible_ssh_host");
                 String nameTag = InventoryList.findTag(hostnames, tags);
-                node.setHostname(Optional.ofNullable(nameTag)
-                        .orElseThrow(() -> new ResourceModelSourceException(format(ERROR_MISSING_TAG, hostnames))));
+                Optional.ofNullable(nameTag).ifPresent(node::setHostname);
             }
         },
         USERNAME {

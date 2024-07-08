@@ -689,12 +689,20 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
         node.setHostname(hostName);
         node.setNodename(hostName);
         Map<String, Object> nodeValues = InventoryList.getType(hostNode.getValue());
+
+        InventoryList.tagHandle(NodeTag.HOSTNAME, node, nodeValues);
         InventoryList.tagHandle(NodeTag.USERNAME, node, nodeValues);
         InventoryList.tagHandle(NodeTag.OS_FAMILY, node, nodeValues);
         InventoryList.tagHandle(NodeTag.OS_NAME, node, nodeValues);
         InventoryList.tagHandle(NodeTag.OS_ARCHITECTURE, node, nodeValues);
         InventoryList.tagHandle(NodeTag.OS_VERSION, node, nodeValues);
         InventoryList.tagHandle(NodeTag.DESCRIPTION, node, nodeValues);
+
+        nodeValues.forEach((key, value) -> {
+          if (value != null) {
+            node.setAttribute(key, value.toString());
+          }
+        });
 
         nodes.putNode(node);
       }
