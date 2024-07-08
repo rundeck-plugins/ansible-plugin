@@ -85,7 +85,7 @@ class BaseTestConfiguration extends Specification{
         return logs
     }
 
-    def configureRundeck(String projectName){
+    def configureRundeck(String projectName, String nodeName){
 
         //add private key
         RequestBody requestBody = RequestBody.create(new File("src/test/resources/docker/keys/id_rsa"), Client.MEDIA_TYPE_OCTET_STREAM)
@@ -125,15 +125,18 @@ class BaseTestConfiguration extends Specification{
                 api.importProjectArchive(projectName,  "preserve", true, true, true, true, true, true, true, [:], body)
         )
 
-        //wait for node to be available
+        waitForNodeAvailability(projectName, nodeName)
+
+    }
+
+    def waitForNodeAvailability(String projectName, String nodeName){
         def result = client.apiCall {api-> api.listNodes(projectName,".*")}
         def count =0
 
-        while(result.get("ssh-node")==null && count<5){
+        while(result.get(nodeName)==null && count<5){
             sleep(2000)
             result = client.apiCall {api-> api.listNodes(projectName,".*")}
             count++
         }
-
     }
 }

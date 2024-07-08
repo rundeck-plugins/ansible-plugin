@@ -10,10 +10,29 @@ import org.testcontainers.spock.Testcontainers
 class BasicIntegrationSpec extends BaseTestConfiguration {
 
     static String PROJ_NAME = 'ansible-test'
+    static String DEFAULT_NODE_NAME = "ssh-node"
 
     def setupSpec() {
         startCompose()
-        configureRundeck(PROJ_NAME)
+        configureRundeck(PROJ_NAME, DEFAULT_NODE_NAME)
+    }
+
+    def "ansible node executor with ssh password"(){
+        setup:
+        String ansibleNodeExecutorProjectName = "sshPasswordProject"
+        String nodeName = "ssh-node-password"
+        configureRundeck(ansibleNodeExecutorProjectName, nodeName)
+        when:
+        def jobId = "f04f17a9-77cf-4feb-aec1-889a3de0f5ae"
+        JobRun request = new JobRun()
+        request.loglevel = 'INFO'
+        def result = client.apiCall {api-> api.runJob(jobId, request)}
+        def executionState = waitForJob(result.id)
+        def logs = getLogs(result.id)
+        Map<String, Integer> ansibleNodeExecutionStatus = TestUtil.getAnsibleNodeResult(logs)
+        then:
+        executionState!=null
+        executionState.getExecutionState()=="SUCCEEDED"
     }
 
     def "test simple inline playbook"(){

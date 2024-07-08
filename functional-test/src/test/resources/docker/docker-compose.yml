@@ -5,19 +5,19 @@ services:
     build:
       context: node
     environment:
-      NODE_USER_PASSWORD: ${NODE_USER_PASSWORD:-rundeck}
+      NODE_USER_PASSWORD: testpassword123
     networks:
       - rundeck
     ports:
       - "2222:22"
     volumes:
-      - ${PWD}/keys:/configuration:rw
+      - ./keys:/configuration:rw
 
   rundeck:
     build:
       context: rundeck
       args:
-        RUNDECK_IMAGE: ${RUNDECK_IMAGE:-rundeck/rundeck:SNAPSHOT}
+        RUNDECK_IMAGE: rundeck/rundeck:SNAPSHOT
     image: rundeck-ansible-plugin:latest
     command: "-Dansible.debug=false"
     environment:
@@ -30,9 +30,10 @@ services:
     networks:
       - rundeck
     ports:
-      - "4440"
+      - "4440:4440"
     volumes:
-    - ${PWD}/ansible:/home/rundeck/ansible:rw
+    - ./ansible:/home/rundeck/ansible:rw
+    - ./ansible/ansible.cfg:/etc/ansible/ansible.cfg:rw
 
 volumes:
   rundeck-data:

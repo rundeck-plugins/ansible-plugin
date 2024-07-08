@@ -7,10 +7,11 @@ import org.testcontainers.spock.Testcontainers
 class EncryptedInventorySpec extends BaseTestConfiguration {
 
     static String PROJ_NAME = 'ansible-encrypted-inventory'
+    static String DEFAULT_NODE_NAME = "ssh-node"
 
     def setupSpec() {
         startCompose()
-        configureRundeck(PROJ_NAME)
+        configureRundeck(PROJ_NAME, DEFAULT_NODE_NAME)
     }
 
     def "test encrypted inventory"(){
