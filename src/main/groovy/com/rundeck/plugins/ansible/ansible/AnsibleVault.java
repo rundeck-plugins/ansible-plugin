@@ -81,6 +81,7 @@ public class AnsibleVault {
 
         Map<String, String> env = new HashMap<>();
         env.put("VAULT_ID_SECRET", masterPassword);
+        env.put("ANSIBLE_VAULT_PASSWORD_FILE", "");
 
         Process proc = null;
 
