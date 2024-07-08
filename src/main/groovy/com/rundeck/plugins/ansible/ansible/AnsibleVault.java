@@ -66,8 +66,8 @@ public class AnsibleVault {
         }
         procArgs.add(ansibleCommand);
         procArgs.add("encrypt_string");
-        procArgs.add("--vault-id");
-        procArgs.add("internal-encrypt@" + vaultPasswordScriptFile.getAbsolutePath());
+        procArgs.add("--encrypt-vault-id");
+        procArgs.add("internal-encrypt");
 
         if(debug){
             System.out.println("encryptVariable " + key + ": " + procArgs);
@@ -82,7 +82,7 @@ public class AnsibleVault {
 
         Map<String, String> env = new HashMap<>();
         env.put("VAULT_ID_SECRET", masterPassword);
-        env.put("ANSIBLE_VAULT_PASSWORD_FILE", "");
+        env.put("ANSIBLE_VAULT_IDENTITY_LIST", "internal-encrypt@" + vaultPasswordScriptFile.getAbsolutePath());
 
         Process proc = null;
 
