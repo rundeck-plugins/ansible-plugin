@@ -669,7 +669,11 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
    * @throws ResourceModelSourceException
    */
   public void ansibleInventoryList(NodeSetImpl nodes, AnsibleRunner.AnsibleRunnerBuilder runnerBuilder) throws ResourceModelSourceException {
-    Yaml yaml = new Yaml(new SafeConstructor(new LoaderOptions()));
+
+    LoaderOptions snakeOptions = new LoaderOptions();
+    // max inventory file size allowed to 10mb
+    snakeOptions.setCodePointLimit(10_485_760);
+    Yaml yaml = new Yaml(new SafeConstructor(snakeOptions));
 
     String listResp = getNodesFromInventory(runnerBuilder);
 
