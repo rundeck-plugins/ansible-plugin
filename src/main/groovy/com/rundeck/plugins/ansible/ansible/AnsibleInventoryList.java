@@ -117,6 +117,8 @@ public class AnsibleInventoryList {
     private void processAnsibleVault(List<VaultPrompt> stdinVariables, List<String> procArgs)
             throws IOException {
 
+        if (vaultPrompt == null) { return; }
+
         if(ansibleVault == null){
             tempInternalVaultFile = AnsibleVault.createVaultScriptAuth("ansible-script-vault");
             ansibleVault = AnsibleVault.builder()
@@ -125,20 +127,21 @@ public class AnsibleInventoryList {
                     .debug(debug).build();
         }
 
-        if (vaultPrompt != null) {
-            stdinVariables.add(vaultPrompt);
-            tempVaultFile = ansibleVault.getVaultPasswordScriptFile();
-            procArgs.add("--vault-id");
-            procArgs.add(tempVaultFile.getAbsolutePath());
-        }
+        stdinVariables.add(vaultPrompt);
+        tempVaultFile = ansibleVault.getVaultPasswordScriptFile();
+        procArgs.add("--vault-id");
+        procArgs.add(tempVaultFile.getAbsolutePath());
     }
 
     private void processLimit(List<String> procArgs) throws IOException {
-        if (limits != null && limits.size() == 1) {
+
+        if (limits == null) { return; }
+
+        if (limits.size() == 1) {
             procArgs.add("-l");
             procArgs.add(limits.get(0));
 
-        } else if (limits != null && limits.size() > 1) {
+        } else if (limits.size() > 1) {
             StringBuilder sb = new StringBuilder();
             for (String limit : limits) {
                 sb.append(limit).append("\n");
