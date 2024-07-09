@@ -139,4 +139,5 @@ class BaseTestConfiguration extends Specification{
             count++
         }
     }
+
 }
