@@ -287,4 +287,32 @@ class BasicIntegrationSpec extends BaseTestConfiguration {
         logs.findAll {it.log.contains("\"token\": 13231232312321321321321")}.size() == 1
     }
 
+    def "test use encrypted user file with multiline password file"(){
+        when:
+
+        def jobId = "198b7deb-2ba2-4ac6-a80e-94f06ab7fb62"
+
+        JobRun request = new JobRun()
+        request.loglevel = 'INFO'
+
+        def result = client.apiCall {api-> api.runJob(jobId, request)}
+        def executionId = result.id
+
+        def executionState = waitForJob(executionId)
+
+        def logs = getLogs(executionId)
+        Map<String, Integer> ansibleNodeExecutionStatus = TestUtil.getAnsibleNodeResult(logs)
+
+        then:
+        executionState!=null
+        executionState.getExecutionState()=="SUCCEEDED"
+        ansibleNodeExecutionStatus.get("ok")!=0
+        ansibleNodeExecutionStatus.get("unreachable")==0
+        ansibleNodeExecutionStatus.get("failed")==0
+        ansibleNodeExecutionStatus.get("skipped")==0
+        ansibleNodeExecutionStatus.get("ignored")==0
+        logs.findAll {it.log.contains("\"environmentTest\": \"someOtherTest\"")}.size() == 1
+        logs.findAll {it.log.contains("\"token\": \"someOtherToken\"")}.size() == 1
+    }
+
 }
