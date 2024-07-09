@@ -10,14 +10,11 @@ class LargeInventorySpec  extends BaseTestConfiguration {
 
     def setupSpec() {
         startCompose()
-        configureRundeck(PROJ_NAME)
+        configureRundeck(PROJ_NAME, "Node-0")
     }
 
     def "test large inventory"(){
         when:
-
-        //wait for node to be available
-        waitForNodes(PROJ_NAME)
 
         def result = client.apiCall {api-> api.listNodes(PROJ_NAME,".*")}
 

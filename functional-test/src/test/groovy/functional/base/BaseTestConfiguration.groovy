@@ -140,14 +140,4 @@ class BaseTestConfiguration extends Specification{
         }
     }
 
-    void waitForNodes(String projectName){
-        def result = client.apiCall {api-> api.listNodes(projectName,".*")}
-        def count =0
-
-        while(result.size()<=1 && count<5){
-            sleep(2000)
-            result = client.apiCall {api-> api.listNodes(projectName,".*")}
-            count++
-        }
-    }
 }
