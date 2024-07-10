@@ -14,6 +14,7 @@ import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.util.*;
+import com.rundeck.plugins.ansible.ansible.AnsibleException;
 
 @Data
 @Builder
@@ -56,7 +57,7 @@ public class AnsibleVault {
     }
 
     public String encryptVariable(String key,
-                                  String content ) throws IOException {
+                                  String content ) throws IOException, AnsibleException, InterruptedException {
 
         List<String> procArgs = new ArrayList<>();
         String ansibleCommand = ANSIBLE_VAULT_COMMAND;
@@ -65,8 +66,8 @@ public class AnsibleVault {
         }
         procArgs.add(ansibleCommand);
         procArgs.add("encrypt_string");
-        procArgs.add("--vault-id");
-        procArgs.add("internal-encrypt@" + vaultPasswordScriptFile.getAbsolutePath());
+        procArgs.add("--encrypt-vault-id");
+        procArgs.add("internal-encrypt");
 
         if(debug){
             System.out.println("encryptVariable " + key + ": " + procArgs);
@@ -81,6 +82,7 @@ public class AnsibleVault {
 
         Map<String, String> env = new HashMap<>();
         env.put("VAULT_ID_SECRET", masterPassword);
+        env.put("ANSIBLE_VAULT_IDENTITY_LIST", "internal-encrypt@" + vaultPasswordScriptFile.getAbsolutePath());
 
         Process proc = null;
 
@@ -97,10 +99,12 @@ public class AnsibleVault {
             final InputStream stdoutInputStream = proc.getInputStream();
             final BufferedReader stdoutReader = new BufferedReader(new InputStreamReader(stdoutInputStream));
 
+            int exitCode = proc.waitFor();
+
             String line1 = null;
             boolean capture = false;
             while ((line1 = stdoutReader.readLine()) != null) {
-                if (line1.toLowerCase().contains("!vault")) {
+                if (line1.toLowerCase().contains("!vault") || exitCode != 0) {
                     capture = true;
                 }
                 if (capture) {
@@ -108,18 +112,14 @@ public class AnsibleVault {
                 }
             }
 
-            int exitCode = proc.waitFor();
-
             if (exitCode != 0) {
-                System.err.println("ERROR: encryptFileAnsibleVault:" + procArgs);
-                return null;
+                throw new AnsibleException(stringBuilder.toString(), AnsibleException.AnsibleFailureReason.IOFailure);
             }
             return stringBuilder.toString();
 
-        } catch (Exception e) {
-            System.err.println("error encryptFileAnsibleVault file " + e.getMessage());
-            return null;
-        } finally {
+        } catch(Exception e) {
+            throw e;
+        }finally {
             // Make sure to always cleanup on failure and success
             if (proc != null) {
                 proc.destroy();

@@ -1,0 +1,8 @@
+by:
+  urn: project:ansible-large-inventory
+for:
+  storage:
+    - match: 
+        path: 'keys/.*'
+      allow: [read] 
+description: Allow access to key storage
