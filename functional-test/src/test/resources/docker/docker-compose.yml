@@ -33,7 +33,7 @@ services:
       - "4440"
     volumes:
     - ./ansible:/home/rundeck/ansible:rw
-    - ./ansible/ansible.cfg:/etc/ansible/ansible.cfg:rw
+    - ./ansible-list:/home/rundeck/ansible-list:rw
 
 volumes:
   rundeck-data:
