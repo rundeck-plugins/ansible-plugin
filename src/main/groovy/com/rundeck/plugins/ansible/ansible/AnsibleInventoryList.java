@@ -43,7 +43,10 @@ public class AnsibleInventoryList {
 
         List<String> procArgs = new ArrayList<>();
         procArgs.add(ANSIBLE_INVENTORY);
-        procArgs.add("--inventory-file" + "=" + inventory);
+        //inventory can be defined in ansible.cfg
+        if(inventory!=null && !inventory.isEmpty()){
+            procArgs.add("--inventory-file" + "=" + inventory);
+        }
         procArgs.add("--list");
         procArgs.add("-y");
 
