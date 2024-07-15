@@ -158,6 +158,8 @@ public interface AnsibleDescribable extends Describable {
 
     public static final String ANSIBLE_ENCRYPT_EXTRA_VARS = "ansible-encrypt-extra-vars";
 
+    String ANSIBLE_YAML_DATA_SIZE = "ansible-yaml-data-size";
+
     public static Property PLAYBOOK_PATH_PROP = PropertyUtil.string(
     			ANSIBLE_PLAYBOOK_PATH,
               "Playbook",
@@ -526,5 +528,14 @@ public interface AnsibleDescribable extends Describable {
             .required(false)
             .title("Encrypt Extra Vars.")
             .description("Encrypt the value of the extra vars keys.")
+            .build();
+
+    Property YAML_DATA_SIZE_PROP = PropertyBuilder.builder()
+            .string(ANSIBLE_YAML_DATA_SIZE)
+            .required(false)
+            .title("Inventory Yaml Data Size")
+            .description("Set the MB size (Default value is 10MB)"+
+                    " that the plugin can process with the yaml data response from Ansible."+
+                    " (This only applies when Gather Facts = No)")
             .build();
 }

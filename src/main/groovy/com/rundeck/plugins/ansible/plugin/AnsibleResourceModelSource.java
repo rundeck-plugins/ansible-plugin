@@ -72,6 +72,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
 
   private String inventory;
   private boolean gatherFacts;
+  private Integer yamlDataSize;
   private boolean ignoreErrors = false;
   private String limit;
   private String ignoreTagPrefix;
@@ -166,6 +167,10 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     inventory = resolveProperty(AnsibleDescribable.ANSIBLE_INVENTORY,null,configuration,executionDataContext);
     gatherFacts = "true".equals(resolveProperty(AnsibleDescribable.ANSIBLE_GATHER_FACTS,null,configuration,executionDataContext));
     ignoreErrors = "true".equals(resolveProperty(AnsibleDescribable.ANSIBLE_IGNORE_ERRORS,null,configuration,executionDataContext));
+
+    yamlDataSize = getIntegerValue(
+            resolveProperty(AnsibleDescribable.ANSIBLE_YAML_DATA_SIZE,"10", configuration, executionDataContext),
+            AnsibleDescribable.ANSIBLE_YAML_DATA_SIZE);
 
     limit = (String) resolveProperty(AnsibleDescribable.ANSIBLE_LIMIT,null,configuration,executionDataContext);
     ignoreTagPrefix = (String) resolveProperty(AnsibleDescribable.ANSIBLE_IGNORE_TAGS,null,configuration,executionDataContext);
@@ -670,9 +675,11 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
    */
   public void ansibleInventoryList(NodeSetImpl nodes, AnsibleRunner.AnsibleRunnerBuilder runnerBuilder) throws ResourceModelSourceException {
 
+    int codePointLimit = yamlDataSize * 1024 * 1024;
+
     LoaderOptions snakeOptions = new LoaderOptions();
     // max inventory file size allowed to 10mb
-    snakeOptions.setCodePointLimit(10_485_760);
+    snakeOptions.setCodePointLimit(codePointLimit);
     Yaml yaml = new Yaml(new SafeConstructor(snakeOptions));
 
     String listResp = getNodesFromInventory(runnerBuilder);
@@ -810,6 +817,25 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
 
     return keys;
 
+  }
+
+  /**
+   *
+   * @param value parameter from gui
+   * @param paramName parameter name
+   * @return an integer value
+   * @throws ConfigurationException
+   */
+  private Integer getIntegerValue(String value, String paramName) throws ConfigurationException {
+    if (value == null) {
+      throw new ConfigurationException("Value cannot be null for parameter: " + paramName);
+    }
+
+    try {
+      return Integer.parseInt(value);
+    } catch (NumberFormatException e) {
+      throw new ConfigurationException("Error parsing " + paramName + " as integer: " + e.getMessage(), e);
+    }
   }
 
 }
