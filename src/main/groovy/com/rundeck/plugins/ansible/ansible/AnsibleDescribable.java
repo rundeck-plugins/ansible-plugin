@@ -534,8 +534,8 @@ public interface AnsibleDescribable extends Describable {
             .integer(ANSIBLE_YAML_DATA_SIZE)
             .required(false)
             .title("Inventory Yaml Data Size")
-            .description("Set the MB size (Default value is 10MB)"+
-                    " that the plugin can process with the yaml data response from Ansible."+
+            .description("Set the MB size (Default value is 10)"+
+                    " therefore, the plugin can process the yaml data response coming from Ansible."+
                     " (This only applies when Gather Facts = No)")
             .build();
 }
