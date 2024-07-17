@@ -24,6 +24,7 @@ import com.rundeck.plugins.ansible.ansible.AnsibleException;
 import com.rundeck.plugins.ansible.ansible.AnsibleInventoryList;
 import com.rundeck.plugins.ansible.ansible.AnsibleRunner;
 import com.rundeck.plugins.ansible.ansible.InventoryList;
+import com.rundeck.plugins.ansible.ansible.PropertyResolver;
 import com.rundeck.plugins.ansible.util.VaultPrompt;
 import org.rundeck.app.spi.Services;
 import org.rundeck.storage.api.PathUtil;
@@ -143,6 +144,24 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
         }
   }
 
+  private static Integer resolveIntProperty(
+          final String attribute,
+          final Integer defaultValue,
+          final Properties configuration,
+          final Map<String, Map<String, String>> dataContext) throws ConfigurationException {
+      final String strValue = resolveProperty(attribute, null, configuration, dataContext);
+      if (null != strValue) {
+          try {
+              return Integer.parseInt(strValue);
+          } catch (NumberFormatException e) {
+              throw new ConfigurationException("Can't parse attribute :" + attribute +
+                      ", value: " + strValue +
+                      " Expected Integer. : " + e.getMessage(), e);
+          }
+      }
+      return defaultValue;
+  }
+
   private static Boolean skipVar(final String hostVar, final List<String> varList) {
     for (final String specialVarString : varList) {
       if (hostVar.startsWith(specialVarString)) return true;
@@ -168,9 +187,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     gatherFacts = "true".equals(resolveProperty(AnsibleDescribable.ANSIBLE_GATHER_FACTS,null,configuration,executionDataContext));
     ignoreErrors = "true".equals(resolveProperty(AnsibleDescribable.ANSIBLE_IGNORE_ERRORS,null,configuration,executionDataContext));
 
-    yamlDataSize = getIntegerValue(
-            resolveProperty(AnsibleDescribable.ANSIBLE_YAML_DATA_SIZE,"10", configuration, executionDataContext),
-            AnsibleDescribable.ANSIBLE_YAML_DATA_SIZE);
+    yamlDataSize = resolveIntProperty(AnsibleDescribable.ANSIBLE_YAML_DATA_SIZE,10, configuration, executionDataContext);
 
     limit = (String) resolveProperty(AnsibleDescribable.ANSIBLE_LIMIT,null,configuration,executionDataContext);
     ignoreTagPrefix = (String) resolveProperty(AnsibleDescribable.ANSIBLE_IGNORE_TAGS,null,configuration,executionDataContext);

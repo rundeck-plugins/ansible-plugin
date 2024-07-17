@@ -531,7 +531,7 @@ public interface AnsibleDescribable extends Describable {
             .build();
 
     Property YAML_DATA_SIZE_PROP = PropertyBuilder.builder()
-            .string(ANSIBLE_YAML_DATA_SIZE)
+            .integer(ANSIBLE_YAML_DATA_SIZE)
             .required(false)
             .title("Inventory Yaml Data Size")
             .description("Set the MB size (Default value is 10MB)"+
