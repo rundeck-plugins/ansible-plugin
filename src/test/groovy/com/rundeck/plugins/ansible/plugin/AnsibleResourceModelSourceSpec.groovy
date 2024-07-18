@@ -1,19 +1,19 @@
 package com.rundeck.plugins.ansible.plugin
 
-import com.dtolabs.rundeck.core.storage.StorageTree
-import com.dtolabs.rundeck.core.storage.keys.KeyStorageTree
-import org.rundeck.app.spi.Services
-
-import static com.rundeck.plugins.ansible.ansible.AnsibleInventoryList.AnsibleInventoryListBuilder
-
 import com.dtolabs.rundeck.core.common.Framework
 import com.dtolabs.rundeck.core.common.INodeEntry
 import com.dtolabs.rundeck.core.common.INodeSet
 import com.dtolabs.rundeck.core.resources.ResourceModelSource
+import com.dtolabs.rundeck.core.resources.ResourceModelSourceException
+import com.dtolabs.rundeck.core.storage.keys.KeyStorageTree
 import com.rundeck.plugins.ansible.ansible.AnsibleDescribable
 import com.rundeck.plugins.ansible.ansible.AnsibleInventoryList
+import org.rundeck.app.spi.Services
 import org.yaml.snakeyaml.Yaml
+import org.yaml.snakeyaml.error.YAMLException
 import spock.lang.Specification
+
+import static com.rundeck.plugins.ansible.ansible.AnsibleInventoryList.AnsibleInventoryListBuilder
 
 /**
  * AnsibleResourceModelSource test
@@ -92,6 +92,89 @@ class AnsibleResourceModelSourceSpec extends Specification {
         'NODE_1' | 'ansible_os_family' | 'ansible_os_name' | 'ansible_kernel' | 'ansible_architecture' | 'ansible_user'     | 'ansible_distribution'
         'NODE_2' | 'ansible_os_family' | 'ansible_os_name' | 'ansible_kernel' | 'ansible_architecture' | 'ansible_ssh_user' | 'ansible_distribution'
         'NODE_3' | 'ansible_os_family' | 'ansible_os_name' | 'ansible_kernel' | 'ansible_architecture' | 'ansible_user_id'  | 'ansible_distribution'
+    }
+
+    void "ansible yaml data size parameter without an Exception"() {
+        given:
+        Framework framework = Mock(Framework) {
+            getBaseDir() >> Mock(File) {
+                getAbsolutePath() >> '/tmp'
+            }
+        }
+        ResourceModelSource plugin = new AnsibleResourceModelSource(framework)
+        Properties config = new Properties()
+        config.put('project', 'project_1')
+        config.put(AnsibleDescribable.ANSIBLE_GATHER_FACTS, 'false')
+        plugin.configure(config)
+        Services services = Mock(Services) {
+            getService(KeyStorageTree.class) >> Mock(KeyStorageTree)
+        }
+        plugin.setServices(services)
+        plugin.yamlDataSize = 2
+
+        when: "small inventory"
+        AnsibleInventoryListBuilder inventoryListBuilder = mockInventoryList(qtyNodes)
+        plugin.ansibleInventoryListBuilder = inventoryListBuilder
+        INodeSet nodes = plugin.getNodes()
+
+        then: "non exception is thrown because data can be handled"
+        notThrown(YAMLException)
+        nodes.size() == qtyNodes
+
+        where:
+        qtyNodes | _
+        2_0000   | _
+        3_0000   | _
+    }
+
+    void "ansible yaml data size parameter with an Exception"() {
+        given:
+        Framework framework = Mock(Framework) {
+            getBaseDir() >> Mock(File) {
+                getAbsolutePath() >> '/tmp'
+            }
+        }
+        ResourceModelSource plugin = new AnsibleResourceModelSource(framework)
+        Properties config = new Properties()
+        config.put('project', 'project_1')
+        config.put(AnsibleDescribable.ANSIBLE_GATHER_FACTS, 'false')
+        plugin.configure(config)
+        Services services = Mock(Services) {
+            getService(KeyStorageTree.class) >> Mock(KeyStorageTree)
+        }
+        plugin.setServices(services)
+        plugin.yamlDataSize = 2
+
+        when: "huge inventory"
+        AnsibleInventoryListBuilder inventoryListBuilder = mockInventoryList(100_000)
+        plugin.ansibleInventoryListBuilder = inventoryListBuilder
+        plugin.getNodes()
+
+        then: "throws an exception because data is too big to be precessed"
+        thrown(ResourceModelSourceException)
+    }
+
+    private AnsibleInventoryListBuilder mockInventoryList(int qtyNodes) {
+        return Mock(AnsibleInventoryListBuilder) {
+            build() >> Mock(AnsibleInventoryList) {
+                getNodeList() >> createNodes(qtyNodes)
+            }
+        }
+    }
+
+    private static String createNodes(int qty) {
+        Yaml yaml = new Yaml()
+        Map<String, Object> host = [:]
+        for (int i=1; i <= qty; i++) {
+            String nodeName = "node-$i"
+            String hostValue = "any-name-$i"
+            host.put((nodeName), ['hostname' : (hostValue)])
+        }
+        def hosts = ['hosts' : host]
+        def groups = ['ungrouped' : hosts]
+        def children = ['children' : groups]
+        def all = ['all' : children]
+        return yaml.dump(all)
     }
 
 }
