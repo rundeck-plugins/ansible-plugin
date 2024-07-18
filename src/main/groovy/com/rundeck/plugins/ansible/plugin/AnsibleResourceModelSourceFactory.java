@@ -35,6 +35,7 @@ public class AnsibleResourceModelSourceFactory implements ResourceModelSourceFac
         builder.property(INVENTORY_PROP);
         builder.property(CONFIG_FILE_PATH);
         builder.property(GATHER_FACTS_PROP);
+        builder.property(YAML_DATA_SIZE_PROP);
         builder.property(IGNORE_ERRORS_PROP);
         builder.property(LIMIT_PROP);
         builder.property(DISABLE_LIMIT_PROP);

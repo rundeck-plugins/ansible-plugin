@@ -25,12 +25,14 @@ import com.rundeck.plugins.ansible.ansible.AnsibleInventoryList;
 import com.rundeck.plugins.ansible.ansible.AnsibleRunner;
 import com.rundeck.plugins.ansible.ansible.InventoryList;
 import com.rundeck.plugins.ansible.util.VaultPrompt;
+import lombok.Setter;
 import org.rundeck.app.spi.Services;
 import org.rundeck.storage.api.PathUtil;
 import org.rundeck.storage.api.StorageException;
 import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.SafeConstructor;
+import org.yaml.snakeyaml.error.YAMLException;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
@@ -45,6 +47,7 @@ import java.nio.file.Paths;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -60,8 +63,10 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
   public static final String HOST_TPL_J2 = "host-tpl.j2";
   public static final String GATHER_HOSTS_YML = "gather-hosts.yml";
 
+  @Setter
   private Framework framework;
 
+  @Setter
   private Services services;
 
   private String project;
@@ -72,6 +77,8 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
 
   private String inventory;
   private boolean gatherFacts;
+  @Setter
+  private Integer yamlDataSize;
   private boolean ignoreErrors = false;
   private String limit;
   private String ignoreTagPrefix;
@@ -118,17 +125,14 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
 
   protected boolean encryptExtraVars = false;
 
+  @Setter
   private AnsibleInventoryList.AnsibleInventoryListBuilder ansibleInventoryListBuilder = null;
 
   public AnsibleResourceModelSource(final Framework framework) {
       this.framework = framework;
   }
 
-  public void setAnsibleInventoryListBuilder(AnsibleInventoryList.AnsibleInventoryListBuilder builder) {
-    this.ansibleInventoryListBuilder = builder;
-  }
-
-  private static String resolveProperty(
+    private static String resolveProperty(
             final String attribute,
             final String defaultValue,
             final Properties configuration,
@@ -142,6 +146,24 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
         }
   }
 
+  private static Integer resolveIntProperty(
+          final String attribute,
+          final Integer defaultValue,
+          final Properties configuration,
+          final Map<String, Map<String, String>> dataContext) throws ConfigurationException {
+      final String strValue = resolveProperty(attribute, null, configuration, dataContext);
+      if (null != strValue) {
+          try {
+              return Integer.parseInt(strValue);
+          } catch (NumberFormatException e) {
+              throw new ConfigurationException("Can't parse attribute :" + attribute +
+                      ", value: " + strValue +
+                      " Expected Integer. : " + e.getMessage(), e);
+          }
+      }
+      return defaultValue;
+  }
+
   private static Boolean skipVar(final String hostVar, final List<String> varList) {
     for (final String specialVarString : varList) {
       if (hostVar.startsWith(specialVarString)) return true;
@@ -149,11 +171,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     return false;
   }
 
-  public void setServices(Services services) {
-    this.services = services;
-  }
-
-  public void configure(Properties configuration) throws ConfigurationException {
+    public void configure(Properties configuration) throws ConfigurationException {
 
     project = configuration.getProperty("project");
     configDataContext = new HashMap<String, Map<String, String>>();
@@ -166,6 +184,8 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     inventory = resolveProperty(AnsibleDescribable.ANSIBLE_INVENTORY,null,configuration,executionDataContext);
     gatherFacts = "true".equals(resolveProperty(AnsibleDescribable.ANSIBLE_GATHER_FACTS,null,configuration,executionDataContext));
     ignoreErrors = "true".equals(resolveProperty(AnsibleDescribable.ANSIBLE_IGNORE_ERRORS,null,configuration,executionDataContext));
+
+    yamlDataSize = resolveIntProperty(AnsibleDescribable.ANSIBLE_YAML_DATA_SIZE,10, configuration, executionDataContext);
 
     limit = (String) resolveProperty(AnsibleDescribable.ANSIBLE_LIMIT,null,configuration,executionDataContext);
     ignoreTagPrefix = (String) resolveProperty(AnsibleDescribable.ANSIBLE_IGNORE_TAGS,null,configuration,executionDataContext);
@@ -670,14 +690,22 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
    */
   public void ansibleInventoryList(NodeSetImpl nodes, AnsibleRunner.AnsibleRunnerBuilder runnerBuilder) throws ResourceModelSourceException {
 
+    int codePointLimit = yamlDataSize * 1024 * 1024;
+
     LoaderOptions snakeOptions = new LoaderOptions();
     // max inventory file size allowed to 10mb
-    snakeOptions.setCodePointLimit(10_485_760);
+    snakeOptions.setCodePointLimit(codePointLimit);
     Yaml yaml = new Yaml(new SafeConstructor(snakeOptions));
 
     String listResp = getNodesFromInventory(runnerBuilder);
 
-    Map<String, Object> allInventory = yaml.load(listResp);
+    Map<String, Object> allInventory;
+    try {
+      allInventory = yaml.load(listResp);
+    } catch (YAMLException e) {
+      throw new ResourceModelSourceException("Cannot load yaml data coming from Ansible: " + e.getMessage(), e);
+    }
+
     Map<String, Object> all = InventoryList.getValue(allInventory, ALL);
     Map<String, Object> children = InventoryList.getValue(all, CHILDREN);
 
