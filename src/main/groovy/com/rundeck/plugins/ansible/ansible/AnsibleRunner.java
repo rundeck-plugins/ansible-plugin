@@ -447,7 +447,7 @@ public class AnsibleRunner {
             }
 
             if (sshUsePassword) {
-                String extraVarsPassword = "ansible_ssh_password: " + sshPass;
+                String extraVarsPassword = "ansible_ssh_pass: " + sshPass;
                 String finalextraVarsPassword = extraVarsPassword;
 
                 if(useAnsibleVault){
