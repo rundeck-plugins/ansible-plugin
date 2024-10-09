@@ -185,7 +185,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     gatherFacts = "true".equals(resolveProperty(AnsibleDescribable.ANSIBLE_GATHER_FACTS,null,configuration,executionDataContext));
     ignoreErrors = "true".equals(resolveProperty(AnsibleDescribable.ANSIBLE_IGNORE_ERRORS,null,configuration,executionDataContext));
 
-    yamlDataSize = resolveIntProperty(AnsibleDescribable.ANSIBLE_YAML_DATA_SIZE,10, configuration, executionDataContext);
+    yamlDataSize = resolveIntProperty(AnsibleDescribable.ANSIBLE_YAML_DATA_SIZE,1000, configuration, executionDataContext);
 
     limit = (String) resolveProperty(AnsibleDescribable.ANSIBLE_LIMIT,null,configuration,executionDataContext);
     ignoreTagPrefix = (String) resolveProperty(AnsibleDescribable.ANSIBLE_IGNORE_TAGS,null,configuration,executionDataContext);
@@ -693,11 +693,15 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     int codePointLimit = yamlDataSize * 1024 * 1024;
 
     LoaderOptions snakeOptions = new LoaderOptions();
-    // max inventory file size allowed to 10mb
+    // max inventory file size allowed to 100mb
     snakeOptions.setCodePointLimit(codePointLimit);
+    snakeOptions.setMaxAliasesForCollections(Integer.MAX_VALUE); // crazy large number for now
     Yaml yaml = new Yaml(new SafeConstructor(snakeOptions));
 
     String listResp = getNodesFromInventory(runnerBuilder);
+
+    //strip everything before all:
+    listResp = listResp.substring(listResp.indexOf("all:"));
 
     Map<String, Object> allInventory;
     try {
