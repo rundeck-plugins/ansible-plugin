@@ -693,7 +693,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     int codePointLimit = yamlDataSize * 1024 * 1024;
 
     LoaderOptions snakeOptions = new LoaderOptions();
-    // max inventory file size allowed to 100mb
+    // max inventory file size allowed to 1000mb
     snakeOptions.setCodePointLimit(codePointLimit);
     snakeOptions.setMaxAliasesForCollections(Integer.MAX_VALUE); // crazy large number for now
     Yaml yaml = new Yaml(new SafeConstructor(snakeOptions));
@@ -713,15 +713,15 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     Map<String, Object> all = InventoryList.getValue(allInventory, ALL);
     Map<String, Object> children = InventoryList.getValue(all, CHILDREN);
 
-    //check that the child has hosts in it and not just other children
-    if (hosts == null) {
-      continue;
-    }
-
     for (Map.Entry<String, Object> pair : children.entrySet()) {
       String hostGroup = pair.getKey();
       Map<String, Object> hostNames = InventoryList.getType(pair.getValue());
       Map<String, Object> hosts = InventoryList.getValue(hostNames, HOSTS);
+
+      //check that the child has hosts in it and not just other children
+      if (hosts == null) {
+        continue;
+      }
 
       for (Map.Entry<String, Object> hostNode : hosts.entrySet()) {
         NodeEntryImpl node = new NodeEntryImpl();
