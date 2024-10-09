@@ -713,6 +713,11 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     Map<String, Object> all = InventoryList.getValue(allInventory, ALL);
     Map<String, Object> children = InventoryList.getValue(all, CHILDREN);
 
+    //check that the child has hosts in it and not just other children
+    if (hosts == null) {
+      continue;
+    }
+
     for (Map.Entry<String, Object> pair : children.entrySet()) {
       String hostGroup = pair.getKey();
       Map<String, Object> hostNames = InventoryList.getType(pair.getValue());
