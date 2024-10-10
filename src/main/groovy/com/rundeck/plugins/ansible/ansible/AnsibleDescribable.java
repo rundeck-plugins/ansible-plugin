@@ -372,25 +372,25 @@ public interface AnsibleDescribable extends Describable {
     static final Property SSH_PASSWORD_STORAGE_PROP = PropertyBuilder.builder()
             .string(ANSIBLE_SSH_PASSWORD_STORAGE_PATH)
             .required(false)
-            .title("SSH Password Storage Path")
-            .description("Path to the ssh Password to use within Rundeck Storage.")
+            .title("Password Storage Path")
+            .description("Path to the Password to use within Rundeck Storage.")
             .renderingOption(StringRenderingConstants.SELECTION_ACCESSOR_KEY,
                     StringRenderingConstants.SelectionAccessor.STORAGE_PATH)
             .renderingOption(StringRenderingConstants.STORAGE_PATH_ROOT_KEY, "keys")
             .renderingOption(StringRenderingConstants.STORAGE_FILE_META_FILTER_KEY, "Rundeck-data-type=password")
             .renderingOption(StringRenderingConstants.GROUPING,"SECONDARY")
-            .renderingOption(StringRenderingConstants.GROUP_NAME,"SSH Connection")
+            .renderingOption(StringRenderingConstants.GROUP_NAME,"Authentication")
             .build();
 
     static final Property SSH_PASSWORD_PROP = PropertyBuilder.builder()
             .string(ANSIBLE_SSH_PASSWORD)
             .required(false)
-            .title("SSH Password")
-            .description("Ansible SSH password.")
+            .title("User Password")
+            .description("Ansible User Password.")
             .renderingOption(StringRenderingConstants.DISPLAY_TYPE_KEY,
                     StringRenderingConstants.DisplayType.PASSWORD)
             .renderingOption(StringRenderingConstants.GROUPING,"SECONDARY")
-            .renderingOption(StringRenderingConstants.GROUP_NAME,"SSH Connection")
+            .renderingOption(StringRenderingConstants.GROUP_NAME,"Authentication")
             .build();
 
     static final Property SSH_AUTH_TYPE_PROP = PropertyBuilder.builder()
@@ -406,10 +406,10 @@ public interface AnsibleDescribable extends Describable {
     static final Property SSH_USER_PROP = PropertyBuilder.builder()
             .string(ANSIBLE_SSH_USER)
             .required(false)
-            .title("SSH User")
-            .description("SSH User to authenticate as (default=rundeck).")
+            .title("User")
+            .description("User to authenticate as (default=rundeck).")
             .renderingOption(StringRenderingConstants.GROUPING,"SECONDARY")
-            .renderingOption(StringRenderingConstants.GROUP_NAME,"SSH Connection")
+            .renderingOption(StringRenderingConstants.GROUP_NAME,"Authentication")
             .build();
 
     static final Property SSH_TIMEOUT_PROP = PropertyBuilder.builder()

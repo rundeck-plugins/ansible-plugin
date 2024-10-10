@@ -36,9 +36,9 @@ public class AnsibleNodeExecutor implements NodeExecutor, AnsibleDescribable, Pr
         builder.property(WINDOWS_EXECUTABLE_PROP);
         builder.property(CONFIG_FILE_PATH);
         builder.property(GENERATE_INVENTORY_PROP);
-        builder.property(SSH_AUTH_TYPE_PROP);
         builder.property(SSH_USER_PROP);
         builder.property(SSH_PASSWORD_STORAGE_PROP);
+        builder.property(SSH_AUTH_TYPE_PROP);
         builder.property(SSH_KEY_FILE_PROP);
         builder.property(SSH_KEY_STORAGE_PROP);
         builder.property(SSH_TIMEOUT_PROP);
