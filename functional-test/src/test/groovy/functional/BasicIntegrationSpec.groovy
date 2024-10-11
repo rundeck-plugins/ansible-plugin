@@ -85,7 +85,7 @@ class BasicIntegrationSpec extends BaseTestConfiguration {
         ansibleNodeExecutionStatus.get("failed")==0
         ansibleNodeExecutionStatus.get("skipped")==0
         ansibleNodeExecutionStatus.get("ignored")==0
-        logs.findAll {it.log.contains("encryptVariable ansible_ssh_password:")}.size() == 1
+        logs.findAll {it.log.contains("encryptVariable ansible_ssh_pass:")}.size() == 1
     }
 
     def "test simple inline playbook private-key with passphrase authentication"(){
@@ -301,7 +301,7 @@ class BasicIntegrationSpec extends BaseTestConfiguration {
         ansibleNodeExecutionStatus.get("failed")==0
         ansibleNodeExecutionStatus.get("skipped")==0
         ansibleNodeExecutionStatus.get("ignored")==0
-        logs.findAll {it.log.contains("encryptVariable ansible_ssh_password:")}.size() == 1
+        logs.findAll {it.log.contains("encryptVariable ansible_ssh_pass:")}.size() == 1
         logs.findAll {it.log.contains("\"environmentTest\": \"test\"")}.size() == 1
         logs.findAll {it.log.contains("\"token\": 13231232312321321321321")}.size() == 1
     }

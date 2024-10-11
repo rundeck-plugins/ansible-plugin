@@ -185,7 +185,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     gatherFacts = "true".equals(resolveProperty(AnsibleDescribable.ANSIBLE_GATHER_FACTS,null,configuration,executionDataContext));
     ignoreErrors = "true".equals(resolveProperty(AnsibleDescribable.ANSIBLE_IGNORE_ERRORS,null,configuration,executionDataContext));
 
-    yamlDataSize = resolveIntProperty(AnsibleDescribable.ANSIBLE_YAML_DATA_SIZE,10, configuration, executionDataContext);
+    yamlDataSize = resolveIntProperty(AnsibleDescribable.ANSIBLE_YAML_DATA_SIZE,1000, configuration, executionDataContext);
 
     limit = (String) resolveProperty(AnsibleDescribable.ANSIBLE_LIMIT,null,configuration,executionDataContext);
     ignoreTagPrefix = (String) resolveProperty(AnsibleDescribable.ANSIBLE_IGNORE_TAGS,null,configuration,executionDataContext);
@@ -683,6 +683,55 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     }
   }
 
+  private NodeSetImpl ansibleInventoryListAddNodes(NodeSetImpl nodes, Map<String, Object> all) throws ResourceModelSourceException {
+    //System.out.println("[DEBUG] all: " + all);
+    Map<String, Object> children = InventoryList.getValue(all, CHILDREN);
+
+    for (Map.Entry<String, Object> pair : children.entrySet()) {
+      String hostGroup = pair.getKey();
+      Map<String, Object> hostNames = InventoryList.getType(pair.getValue());
+      Map<String, Object> hosts = InventoryList.getValue(hostNames, HOSTS);
+      Map<String, Object> grandchildren = InventoryList.getValue(hostNames, CHILDREN);
+
+      if (grandchildren != null) {
+        //System.out.println("[DEBUG] pair: " + pair);
+        //System.out.println("[DEBUG] grandchildren: " + grandchildren);
+	nodes = ansibleInventoryListAddNodes(nodes,
+	  Map.ofEntries(
+            Map.entry("children", grandchildren)
+          )
+	);
+      }
+      if (hosts != null) {
+        for (Map.Entry<String, Object> hostNode : hosts.entrySet()) {
+          NodeEntryImpl node = new NodeEntryImpl();
+          node.setTags(Set.of(hostGroup));
+          String hostName = hostNode.getKey();
+          node.setHostname(hostName);
+          node.setNodename(hostName);
+          Map<String, Object> nodeValues = InventoryList.getType(hostNode.getValue());
+
+          InventoryList.tagHandle(NodeTag.HOSTNAME, node, nodeValues);
+          InventoryList.tagHandle(NodeTag.USERNAME, node, nodeValues);
+          InventoryList.tagHandle(NodeTag.OS_FAMILY, node, nodeValues);
+          InventoryList.tagHandle(NodeTag.OS_NAME, node, nodeValues);
+          InventoryList.tagHandle(NodeTag.OS_ARCHITECTURE, node, nodeValues);
+          InventoryList.tagHandle(NodeTag.OS_VERSION, node, nodeValues);
+          InventoryList.tagHandle(NodeTag.DESCRIPTION, node, nodeValues);
+
+          nodeValues.forEach((key, value) -> {
+            if (value != null) {
+              node.setAttribute(key, value.toString());
+            }
+          });
+
+          nodes.putNode(node);
+        }
+      }
+    }
+    return nodes;
+  }	  
+
   /**
    * Process nodes coming from Ansible to convert them to Rundeck node
    * @param nodes Rundeck nodes
@@ -693,11 +742,15 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     int codePointLimit = yamlDataSize * 1024 * 1024;
 
     LoaderOptions snakeOptions = new LoaderOptions();
-    // max inventory file size allowed to 10mb
+    // max inventory file size allowed to 1000mb
     snakeOptions.setCodePointLimit(codePointLimit);
+    snakeOptions.setMaxAliasesForCollections(Integer.MAX_VALUE); // crazy large number for now
     Yaml yaml = new Yaml(new SafeConstructor(snakeOptions));
 
     String listResp = getNodesFromInventory(runnerBuilder);
+
+    //strip everything before all:
+    listResp = listResp.substring(listResp.indexOf("all:"));
 
     Map<String, Object> allInventory;
     try {
@@ -707,38 +760,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     }
 
     Map<String, Object> all = InventoryList.getValue(allInventory, ALL);
-    Map<String, Object> children = InventoryList.getValue(all, CHILDREN);
-
-    for (Map.Entry<String, Object> pair : children.entrySet()) {
-      String hostGroup = pair.getKey();
-      Map<String, Object> hostNames = InventoryList.getType(pair.getValue());
-      Map<String, Object> hosts = InventoryList.getValue(hostNames, HOSTS);
-
-      for (Map.Entry<String, Object> hostNode : hosts.entrySet()) {
-        NodeEntryImpl node = new NodeEntryImpl();
-        node.setTags(Set.of(hostGroup));
-        String hostName = hostNode.getKey();
-        node.setHostname(hostName);
-        node.setNodename(hostName);
-        Map<String, Object> nodeValues = InventoryList.getType(hostNode.getValue());
-
-        InventoryList.tagHandle(NodeTag.HOSTNAME, node, nodeValues);
-        InventoryList.tagHandle(NodeTag.USERNAME, node, nodeValues);
-        InventoryList.tagHandle(NodeTag.OS_FAMILY, node, nodeValues);
-        InventoryList.tagHandle(NodeTag.OS_NAME, node, nodeValues);
-        InventoryList.tagHandle(NodeTag.OS_ARCHITECTURE, node, nodeValues);
-        InventoryList.tagHandle(NodeTag.OS_VERSION, node, nodeValues);
-        InventoryList.tagHandle(NodeTag.DESCRIPTION, node, nodeValues);
-
-        nodeValues.forEach((key, value) -> {
-          if (value != null) {
-            node.setAttribute(key, value.toString());
-          }
-        });
-
-        nodes.putNode(node);
-      }
-    }
+    nodes = ansibleInventoryListAddNodes(nodes, all);
   }
 
   /**
