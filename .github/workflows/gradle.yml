@@ -30,7 +30,7 @@ jobs:
         id: get_version
         run: VERSION=$(./gradlew currentVersion -q -Prelease.quiet) && echo ::set-output name=VERSION::$VERSION
       - name: Upload plugin jar
-        uses: actions/upload-artifact@v1.0.0
+        uses: actions/upload-artifact@v4
         with:
           # Artifact name
           name: Grails-Plugin-${{ steps.get_version.outputs.VERSION }}

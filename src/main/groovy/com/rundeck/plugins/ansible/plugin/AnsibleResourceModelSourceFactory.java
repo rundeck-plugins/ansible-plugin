@@ -47,7 +47,10 @@ public class AnsibleResourceModelSourceFactory implements ResourceModelSourceFac
         builder.property(SSH_AUTH_TYPE_PROP);
         builder.property(SSH_USER_PROP);
         builder.property(SSH_PASSWORD_PROP);
+        builder.property(SSH_PASSWORD_STORAGE_PROP);
         builder.property(SSH_KEY_FILE_PROP);
+        builder.property(SSH_KEY_STORAGE_PROP);
+
         builder.property(SSH_TIMEOUT_PROP);
         builder.property(BECOME_PROP);
         builder.property(BECOME_AUTH_TYPE_PROP);
@@ -57,10 +60,7 @@ public class AnsibleResourceModelSourceFactory implements ResourceModelSourceFac
         builder.property(VAULT_PASSWORD_PROP);
         builder.property(VAULT_KEY_STORAGE_PROP);
 
-        builder.property(SSH_PASSWORD_STORAGE_PROP);
-        builder.property(SSH_KEY_STORAGE_PROP);
         builder.property(SSH_PASSPHRASE);
-
         builder.property(SSH_USE_AGENT);
         builder.property(BECOME_PASSWORD_STORAGE_PROP);
 

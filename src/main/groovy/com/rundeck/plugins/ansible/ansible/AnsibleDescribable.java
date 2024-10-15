@@ -352,7 +352,7 @@ public interface AnsibleDescribable extends Describable {
             .title("SSH Key File path")
             .description("File Path to the SSH Key to use")
             .renderingOption(StringRenderingConstants.GROUPING,"SECONDARY")
-            .renderingOption(StringRenderingConstants.GROUP_NAME,"SSH Connection")
+            .renderingOption(StringRenderingConstants.GROUP_NAME,"Authentication")
             .build();
 
 
@@ -366,50 +366,50 @@ public interface AnsibleDescribable extends Describable {
             .renderingOption(StringRenderingConstants.STORAGE_PATH_ROOT_KEY, "keys")
             .renderingOption(StringRenderingConstants.STORAGE_FILE_META_FILTER_KEY, "Rundeck-key-type=private")
             .renderingOption(StringRenderingConstants.GROUPING,"SECONDARY")
-            .renderingOption(StringRenderingConstants.GROUP_NAME,"SSH Connection")
+            .renderingOption(StringRenderingConstants.GROUP_NAME,"Authentication")
             .build();
 
     static final Property SSH_PASSWORD_STORAGE_PROP = PropertyBuilder.builder()
             .string(ANSIBLE_SSH_PASSWORD_STORAGE_PATH)
             .required(false)
-            .title("SSH Password Storage Path")
-            .description("Path to the ssh Password to use within Rundeck Storage.")
+            .title("Password Storage Path")
+            .description("Path to the Password to use within Rundeck Storage.")
             .renderingOption(StringRenderingConstants.SELECTION_ACCESSOR_KEY,
                     StringRenderingConstants.SelectionAccessor.STORAGE_PATH)
             .renderingOption(StringRenderingConstants.STORAGE_PATH_ROOT_KEY, "keys")
             .renderingOption(StringRenderingConstants.STORAGE_FILE_META_FILTER_KEY, "Rundeck-data-type=password")
             .renderingOption(StringRenderingConstants.GROUPING,"SECONDARY")
-            .renderingOption(StringRenderingConstants.GROUP_NAME,"SSH Connection")
+            .renderingOption(StringRenderingConstants.GROUP_NAME,"Authentication")
             .build();
 
     static final Property SSH_PASSWORD_PROP = PropertyBuilder.builder()
             .string(ANSIBLE_SSH_PASSWORD)
             .required(false)
-            .title("SSH Password")
-            .description("Ansible SSH password.")
+            .title("User Password")
+            .description("Ansible User Password.")
             .renderingOption(StringRenderingConstants.DISPLAY_TYPE_KEY,
                     StringRenderingConstants.DisplayType.PASSWORD)
             .renderingOption(StringRenderingConstants.GROUPING,"SECONDARY")
-            .renderingOption(StringRenderingConstants.GROUP_NAME,"SSH Connection")
+            .renderingOption(StringRenderingConstants.GROUP_NAME,"Authentication")
             .build();
 
     static final Property SSH_AUTH_TYPE_PROP = PropertyBuilder.builder()
             .select(ANSIBLE_SSH_AUTH_TYPE)
             .required(false)
-            .title("SSH Authentication")
-            .description("Type of SSH Authentication to use.")
+            .title("Authentication Type")
+            .description("Type of Authentication to use.")
             .values(Arrays.asList(AuthenticationType.getValues()))
             .renderingOption(StringRenderingConstants.GROUPING,"SECONDARY")
-            .renderingOption(StringRenderingConstants.GROUP_NAME,"SSH Connection")
+            .renderingOption(StringRenderingConstants.GROUP_NAME,"Authentication")
             .build();
 
     static final Property SSH_USER_PROP = PropertyBuilder.builder()
             .string(ANSIBLE_SSH_USER)
             .required(false)
-            .title("SSH User")
-            .description("SSH User to authenticate as (default=rundeck).")
+            .title("User")
+            .description("User to authenticate as (default=rundeck).")
             .renderingOption(StringRenderingConstants.GROUPING,"SECONDARY")
-            .renderingOption(StringRenderingConstants.GROUP_NAME,"SSH Connection")
+            .renderingOption(StringRenderingConstants.GROUP_NAME,"Authentication")
             .build();
 
     static final Property SSH_TIMEOUT_PROP = PropertyBuilder.builder()
@@ -418,7 +418,7 @@ public interface AnsibleDescribable extends Describable {
             .title("SSH Timeout")
             .description("SSH timeout, override the SSH timeout in seconds (default=10).")
             .renderingOption(StringRenderingConstants.GROUPING,"SECONDARY")
-            .renderingOption(StringRenderingConstants.GROUP_NAME,"SSH Connection")
+            .renderingOption(StringRenderingConstants.GROUP_NAME,"SSH Extra Configuration")
             .build();
 
     static final Property SSH_USE_AGENT = PropertyBuilder.builder()
@@ -427,7 +427,7 @@ public interface AnsibleDescribable extends Describable {
             .title("Use ssh-agent.")
             .description("Use ssh-agent to connect with a private key plus a passphrase.")
             .renderingOption(StringRenderingConstants.GROUPING,"SECONDARY")
-            .renderingOption(StringRenderingConstants.GROUP_NAME,"SSH Connection")
+            .renderingOption(StringRenderingConstants.GROUP_NAME,"SSH Extra Configuration")
             .build();
 
     static final Property SSH_PASSPHRASE = PropertyBuilder.builder()
@@ -440,7 +440,7 @@ public interface AnsibleDescribable extends Describable {
             .renderingOption(StringRenderingConstants.STORAGE_PATH_ROOT_KEY, "keys")
             .renderingOption(StringRenderingConstants.STORAGE_FILE_META_FILTER_KEY, "Rundeck-data-type=password")
             .renderingOption(StringRenderingConstants.GROUPING,"SECONDARY")
-            .renderingOption(StringRenderingConstants.GROUP_NAME,"SSH Connection")
+            .renderingOption(StringRenderingConstants.GROUP_NAME,"SSH Extra Configuration")
             .build();
 
     static final Property SSH_PASSPHRASE_OPTION = PropertyBuilder.builder()
@@ -450,7 +450,7 @@ public interface AnsibleDescribable extends Describable {
             .description("SSH Passphrase from secure option on a job, it just works if the ssh-agent is used.")
             .defaultValue(DEFAULT_ANSIBLE_SSH_PASSPHRASE_OPTION)
             .renderingOption(StringRenderingConstants.GROUPING,"SECONDARY")
-            .renderingOption(StringRenderingConstants.GROUP_NAME,"SSH Connection")
+            .renderingOption(StringRenderingConstants.GROUP_NAME,"SSH Extra Configuration")
             .build();
 
 
