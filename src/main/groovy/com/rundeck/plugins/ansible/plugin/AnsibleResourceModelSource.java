@@ -47,7 +47,6 @@ import java.nio.file.Paths;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -57,6 +56,7 @@ import java.util.Properties;
 import java.util.Set;
 
 import static com.rundeck.plugins.ansible.ansible.InventoryList.*;
+import static com.rundeck.plugins.ansible.ansible.AnsibleDescribable.*;
 
 public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRunnerPlugin {
 
@@ -77,8 +77,6 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
 
   private String inventory;
   private boolean gatherFacts;
-  @Setter
-  private Integer yamlDataSize;
   private boolean ignoreErrors = false;
   private String limit;
   private String ignoreTagPrefix;
@@ -124,6 +122,11 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
   protected String becamePasswordStoragePath;
 
   protected boolean encryptExtraVars = false;
+
+  @Setter
+  private Integer yamlDataSize;
+  @Setter
+  private Integer yamlMaxAliases;
 
   @Setter
   private AnsibleInventoryList.AnsibleInventoryListBuilder ansibleInventoryListBuilder = null;
@@ -185,8 +188,6 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     gatherFacts = "true".equals(resolveProperty(AnsibleDescribable.ANSIBLE_GATHER_FACTS,null,configuration,executionDataContext));
     ignoreErrors = "true".equals(resolveProperty(AnsibleDescribable.ANSIBLE_IGNORE_ERRORS,null,configuration,executionDataContext));
 
-    yamlDataSize = resolveIntProperty(AnsibleDescribable.ANSIBLE_YAML_DATA_SIZE,10, configuration, executionDataContext);
-
     limit = (String) resolveProperty(AnsibleDescribable.ANSIBLE_LIMIT,null,configuration,executionDataContext);
     ignoreTagPrefix = (String) resolveProperty(AnsibleDescribable.ANSIBLE_IGNORE_TAGS,null,configuration,executionDataContext);
 
@@ -241,6 +242,10 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     becamePasswordStoragePath = (String) resolveProperty(AnsibleDescribable.ANSIBLE_BECOME_PASSWORD_STORAGE_PATH,null,configuration,executionDataContext);
 
     encryptExtraVars = "true".equals(resolveProperty(AnsibleDescribable.ANSIBLE_ENCRYPT_EXTRA_VARS,"false",configuration,executionDataContext));
+
+    // Inventory Yaml
+    yamlDataSize = resolveIntProperty(ANSIBLE_YAML_DATA_SIZE,10, configuration, executionDataContext);
+    yamlMaxAliases = resolveIntProperty(ANSIBLE_YAML_MAX_ALIASES,1000, configuration, executionDataContext);
 
   }
 
@@ -695,6 +700,8 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     LoaderOptions snakeOptions = new LoaderOptions();
     // max inventory file size allowed to 10mb
     snakeOptions.setCodePointLimit(codePointLimit);
+    // max aliases. Default value is 1000
+    snakeOptions.setMaxAliasesForCollections(yamlMaxAliases);
     Yaml yaml = new Yaml(new SafeConstructor(snakeOptions));
 
     String listResp = getNodesFromInventory(runnerBuilder);
