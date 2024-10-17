@@ -59,6 +59,32 @@ class AnsibleSetStatsFilterPlugin implements LogFilterPlugin{
         allData = [:]
     }
 
+    String getJsonElementAsString(JsonElement obj){
+      if(obj.isJsonPrimitive()){
+    		return obj.getAsString()
+    	}else if(obj.isJsonArray()){
+    		Iterator<JsonElement> items = obj.getAsJsonArray().iterator()
+    		List<String> result = new ArrayList<String>()
+    		while(items.hasNext()) {
+    			result.add(getJsonAsString(items.next()))
+    		}
+    		return "[" + String.join(", ", result) + "]"
+    	}else if(obj.isJsonNull()){
+    		return obj.toString()
+    	}else if(obj.isJsonObject()){
+    		Iterator<String> keys = obj.getAsJsonObject().keySet().iterator()
+    		List<String> result = new ArrayList<String>()
+    		while(keys.hasNext()) {
+    			String key = keys.next()
+    			String value = getJsonAsString(obj.getAsJsonObject().get(key));
+    			result.add("\"" + key + "\": \"" + value + "\"");
+    		}
+    		return "{" + String.join(", ", result) + "}";
+    	}else{
+    		return null;
+    	}
+    }
+
     @Override
     void handleEvent(final PluginLoggingContext context, final LogEventControl event) {
         if (event.eventType == 'log' && event.loglevel == LogLevel.NORMAL && event.message?.length() > 0) {
@@ -70,7 +96,7 @@ class AnsibleSetStatsFilterPlugin implements LogFilterPlugin{
                 Iterator<String> keys = obj.keySet().iterator()
                 while(keys.hasNext()) {
                         String key = keys.next()
-                        String value =  obj.get(key).getAsString()
+                        String value =  getJsonElementAsString(obj.get(key))
                         allData[key] = value
                         outputContext.addOutput("data", key, value)
                 }
