@@ -25,7 +25,10 @@ import com.rundeck.plugins.ansible.ansible.AnsibleInventoryList;
 import com.rundeck.plugins.ansible.ansible.AnsibleRunner;
 import com.rundeck.plugins.ansible.ansible.InventoryList;
 import com.rundeck.plugins.ansible.util.VaultPrompt;
+import com.rundeck.plugins.ansible.util.YamlUtil;
 import lombok.Setter;
+import lombok.extern.log4j.Log4j2;
+import lombok.extern.slf4j.Slf4j;
 import org.rundeck.app.spi.Services;
 import org.rundeck.storage.api.PathUtil;
 import org.rundeck.storage.api.StorageException;
@@ -55,9 +58,14 @@ import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Set;
 
-import static com.rundeck.plugins.ansible.ansible.InventoryList.*;
-import static com.rundeck.plugins.ansible.ansible.AnsibleDescribable.*;
+import static com.rundeck.plugins.ansible.ansible.AnsibleDescribable.ANSIBLE_YAML_DATA_SIZE;
+import static com.rundeck.plugins.ansible.ansible.AnsibleDescribable.ANSIBLE_YAML_MAX_ALIASES;
+import static com.rundeck.plugins.ansible.ansible.InventoryList.ALL;
+import static com.rundeck.plugins.ansible.ansible.InventoryList.CHILDREN;
+import static com.rundeck.plugins.ansible.ansible.InventoryList.HOSTS;
+import static com.rundeck.plugins.ansible.ansible.InventoryList.NodeTag;
 
+@Slf4j
 public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRunnerPlugin {
 
   public static final String HOST_TPL_J2 = "host-tpl.j2";
@@ -706,6 +714,8 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
 
     String listResp = getNodesFromInventory(runnerBuilder);
 
+    validateAliases(listResp);
+
     Map<String, Object> allInventory;
     try {
       allInventory = yaml.load(listResp);
@@ -714,36 +724,43 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     }
 
     Map<String, Object> all = InventoryList.getValue(allInventory, ALL);
-    Map<String, Object> children = InventoryList.getValue(all, CHILDREN);
 
-    for (Map.Entry<String, Object> pair : children.entrySet()) {
-      String hostGroup = pair.getKey();
-      Map<String, Object> hostNames = InventoryList.getType(pair.getValue());
-      Map<String, Object> hosts = InventoryList.getValue(hostNames, HOSTS);
+    if (all != null) {
+      Map<String, Object> children = InventoryList.getValue(all, CHILDREN);
 
-      for (Map.Entry<String, Object> hostNode : hosts.entrySet()) {
-        NodeEntryImpl node = new NodeEntryImpl();
-        node.setTags(Set.of(hostGroup));
-        String hostName = hostNode.getKey();
-        node.setHostname(hostName);
-        node.setNodename(hostName);
-        Map<String, Object> nodeValues = InventoryList.getType(hostNode.getValue());
+      if (children != null) {
+        for (Map.Entry<String, Object> pair : children.entrySet()) {
+          String hostGroup = pair.getKey();
+          Map<String, Object> hostNames = InventoryList.getType(pair.getValue());
+          Map<String, Object> hosts = InventoryList.getValue(hostNames, HOSTS);
 
-        InventoryList.tagHandle(NodeTag.HOSTNAME, node, nodeValues);
-        InventoryList.tagHandle(NodeTag.USERNAME, node, nodeValues);
-        InventoryList.tagHandle(NodeTag.OS_FAMILY, node, nodeValues);
-        InventoryList.tagHandle(NodeTag.OS_NAME, node, nodeValues);
-        InventoryList.tagHandle(NodeTag.OS_ARCHITECTURE, node, nodeValues);
-        InventoryList.tagHandle(NodeTag.OS_VERSION, node, nodeValues);
-        InventoryList.tagHandle(NodeTag.DESCRIPTION, node, nodeValues);
+          if (hosts != null) {
+            for (Map.Entry<String, Object> hostNode : hosts.entrySet()) {
+              NodeEntryImpl node = new NodeEntryImpl();
+              node.setTags(Set.of(hostGroup));
+              String hostName = hostNode.getKey();
+              node.setHostname(hostName);
+              node.setNodename(hostName);
+              Map<String, Object> nodeValues = InventoryList.getType(hostNode.getValue());
 
-        nodeValues.forEach((key, value) -> {
-          if (value != null) {
-            node.setAttribute(key, value.toString());
+              InventoryList.tagHandle(NodeTag.HOSTNAME, node, nodeValues);
+              InventoryList.tagHandle(NodeTag.USERNAME, node, nodeValues);
+              InventoryList.tagHandle(NodeTag.OS_FAMILY, node, nodeValues);
+              InventoryList.tagHandle(NodeTag.OS_NAME, node, nodeValues);
+              InventoryList.tagHandle(NodeTag.OS_ARCHITECTURE, node, nodeValues);
+              InventoryList.tagHandle(NodeTag.OS_VERSION, node, nodeValues);
+              InventoryList.tagHandle(NodeTag.DESCRIPTION, node, nodeValues);
+
+              nodeValues.forEach((key, value) -> {
+                if (value != null) {
+                  node.setAttribute(key, value.toString());
+                }
+              });
+
+              nodes.putNode(node);
+            }
           }
-        });
-
-        nodes.putNode(node);
+        }
       }
     }
   }
@@ -845,6 +862,17 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
 
     return keys;
 
+  }
+
+  /**
+   * Validates whether the YAML content contains aliases that exceed the maximum allowed.
+   * @param content String yaml
+   */
+  public void validateAliases(String content) {
+    Map<String, Integer> checkMap  = YamlUtil.checkAliasesAndAnchors(content);
+    if (!checkMap.isEmpty() && checkMap.get(YamlUtil.ALIASES) > yamlMaxAliases) {
+      log.warn("The yaml inventory received has {} aliases and the maximum allowed is {}.", checkMap.get(YamlUtil.ALIASES), yamlMaxAliases);
+    }
   }
 
 }
