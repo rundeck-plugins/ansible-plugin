@@ -69,9 +69,9 @@ class AnsibleSetStatsFilterPlugin implements LogFilterPlugin{
                 String jsonString = match.group(1)
                 JsonObject obj = JsonParser.parseString(jsonString).getAsJsonObject()
                 Iterator<String> keys = obj.keySet().iterator()
+                Gson gson = new GsonBuilder().create()
                 while(keys.hasNext()) {
                         String key = keys.next()
-                        Gson gson = new GsonBuilder().create()
                         String value = gson.toJson(obj.get(key))
                         allData[key] = value
                         outputContext.addOutput("data", key, value)
