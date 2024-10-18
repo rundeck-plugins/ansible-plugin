@@ -154,10 +154,40 @@ class AnsibleResourceModelSourceSpec extends Specification {
         thrown(ResourceModelSourceException)
     }
 
-    private AnsibleInventoryListBuilder mockInventoryList(int qtyNodes) {
+    void "inventory with null host"() {
+        given:
+        Framework framework = Mock(Framework) {
+            getBaseDir() >> Mock(File) {
+                getAbsolutePath() >> '/tmp'
+            }
+        }
+        ResourceModelSource plugin = new AnsibleResourceModelSource(framework)
+        Properties config = new Properties()
+        config.put('project', 'project_1')
+        config.put(AnsibleDescribable.ANSIBLE_GATHER_FACTS, 'false')
+        plugin.configure(config)
+        Services services = Mock(Services) {
+            getService(KeyStorageTree.class) >> Mock(KeyStorageTree)
+        }
+        plugin.setServices(services)
+        plugin.yamlDataSize = 10
+        plugin.yamlMaxAliases = 3
+
+        when: "nodes using aliases"
+        AnsibleInventoryListBuilder inventoryListBuilder = mockInventoryList(0, true)
+        plugin.ansibleInventoryListBuilder = inventoryListBuilder
+        plugin.getNodes()
+
+        then: "throws an exception because host tag is null"
+        ResourceModelSourceException exception = thrown()
+        exception.message.contains("Cannot find hosts for")
+    }
+
+    private AnsibleInventoryListBuilder mockInventoryList(int qtyNodes, boolean aliases = false) {
+        String nodes = aliases ? yamlInventory(qtyNodes) : createNodes(qtyNodes)
         return Mock(AnsibleInventoryListBuilder) {
             build() >> Mock(AnsibleInventoryList) {
-                getNodeList() >> createNodes(qtyNodes)
+                getNodeList() >> nodes
             }
         }
     }
@@ -177,4 +207,19 @@ class AnsibleResourceModelSourceSpec extends Specification {
         return yaml.dump(all)
     }
 
+    private static String yamlInventory(int qty) {
+        String inventory = """all:
+    children:
+        ungrouped:
+            hosts:
+"""
+        for (int i=0; i<qty; i++) {
+            inventory += """                web${(i + 1)}.server.com:
+                    common_var1: value1
+                    common_var2: value2
+                    web_specific_var: "web${(i + 1)}_value
+"""
+        }
+        return inventory
+    }
 }
