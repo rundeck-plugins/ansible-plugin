@@ -23,6 +23,8 @@ import java.util.Iterator
 import com.google.gson.JsonParser
 import com.google.gson.JsonObject
 import com.google.gson.JsonElement
+import com.google.gson.GsonBuilder
+import com.google.gson.Gson
 
 
 /**
@@ -96,7 +98,8 @@ class AnsibleSetStatsFilterPlugin implements LogFilterPlugin{
                 Iterator<String> keys = obj.keySet().iterator()
                 while(keys.hasNext()) {
                         String key = keys.next()
-                        String value =  getJsonElementAsString(obj.get(key))
+                        Gson gson = new GsonBuilder().create()
+                        String value = gson.toJson(obj.get(key))
                         allData[key] = value
                         outputContext.addOutput("data", key, value)
                 }
