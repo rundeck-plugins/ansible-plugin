@@ -22,7 +22,6 @@ import java.util.regex.PatternSyntaxException
 import java.util.Iterator
 import com.google.gson.JsonParser
 import com.google.gson.JsonObject
-import com.google.gson.JsonElement
 import com.google.gson.GsonBuilder
 import com.google.gson.Gson
 
@@ -59,32 +58,6 @@ class AnsibleSetStatsFilterPlugin implements LogFilterPlugin{
         outputContext = context.getOutputContext()
         mapper = new ObjectMapper()
         allData = [:]
-    }
-
-    String getJsonElementAsString(JsonElement obj){
-      if(obj.isJsonPrimitive()){
-    		return obj.getAsString()
-    	}else if(obj.isJsonArray()){
-    		Iterator<JsonElement> items = obj.getAsJsonArray().iterator()
-    		List<String> result = new ArrayList<String>()
-    		while(items.hasNext()) {
-    			result.add(getJsonElementAsString(items.next()))
-    		}
-    		return "[" + String.join(", ", result) + "]"
-    	}else if(obj.isJsonNull()){
-    		return obj.toString()
-    	}else if(obj.isJsonObject()){
-    		Iterator<String> keys = obj.getAsJsonObject().keySet().iterator()
-    		List<String> result = new ArrayList<String>()
-    		while(keys.hasNext()) {
-    			String key = keys.next()
-    			String value = getJsonElementAsString(obj.getAsJsonObject().get(key));
-    			result.add("\"" + key + "\": \"" + value + "\"");
-    		}
-    		return "{" + String.join(", ", result) + "}";
-    	}else{
-    		return null;
-    	}
     }
 
     @Override
