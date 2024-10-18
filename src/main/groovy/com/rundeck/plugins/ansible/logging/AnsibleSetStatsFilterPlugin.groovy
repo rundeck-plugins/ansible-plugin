@@ -66,7 +66,7 @@ class AnsibleSetStatsFilterPlugin implements LogFilterPlugin{
     		Iterator<JsonElement> items = obj.getAsJsonArray().iterator()
     		List<String> result = new ArrayList<String>()
     		while(items.hasNext()) {
-    			result.add(getJsonAsString(items.next()))
+    			result.add(getJsonElementAsString(items.next()))
     		}
     		return "[" + String.join(", ", result) + "]"
     	}else if(obj.isJsonNull()){
@@ -76,7 +76,7 @@ class AnsibleSetStatsFilterPlugin implements LogFilterPlugin{
     		List<String> result = new ArrayList<String>()
     		while(keys.hasNext()) {
     			String key = keys.next()
-    			String value = getJsonAsString(obj.getAsJsonObject().get(key));
+    			String value = getJsonElementAsString(obj.getAsJsonObject().get(key));
     			result.add("\"" + key + "\": \"" + value + "\"");
     		}
     		return "{" + String.join(", ", result) + "}";
