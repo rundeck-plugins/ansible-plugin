@@ -712,16 +712,16 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
 
     Map<String, Object> all = InventoryList.getValue(allInventory, ALL);
 
-    if (isTagMapEmpty(all, ALL)) {
+    if (isTagMapValid(all, ALL)) {
       Map<String, Object> children = InventoryList.getValue(all, CHILDREN);
 
-      if (isTagMapEmpty(children, CHILDREN)) {
+      if (isTagMapValid(children, CHILDREN)) {
         for (Map.Entry<String, Object> pair : children.entrySet()) {
           String hostGroup = pair.getKey();
           Map<String, Object> hostNames = InventoryList.getType(pair.getValue());
           Map<String, Object> hosts = InventoryList.getValue(hostNames, HOSTS);
 
-          if (isTagMapEmpty(hosts, HOSTS)) {
+          if (isTagMapValid(hosts, HOSTS)) {
             for (Map.Entry<String, Object> hostNode : hosts.entrySet()) {
               NodeEntryImpl node = new NodeEntryImpl();
               node.setTags(Set.of(hostGroup));
@@ -858,7 +858,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
    * @param tagName The name of the tag to validate.
    * @return True if the tag is empty, false otherwise.
    */
-  private boolean isTagMapEmpty(Map<String, Object> tagMap, String tagName) {
+  private boolean isTagMapValid(Map<String, Object> tagMap, String tagName) {
     if (tagMap == null) {
       log.warn("Tag '{}' is empty!", tagName);
       return false;

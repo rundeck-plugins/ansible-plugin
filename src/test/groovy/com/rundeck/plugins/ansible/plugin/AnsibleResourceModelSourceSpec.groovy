@@ -154,15 +154,42 @@ class AnsibleResourceModelSourceSpec extends Specification {
         thrown(ResourceModelSourceException)
     }
 
-    private AnsibleInventoryListBuilder mockInventoryList(int qtyNodes) {
+    void "tag hosts is empty"() {
+        given:
+        Framework framework = Mock(Framework) {
+            getBaseDir() >> Mock(File) {
+                getAbsolutePath() >> '/tmp'
+            }
+        }
+        ResourceModelSource plugin = new AnsibleResourceModelSource(framework)
+        Properties config = new Properties()
+        config.put('project', 'project_1')
+        config.put(AnsibleDescribable.ANSIBLE_GATHER_FACTS, 'false')
+        plugin.configure(config)
+        Services services = Mock(Services) {
+            getService(KeyStorageTree.class) >> Mock(KeyStorageTree)
+        }
+        plugin.setServices(services)
+        plugin.yamlDataSize = 2
+
+        when: "inventory with null hosts"
+        AnsibleInventoryListBuilder inventoryListBuilder = mockInventoryList(1, true)
+        plugin.ansibleInventoryListBuilder = inventoryListBuilder
+        plugin.getNodes()
+
+        then: "no exception thrown due to null tag is handled"
+        notThrown(Exception)
+    }
+
+    private AnsibleInventoryListBuilder mockInventoryList(int qtyNodes, boolean nullHosts = false) {
         return Mock(AnsibleInventoryListBuilder) {
             build() >> Mock(AnsibleInventoryList) {
-                getNodeList() >> createNodes(qtyNodes)
+                getNodeList() >> createNodes(qtyNodes, nullHosts)
             }
         }
     }
 
-    private static String createNodes(int qty) {
+    private static String createNodes(int qty, boolean nullHosts) {
         Yaml yaml = new Yaml()
         Map<String, Object> host = [:]
         for (int i=1; i <= qty; i++) {
@@ -170,7 +197,7 @@ class AnsibleResourceModelSourceSpec extends Specification {
             String hostValue = "any-name-$i"
             host.put((nodeName), ['hostname' : (hostValue)])
         }
-        def hosts = ['hosts' : host]
+        def hosts = ['hosts' : nullHosts ? null : host]
         def groups = ['ungrouped' : hosts]
         def children = ['children' : groups]
         def all = ['all' : children]
