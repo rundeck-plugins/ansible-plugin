@@ -26,6 +26,7 @@ import com.rundeck.plugins.ansible.ansible.AnsibleRunner;
 import com.rundeck.plugins.ansible.ansible.InventoryList;
 import com.rundeck.plugins.ansible.util.VaultPrompt;
 import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
 import org.rundeck.app.spi.Services;
 import org.rundeck.storage.api.PathUtil;
 import org.rundeck.storage.api.StorageException;
@@ -47,7 +48,6 @@ import java.nio.file.Paths;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -56,8 +56,12 @@ import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Set;
 
-import static com.rundeck.plugins.ansible.ansible.InventoryList.*;
+import static com.rundeck.plugins.ansible.ansible.InventoryList.ALL;
+import static com.rundeck.plugins.ansible.ansible.InventoryList.CHILDREN;
+import static com.rundeck.plugins.ansible.ansible.InventoryList.HOSTS;
+import static com.rundeck.plugins.ansible.ansible.InventoryList.NodeTag;
 
+@Slf4j
 public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRunnerPlugin {
 
   public static final String HOST_TPL_J2 = "host-tpl.j2";
@@ -707,36 +711,43 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     }
 
     Map<String, Object> all = InventoryList.getValue(allInventory, ALL);
-    Map<String, Object> children = InventoryList.getValue(all, CHILDREN);
 
-    for (Map.Entry<String, Object> pair : children.entrySet()) {
-      String hostGroup = pair.getKey();
-      Map<String, Object> hostNames = InventoryList.getType(pair.getValue());
-      Map<String, Object> hosts = InventoryList.getValue(hostNames, HOSTS);
+    if (isTagMapValid(all, ALL)) {
+      Map<String, Object> children = InventoryList.getValue(all, CHILDREN);
 
-      for (Map.Entry<String, Object> hostNode : hosts.entrySet()) {
-        NodeEntryImpl node = new NodeEntryImpl();
-        node.setTags(Set.of(hostGroup));
-        String hostName = hostNode.getKey();
-        node.setHostname(hostName);
-        node.setNodename(hostName);
-        Map<String, Object> nodeValues = InventoryList.getType(hostNode.getValue());
+      if (isTagMapValid(children, CHILDREN)) {
+        for (Map.Entry<String, Object> pair : children.entrySet()) {
+          String hostGroup = pair.getKey();
+          Map<String, Object> hostNames = InventoryList.getType(pair.getValue());
+          Map<String, Object> hosts = InventoryList.getValue(hostNames, HOSTS);
 
-        InventoryList.tagHandle(NodeTag.HOSTNAME, node, nodeValues);
-        InventoryList.tagHandle(NodeTag.USERNAME, node, nodeValues);
-        InventoryList.tagHandle(NodeTag.OS_FAMILY, node, nodeValues);
-        InventoryList.tagHandle(NodeTag.OS_NAME, node, nodeValues);
-        InventoryList.tagHandle(NodeTag.OS_ARCHITECTURE, node, nodeValues);
-        InventoryList.tagHandle(NodeTag.OS_VERSION, node, nodeValues);
-        InventoryList.tagHandle(NodeTag.DESCRIPTION, node, nodeValues);
+          if (isTagMapValid(hosts, HOSTS)) {
+            for (Map.Entry<String, Object> hostNode : hosts.entrySet()) {
+              NodeEntryImpl node = new NodeEntryImpl();
+              node.setTags(Set.of(hostGroup));
+              String hostName = hostNode.getKey();
+              node.setHostname(hostName);
+              node.setNodename(hostName);
+              Map<String, Object> nodeValues = InventoryList.getType(hostNode.getValue());
 
-        nodeValues.forEach((key, value) -> {
-          if (value != null) {
-            node.setAttribute(key, value.toString());
+              InventoryList.tagHandle(NodeTag.HOSTNAME, node, nodeValues);
+              InventoryList.tagHandle(NodeTag.USERNAME, node, nodeValues);
+              InventoryList.tagHandle(NodeTag.OS_FAMILY, node, nodeValues);
+              InventoryList.tagHandle(NodeTag.OS_NAME, node, nodeValues);
+              InventoryList.tagHandle(NodeTag.OS_ARCHITECTURE, node, nodeValues);
+              InventoryList.tagHandle(NodeTag.OS_VERSION, node, nodeValues);
+              InventoryList.tagHandle(NodeTag.DESCRIPTION, node, nodeValues);
+
+              nodeValues.forEach((key, value) -> {
+                if (value != null) {
+                  node.setAttribute(key, value.toString());
+                }
+              });
+
+              nodes.putNode(node);
+            }
           }
-        });
-
-        nodes.putNode(node);
+        }
       }
     }
   }
@@ -838,6 +849,21 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
 
     return keys;
 
+  }
+
+  /**
+   * Validates if a tag is empty.
+   *
+   * @param tagMap  The map containing the tag content.
+   * @param tagName The name of the tag to validate.
+   * @return True if the tag is empty, false otherwise.
+   */
+  private boolean isTagMapValid(Map<String, Object> tagMap, String tagName) {
+    if (tagMap == null) {
+      log.warn("Tag '{}' is empty!", tagName);
+      return false;
+    }
+    return true;
   }
 
 }
