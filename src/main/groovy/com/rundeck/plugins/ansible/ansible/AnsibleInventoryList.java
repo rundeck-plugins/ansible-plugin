@@ -21,6 +21,7 @@ import java.util.Map;
 public class AnsibleInventoryList {
 
     private String inventory;
+    private String ansibleBinariesDirectoryPath;
     private String configFile;
     private boolean debug;
 
@@ -42,6 +43,9 @@ public class AnsibleInventoryList {
     public String getNodeList() throws IOException, AnsibleException {
 
         List<String> procArgs = new ArrayList<>();
+        if(ansibleBinariesDirectoryPath!=null && !ansibleBinariesDirectoryPath.isEmpty()) {
+            procArgs.add(ansibleBinariesDirectoryPath+"/"+ANSIBLE_INVENTORY);
+        }
         procArgs.add(ANSIBLE_INVENTORY);
         //inventory can be defined in ansible.cfg
         if(inventory!=null && !inventory.isEmpty()){
