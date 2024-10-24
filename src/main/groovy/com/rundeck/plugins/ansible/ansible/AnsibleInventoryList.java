@@ -34,7 +34,7 @@ public class AnsibleInventoryList {
     private File vaultPromptFile;
     private File tempLimitFile;
 
-    public static final String ANSIBLE_INVENTORY = "/ansible-inventory";
+    public static final String ANSIBLE_INVENTORY = "ansible-inventory";
 
     /**
      * Executes Ansible command to bring all nodes from inventory
@@ -43,7 +43,10 @@ public class AnsibleInventoryList {
     public String getNodeList() throws IOException, AnsibleException {
 
         List<String> procArgs = new ArrayList<>();
-        procArgs.add(ansibleBinariesDirectoryPath+ANSIBLE_INVENTORY);
+        if(ansibleBinariesDirectoryPath!=null && !ansibleBinariesDirectoryPath.isEmpty()) {
+            procArgs.add(ansibleBinariesDirectoryPath+"/"+ANSIBLE_INVENTORY);
+        }
+        procArgs.add(ANSIBLE_INVENTORY);
         //inventory can be defined in ansible.cfg
         if(inventory!=null && !inventory.isEmpty()){
             procArgs.add("--inventory-file" + "=" + inventory);
