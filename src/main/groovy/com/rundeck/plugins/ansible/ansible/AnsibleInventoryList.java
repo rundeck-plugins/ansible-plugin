@@ -63,6 +63,15 @@ public class AnsibleInventoryList {
         processAnsibleVault(stdinVariables, procArgs);
         processLimit(procArgs);
 
+        procArgs.add("2>/dev/null");
+
+        String allCmd = String.join(" ", procArgs);
+
+        procArgs.clear();
+        procArgs.add("bash");
+        procArgs.add("-c");
+        procArgs.add(allCmd);
+
         if(debug){
             System.out.println("getNodeList " + procArgs);
         }
