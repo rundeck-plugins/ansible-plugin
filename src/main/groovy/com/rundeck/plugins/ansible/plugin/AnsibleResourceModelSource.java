@@ -761,12 +761,18 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     AnsibleRunner runner = runnerBuilder.build();
 
     if (this.ansibleInventoryListBuilder == null) {
+      if(ansibleBinariesDirectoryPath!=null && !ansibleBinariesDirectoryPath.isEmpty()){
+        this.ansibleInventoryListBuilder = AnsibleInventoryList.builder()
+                .inventory(inventory)
+                .ansibleBinariesDirectory(java.nio.file.Path.of(ansibleBinariesDirectoryPath))
+                .configFile(configFile)
+                .debug(debug);
+      }
       this.ansibleInventoryListBuilder = AnsibleInventoryList.builder()
               .inventory(inventory)
-              .ansibleBinariesDirectory(java.nio.file.Path.of(ansibleBinariesDirectoryPath))
               .configFile(configFile)
               .debug(debug);
-    }
+      }
 
     if(runner.getVaultPass() != null){
       VaultPrompt vaultPrompt = VaultPrompt.builder()
