@@ -30,10 +30,11 @@ services:
     networks:
       - rundeck
     ports:
-      - "4440"
+      - "4440:4440"
     volumes:
     - ./ansible:/home/rundeck/ansible:rw
     - ./ansible-list:/home/rundeck/ansible-list:rw
+    - ./ansible-yaml-parsing:/home/rundeck/ansible-yaml-parsing:rw
 
 volumes:
   rundeck-data:
