@@ -1,6 +1,7 @@
 package com.rundeck.plugins.ansible.plugin;
 
 import com.dtolabs.rundeck.core.common.Framework;
+import com.dtolabs.rundeck.core.common.INodeEntry;
 import com.dtolabs.rundeck.core.common.INodeSet;
 import com.dtolabs.rundeck.core.common.NodeEntryImpl;
 import com.dtolabs.rundeck.core.common.NodeSetImpl;
@@ -48,6 +49,7 @@ import java.nio.file.Paths;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -55,6 +57,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static com.rundeck.plugins.ansible.ansible.InventoryList.ALL;
 import static com.rundeck.plugins.ansible.ansible.InventoryList.CHILDREN;
@@ -131,6 +134,8 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
 
   @Setter
   private AnsibleInventoryList.AnsibleInventoryListBuilder ansibleInventoryListBuilder = null;
+
+  private Map<String, NodeEntryImpl> ansibleNodes = new HashMap<>();
 
   public AnsibleResourceModelSource(final Framework framework) {
       this.framework = framework;
@@ -714,42 +719,132 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
 
     if (isTagMapValid(all, ALL)) {
       Map<String, Object> children = InventoryList.getValue(all, CHILDREN);
+      processChildren(children, new HashSet<>());
+    }
 
-      if (isTagMapValid(children, CHILDREN)) {
-        for (Map.Entry<String, Object> pair : children.entrySet()) {
-          String hostGroup = pair.getKey();
-          Map<String, Object> hostNames = InventoryList.getType(pair.getValue());
-          Map<String, Object> hosts = InventoryList.getValue(hostNames, HOSTS);
+    ansibleNodes.forEach((k, node) -> nodes.putNode(node));
+    ansibleNodes.clear();
+  }
 
-          if (isTagMapValid(hosts, HOSTS)) {
-            for (Map.Entry<String, Object> hostNode : hosts.entrySet()) {
-              NodeEntryImpl node = new NodeEntryImpl();
-              node.setTags(Set.of(hostGroup));
-              String hostName = hostNode.getKey();
-              node.setHostname(hostName);
-              node.setNodename(hostName);
-              Map<String, Object> nodeValues = InventoryList.getType(hostNode.getValue());
+  /**
+   * Processes the given set of nodes and populates the children map with the results.
+   *
+   * @param children a map to be populated with the processed children nodes
+   * @param tags    a set of tags to filter the nodes
+   * @throws ResourceModelSourceException if an error occurs while processing the nodes
+   */
+  public void processChildren(Map<String, Object> children, HashSet<String> tags) throws ResourceModelSourceException {
+    if (!isTagMapValid(children, CHILDREN)) {
+      return;
+    }
 
-              InventoryList.tagHandle(NodeTag.HOSTNAME, node, nodeValues);
-              InventoryList.tagHandle(NodeTag.USERNAME, node, nodeValues);
-              InventoryList.tagHandle(NodeTag.OS_FAMILY, node, nodeValues);
-              InventoryList.tagHandle(NodeTag.OS_NAME, node, nodeValues);
-              InventoryList.tagHandle(NodeTag.OS_ARCHITECTURE, node, nodeValues);
-              InventoryList.tagHandle(NodeTag.OS_VERSION, node, nodeValues);
-              InventoryList.tagHandle(NodeTag.DESCRIPTION, node, nodeValues);
+    for (Map.Entry<String, Object> pair : children.entrySet()) {
 
-              nodeValues.forEach((key, value) -> {
-                if (value != null) {
-                  node.setAttribute(key, value.toString());
-                }
-              });
+      String hostGroup = pair.getKey();
+      tags.add(hostGroup);
+      Map<String, Object> hostNames = InventoryList.getType(pair.getValue());
 
-              nodes.putNode(node);
-            }
-          }
-        }
+      if (hostNames.containsKey(CHILDREN)) {
+        Map<String, Object> subChildren = InventoryList.getValue(hostNames, CHILDREN);
+        processChildren(subChildren, tags);
+      } else {
+        processHosts(hostNames, tags);
+        tags.clear();
       }
     }
+  }
+
+  /**
+   * Processes the hosts within the given host names map and adds them to the nodes set.
+   *
+   * @param hostNames the map containing host names and their attributes
+   * @param tags      the set of tags to apply to the nodes
+   * @throws ResourceModelSourceException if an error occurs while processing the nodes
+   */
+  public void processHosts(Map<String, Object> hostNames, HashSet<String> tags) throws ResourceModelSourceException {
+    Map<String, Object> hosts = InventoryList.getValue(hostNames, HOSTS);
+
+    if (!isTagMapValid(hosts, HOSTS)) {
+      return;
+    }
+
+    for (Map.Entry<String, Object> hostNode : hosts.entrySet()) {
+      NodeEntryImpl node = createNodeEntry(hostNode);
+      addNode(node, tags);
+    }
+  }
+
+  /**
+   * Creates a NodeEntryImpl object from the given host node entry and tags.
+   *
+   * @param hostNode the entry containing the host name and its attributes
+   * @return the created NodeEntryImpl object
+   */
+  public NodeEntryImpl createNodeEntry(Map.Entry<String, Object> hostNode) throws ResourceModelSourceException {
+    NodeEntryImpl node = new NodeEntryImpl();
+    String hostName = hostNode.getKey();
+    node.setHostname(hostName);
+    node.setNodename(hostName);
+    Map<String, Object> nodeValues = InventoryList.getType(hostNode.getValue());
+
+    applyNodeTags(node, nodeValues);
+    nodeValues.forEach((key, value) -> {
+      if (value != null) {
+        node.setAttribute(key, value.toString());
+      }
+    });
+
+    return node;
+  }
+
+  /**
+   * Applies predefined tags to the given node based on the provided node values.
+   *
+   * @param node       the node to which the tags will be applied
+   * @param nodeValues the map containing the node's attributes
+   */
+  public void applyNodeTags(NodeEntryImpl node, Map<String, Object> nodeValues) throws ResourceModelSourceException {
+    InventoryList.tagHandle(NodeTag.HOSTNAME, node, nodeValues);
+    InventoryList.tagHandle(NodeTag.USERNAME, node, nodeValues);
+    InventoryList.tagHandle(NodeTag.OS_FAMILY, node, nodeValues);
+    InventoryList.tagHandle(NodeTag.OS_NAME, node, nodeValues);
+    InventoryList.tagHandle(NodeTag.OS_ARCHITECTURE, node, nodeValues);
+    InventoryList.tagHandle(NodeTag.OS_VERSION, node, nodeValues);
+    InventoryList.tagHandle(NodeTag.DESCRIPTION, node, nodeValues);
+  }
+
+  /**
+   * Adds a node to the ansibleNodes map, merging tags if the node already exists.
+   *
+   * @param node The node to add.
+   * @param tags The tags to associate with the node.
+   */
+  public void addNode(NodeEntryImpl node, Set<String> tags) {
+    ansibleNodes.compute(node.getNodename(), (key, existingNode) -> {
+      if (existingNode != null) {
+        Set<String> mergedTags = new HashSet<>(getStringTags(existingNode));
+        mergedTags.addAll(tags);
+        existingNode.setTags(Set.copyOf(mergedTags));
+        return existingNode;
+      } else {
+        node.setTags(Set.copyOf(tags));
+        return node;
+      }
+    });
+  }
+
+  /**
+   * Retrieves the tags from a node and converts them to strings.
+   *
+   * @param node The node whose tags are to be retrieved.
+   * @return A set of strings representing the node's tags.  Returns an empty set if the node has no tags.
+   */
+  public Set<String> getStringTags(NodeEntryImpl node) {
+    Set<String> tags = new HashSet<>();
+    for (Object tag : node.getTags()) {
+      tags.add(tag.toString());
+    }
+    return tags;
   }
 
   /**
