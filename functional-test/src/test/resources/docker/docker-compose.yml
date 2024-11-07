@@ -35,6 +35,7 @@ services:
     - ./ansible:/home/rundeck/ansible:rw
     - ./ansible-list:/home/rundeck/ansible-list:rw
     - ./ansible-yaml-parsing:/home/rundeck/ansible-yaml-parsing:rw
+    - ./ansible-child-groups:/home/rundeck/ansible-child-groups:rw
 
 volumes:
   rundeck-data:
