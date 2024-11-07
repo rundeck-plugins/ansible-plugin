@@ -11,6 +11,8 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -21,6 +23,7 @@ import java.util.Map;
 public class AnsibleInventoryList {
 
     private String inventory;
+    private Path ansibleBinariesDirectory;
     private String configFile;
     private boolean debug;
 
@@ -33,7 +36,7 @@ public class AnsibleInventoryList {
     private File vaultPromptFile;
     private File tempLimitFile;
 
-    public static final String ANSIBLE_INVENTORY = "ansible-inventory";
+    public static final String ANSIBLE_INVENTORY_COMMAND = "ansible-inventory";
 
     /**
      * Executes Ansible command to bring all nodes from inventory
@@ -42,7 +45,11 @@ public class AnsibleInventoryList {
     public String getNodeList() throws IOException, AnsibleException {
 
         List<String> procArgs = new ArrayList<>();
-        procArgs.add(ANSIBLE_INVENTORY);
+        String ansibleCommand = ANSIBLE_INVENTORY_COMMAND;
+        if(ansibleBinariesDirectory!=null) {
+            ansibleCommand = Paths.get(ansibleBinariesDirectory.toFile().getAbsolutePath(), ansibleCommand).toFile().getAbsolutePath();
+        }
+        procArgs.add(ansibleCommand);
         //inventory can be defined in ansible.cfg
         if(inventory!=null && !inventory.isEmpty()){
             procArgs.add("--inventory-file" + "=" + inventory);
