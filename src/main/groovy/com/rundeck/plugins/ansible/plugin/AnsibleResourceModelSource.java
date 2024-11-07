@@ -768,10 +768,12 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
                 .configFile(configFile)
                 .debug(debug);
       }
-      this.ansibleInventoryListBuilder = AnsibleInventoryList.builder()
-              .inventory(inventory)
-              .configFile(configFile)
-              .debug(debug);
+      else{
+        this.ansibleInventoryListBuilder = AnsibleInventoryList.builder()
+                .inventory(inventory)
+                .configFile(configFile)
+                .debug(debug);
+      }
       }
 
     if(runner.getVaultPass() != null){
