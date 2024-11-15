@@ -10,6 +10,7 @@ import java.util.Collection;
 import java.util.HashMap;
 
 import com.google.gson.Gson;
+import com.rundeck.plugins.ansible.util.AnsibleUtil;
 
 public class AnsibleInventoryBuilder {
 
@@ -21,7 +22,7 @@ public class AnsibleInventoryBuilder {
 
     public File buildInventory() throws ConfigurationException {
         try {
-            File file = File.createTempFile("ansible-inventory", ".json");
+            File file = AnsibleUtil.createTemporaryFile("ansible-inventory", ".json","");
             file.deleteOnExit();
             PrintWriter writer = new PrintWriter(file);
             AnsibleInventory ai = new AnsibleInventory();

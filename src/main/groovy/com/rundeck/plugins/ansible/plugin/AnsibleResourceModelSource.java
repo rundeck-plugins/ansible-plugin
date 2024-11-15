@@ -25,6 +25,7 @@ import com.rundeck.plugins.ansible.ansible.AnsibleException;
 import com.rundeck.plugins.ansible.ansible.AnsibleInventoryList;
 import com.rundeck.plugins.ansible.ansible.AnsibleRunner;
 import com.rundeck.plugins.ansible.ansible.InventoryList;
+import com.rundeck.plugins.ansible.util.AnsibleUtil;
 import com.rundeck.plugins.ansible.util.VaultPrompt;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -41,13 +42,11 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.Charset;
-import java.nio.file.DirectoryStream;
-import java.nio.file.FileVisitResult;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.SimpleFileVisitor;
+import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.FileAttribute;
+import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -420,7 +419,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     final Gson gson = new Gson();
     Path tempDirectory;
     try {
-      tempDirectory = Files.createTempDirectory("ansible-hosts");
+      tempDirectory = Files.createTempDirectory(Paths.get(AnsibleUtil.getAnsibleTmpPath()), "ansible-hosts");
     } catch (IOException e) {
       throw new ResourceModelSourceException("Error creating temporary directory: " + e.getMessage(), e);
     }

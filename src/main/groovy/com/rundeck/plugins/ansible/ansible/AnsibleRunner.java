@@ -1,6 +1,7 @@
 package com.rundeck.plugins.ansible.ansible;
 
 import com.dtolabs.rundeck.core.plugins.configuration.ConfigurationException;
+import com.dtolabs.rundeck.core.utils.Utility;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.rundeck.plugins.ansible.util.*;
 import com.dtolabs.rundeck.core.utils.SSHAgentProcess;
@@ -14,6 +15,7 @@ import java.io.*;
 import java.nio.file.*;
 import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.*;
 
 @Builder
@@ -531,7 +533,7 @@ public class AnsibleRunner {
             List<VaultPrompt> stdinVariables = new ArrayList<>();
 
             if(useAnsibleVault || vaultPass != null ){
-                vaultPromptFile = File.createTempFile("vault-prompt", ".log");
+                vaultPromptFile = AnsibleUtil.createTemporaryFile("vault-prompt",".log", "");
             }
 
             if (useAnsibleVault) {
@@ -677,7 +679,7 @@ public class AnsibleRunner {
 
         File tempPassVarsFile = null;
         if (sshPassphrase != null && sshPassphrase.length() > 0) {
-            tempPassVarsFile = File.createTempFile("ansible-runner", "ssh-add-check");
+            tempPassVarsFile = AnsibleUtil.createTemporaryFile("ssh-add-check", "");
             tempPassVarsFile.setExecutable(true);
 
             List<String> passScript = new ArrayList<>();

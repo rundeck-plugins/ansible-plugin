@@ -105,9 +105,21 @@ public class AnsibleUtil {
 
 
     public static File createTemporaryFile(String suffix, String data) throws IOException {
-        File tempVarsFile = File.createTempFile("ansible-runner", suffix);
+        return createTemporaryFile("ansible-runner", suffix, data);
+    }
+
+    public static File createTemporaryFile(String prefix, String suffix, String data) throws IOException {
+        return createTemporaryFile(new File(getAnsibleTmpPath()), suffix, data, prefix);
+    }
+
+    public static File createTemporaryFile(File path, String suffix, String data, String prefix) throws IOException {
+        File tempVarsFile = File.createTempFile(prefix, suffix, path);
         Files.write(tempVarsFile.toPath(), data.getBytes());
         return tempVarsFile;
+    }
+
+    public static String getAnsibleTmpPath() {
+        return System.getProperty("ansible.tmp.path", System.getProperty("java.io.tmpdir"));
     }
 
 

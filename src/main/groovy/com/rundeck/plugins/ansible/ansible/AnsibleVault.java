@@ -16,6 +16,8 @@ import java.nio.file.attribute.PosixFilePermissions;
 import java.util.*;
 import com.rundeck.plugins.ansible.ansible.AnsibleException;
 
+import static java.io.File.createTempFile;
+
 @Data
 @Builder
 public class AnsibleVault {
@@ -129,7 +131,7 @@ public class AnsibleVault {
 
 
     public static File createVaultScriptAuth(String suffix) throws IOException {
-        File tempInternalVaultFile = File.createTempFile("ansible-runner", suffix + "-client.py");
+        File tempInternalVaultFile = AnsibleUtil.createTemporaryFile(suffix + "-client.py", "");
 
         try {
             Files.copy(AnsibleUtil.class.getClassLoader().getResourceAsStream("vault-client.py"),
@@ -138,7 +140,6 @@ public class AnsibleVault {
         } catch (IOException e) {
             throw new IOException("Failed to copy vault-client.py", e);
         }
-
         Set<PosixFilePermission> perms = PosixFilePermissions.fromString("rwxr-xr-x");
         Files.setPosixFilePermissions(tempInternalVaultFile.toPath(), perms);
 
