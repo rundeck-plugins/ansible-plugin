@@ -16,6 +16,11 @@ import java.util.stream.Collectors;
 
 public class AnsibleUtil {
 
+    public static final String RUNNER_OVERRIDE_TMP_DIR = "runner.rundeck.overrideTempDir";
+    public static final String RUNNER_DIRS_TMP = "runner.dirs.tmp" ;
+    public static final String ANSIBLE_CUSTOM_TMP_DIR = "ansible.custom.tmp.dir";
+    public static final String DEFAULT_TMP_DIR = "java.io.tmpdir";
+
     public static SecretBundle createBundle(AnsibleRunnerContextBuilder builder){
 
         DefaultSecretBundle secretBundle = new DefaultSecretBundle();
@@ -109,19 +114,26 @@ public class AnsibleUtil {
     }
 
     public static File createTemporaryFile(String prefix, String suffix, String data) throws IOException {
-        return createTemporaryFile(new File(getAnsibleTmpPath()), suffix, data, prefix);
+        return createTemporaryFile(prefix, suffix, data, new File(getAnsibleTmpPath()));
     }
 
-    public static File createTemporaryFile(File path, String suffix, String data, String prefix) throws IOException {
+    public static File createTemporaryFile( String prefix, String suffix, String data, File path) throws IOException {
         File tempVarsFile = File.createTempFile(prefix, suffix, path);
         Files.write(tempVarsFile.toPath(), data.getBytes());
         return tempVarsFile;
     }
 
     public static String getAnsibleTmpPath() {
-        return System.getProperty("ansible.tmp.path", System.getProperty("java.io.tmpdir"));
+        if( Boolean.getBoolean(System.getProperty(RUNNER_OVERRIDE_TMP_DIR,"false"))
+                && !System.getProperty(RUNNER_DIRS_TMP,"").isEmpty()){
+            return System.getProperty(RUNNER_DIRS_TMP);
+        }
+        if( !Boolean.getBoolean(System.getProperty(RUNNER_OVERRIDE_TMP_DIR,"false"))
+                && !System.getProperty(ANSIBLE_CUSTOM_TMP_DIR,"").isEmpty()){
+            return System.getProperty(ANSIBLE_CUSTOM_TMP_DIR);
+        }
+        return System.getProperty(DEFAULT_TMP_DIR);
     }
-
 
     public static String randomString(){
         byte[] bytes = new byte[32];
