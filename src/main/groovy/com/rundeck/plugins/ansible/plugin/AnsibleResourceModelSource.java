@@ -1,7 +1,6 @@
 package com.rundeck.plugins.ansible.plugin;
 
 import com.dtolabs.rundeck.core.common.Framework;
-import com.dtolabs.rundeck.core.common.INodeEntry;
 import com.dtolabs.rundeck.core.common.INodeSet;
 import com.dtolabs.rundeck.core.common.NodeEntryImpl;
 import com.dtolabs.rundeck.core.common.NodeSetImpl;
@@ -28,6 +27,7 @@ import com.rundeck.plugins.ansible.ansible.InventoryList;
 import com.rundeck.plugins.ansible.util.VaultPrompt;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang.StringUtils;
 import org.rundeck.app.spi.Services;
 import org.rundeck.storage.api.PathUtil;
 import org.rundeck.storage.api.StorageException;
@@ -49,7 +49,6 @@ import java.nio.file.Paths;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -57,8 +56,9 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Set;
-import java.util.stream.Collectors;
 
+import static com.rundeck.plugins.ansible.ansible.AnsibleDescribable.ANSIBLE_YAML_DATA_SIZE;
+import static com.rundeck.plugins.ansible.ansible.AnsibleDescribable.ANSIBLE_YAML_MAX_ALIASES;
 import static com.rundeck.plugins.ansible.ansible.InventoryList.ALL;
 import static com.rundeck.plugins.ansible.ansible.InventoryList.CHILDREN;
 import static com.rundeck.plugins.ansible.ansible.InventoryList.HOSTS;
@@ -84,8 +84,6 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
 
   private String inventory;
   private boolean gatherFacts;
-  @Setter
-  private Integer yamlDataSize;
   private boolean ignoreErrors = false;
   private String limit;
   private String ignoreTagPrefix;
@@ -133,6 +131,11 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
   protected boolean encryptExtraVars = false;
 
   @Setter
+  private Integer yamlDataSize;
+  @Setter
+  private Integer yamlMaxAliases;
+
+  @Setter
   private AnsibleInventoryList.AnsibleInventoryListBuilder ansibleInventoryListBuilder = null;
 
   private Map<String, NodeEntryImpl> ansibleNodes = new HashMap<>();
@@ -141,7 +144,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
       this.framework = framework;
   }
 
-    private static String resolveProperty(
+  private static String resolveProperty(
             final String attribute,
             final String defaultValue,
             final Properties configuration,
@@ -193,8 +196,6 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     inventory = resolveProperty(AnsibleDescribable.ANSIBLE_INVENTORY,null,configuration,executionDataContext);
     gatherFacts = "true".equals(resolveProperty(AnsibleDescribable.ANSIBLE_GATHER_FACTS,null,configuration,executionDataContext));
     ignoreErrors = "true".equals(resolveProperty(AnsibleDescribable.ANSIBLE_IGNORE_ERRORS,null,configuration,executionDataContext));
-
-    yamlDataSize = resolveIntProperty(AnsibleDescribable.ANSIBLE_YAML_DATA_SIZE,10, configuration, executionDataContext);
 
     limit = (String) resolveProperty(AnsibleDescribable.ANSIBLE_LIMIT,null,configuration,executionDataContext);
     ignoreTagPrefix = (String) resolveProperty(AnsibleDescribable.ANSIBLE_IGNORE_TAGS,null,configuration,executionDataContext);
@@ -250,6 +251,10 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     becamePasswordStoragePath = (String) resolveProperty(AnsibleDescribable.ANSIBLE_BECOME_PASSWORD_STORAGE_PATH,null,configuration,executionDataContext);
 
     encryptExtraVars = "true".equals(resolveProperty(AnsibleDescribable.ANSIBLE_ENCRYPT_EXTRA_VARS,"false",configuration,executionDataContext));
+
+    // Inventory Yaml
+    yamlDataSize = resolveIntProperty(ANSIBLE_YAML_DATA_SIZE,10, configuration, executionDataContext);
+    yamlMaxAliases = resolveIntProperty(ANSIBLE_YAML_MAX_ALIASES,1000, configuration, executionDataContext);
 
   }
 
@@ -704,9 +709,13 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     LoaderOptions snakeOptions = new LoaderOptions();
     // max inventory file size allowed to 10mb
     snakeOptions.setCodePointLimit(codePointLimit);
+    // max aliases. Default value is 1000
+    snakeOptions.setMaxAliasesForCollections(yamlMaxAliases);
     Yaml yaml = new Yaml(new SafeConstructor(snakeOptions));
 
     String listResp = getNodesFromInventory(runnerBuilder);
+
+    validateAliases(listResp);
 
     Map<String, Object> allInventory;
     try {
@@ -965,6 +974,17 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
       return false;
     }
     return true;
+  }
+
+  /**
+   * Validates whether the YAML content contains aliases that exceed the maximum allowed.
+   * @param content String yaml
+   */
+  public void validateAliases(String content) {
+    int totalAliases = StringUtils.countMatches(content, ": *");
+    if (totalAliases > yamlMaxAliases) {
+      log.warn("The yaml inventory received has {} aliases and the maximum allowed is {}.", totalAliases, yamlMaxAliases);
+    }
   }
 
 }

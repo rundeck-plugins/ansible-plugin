@@ -8,6 +8,7 @@ import com.dtolabs.rundeck.plugins.util.PropertyBuilder;
 
 import java.util.Arrays;
 import java.util.LinkedList;
+import java.util.Map;
 
 public interface AnsibleDescribable extends Describable {
 
@@ -90,6 +91,9 @@ public interface AnsibleDescribable extends Describable {
     	}
     }
 
+    // General variables
+    String SECONDARY = "SECONDARY";
+
     public static final String SERVICE_PROVIDER_TYPE = "ansible-service";
     public static final String ANSIBLE_PLAYBOOK_PATH = "ansible-playbook";
     public static final String ANSIBLE_PLAYBOOK_INLINE = "ansible-playbook-inline";
@@ -158,7 +162,14 @@ public interface AnsibleDescribable extends Describable {
 
     public static final String ANSIBLE_ENCRYPT_EXTRA_VARS = "ansible-encrypt-extra-vars";
 
-    String ANSIBLE_YAML_DATA_SIZE = "ansible-yaml-data-size";
+    // Inventory Yaml
+    String ANSIBLE_YAML_DATA_SIZE   = "ansible-yaml-data-size";
+    String ANSIBLE_YAML_MAX_ALIASES = "ansible-yaml-max-aliases";
+    String INVENTORY_YAML = "Inventory Yaml";
+    Map<String, Object> inventoryYamlOpt = Map.of(
+        StringRenderingConstants.GROUPING, SECONDARY,
+        StringRenderingConstants.GROUP_NAME, INVENTORY_YAML
+    );
 
     public static Property PLAYBOOK_PATH_PROP = PropertyUtil.string(
     			ANSIBLE_PLAYBOOK_PATH,
@@ -533,9 +544,20 @@ public interface AnsibleDescribable extends Describable {
     Property YAML_DATA_SIZE_PROP = PropertyBuilder.builder()
             .integer(ANSIBLE_YAML_DATA_SIZE)
             .required(false)
-            .title("Inventory Yaml Data Size")
-            .description("Set the MB size (Default value is 10)"+
-                    " therefore, the plugin can process the yaml data response coming from Ansible."+
+            .title("Data Size")
+            .description("Set the MB size (Default value is 10)."+
+                    " Allows the plugin to process the yaml data response coming from Ansible."+
                     " (This only applies when Gather Facts = No)")
+            .renderingOptions(inventoryYamlOpt)
+            .build();
+
+    Property YAML_MAX_ALIASES_PROP = PropertyBuilder.builder()
+            .integer(ANSIBLE_YAML_MAX_ALIASES)
+            .required(false)
+            .title("Max Aliases")
+            .description("Set max size (Default value is 1000)."+
+                    " Allows to set the maximum number of aliases that the inventory can have."+
+                    " (This only applies when Gather Facts = No)")
+            .renderingOptions(inventoryYamlOpt)
             .build();
 }
