@@ -124,7 +124,7 @@ public class AnsibleUtil {
 
     public static String getCustomTmpPathDir(Framework framework){
         String customTmpDir = framework.getPropertyLookup().getProperty("framework.tmp.dir");
-        if (customTmpDir.isEmpty()) {
+        if (customTmpDir == null ||  customTmpDir.isEmpty()) {
             customTmpDir = System.getProperty("java.io.tmpdir");
         }
         return  customTmpDir;
