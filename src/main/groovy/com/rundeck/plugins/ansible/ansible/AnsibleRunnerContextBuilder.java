@@ -22,6 +22,7 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 
 import com.rundeck.plugins.ansible.plugin.AnsiblePluginGroup;
+import com.rundeck.plugins.ansible.util.AnsibleUtil;
 import lombok.Getter;
 import org.rundeck.storage.api.Path;
 
@@ -605,7 +606,7 @@ public class AnsibleRunnerContextBuilder {
 
 
         if (isGenerated != null && isGenerated) {
-            File tempInventory = new AnsibleInventoryBuilder(this.nodes).buildInventory();
+            File tempInventory = new AnsibleInventoryBuilder(this.nodes, AnsibleUtil.getCustomTmpPathDir(framework)).buildInventory();
             tempFiles.add(tempInventory);
             inventory = tempInventory.getAbsolutePath();
             return inventory;
@@ -625,7 +626,7 @@ public class AnsibleRunnerContextBuilder {
             the builder gets the nodes from rundeck in rundeck node format and converts to ansible inventory
             we don't want that, we simply want the list we provided in ansible format
              */
-            File tempInventory = new AnsibleInlineInventoryBuilder(inline_inventory).buildInventory();
+            File tempInventory = new AnsibleInlineInventoryBuilder(inline_inventory,AnsibleUtil.getCustomTmpPathDir(framework)).buildInventory();
             tempFiles.add(tempInventory);
             inventory = tempInventory.getAbsolutePath();
             return inventory;

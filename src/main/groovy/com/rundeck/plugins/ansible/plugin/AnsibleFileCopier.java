@@ -149,6 +149,7 @@ public class AnsibleFileCopier implements FileCopier, AnsibleDescribable, ProxyR
 
     try {
         runner = AnsibleRunner.buildAnsibleRunner(contextBuilder);
+        runner.setCustomTmpDirPath(AnsibleUtil.getCustomTmpPathDir(contextBuilder.getFramework()));
     } catch (ConfigurationException e) {
           throw new FileCopierException("Error configuring Ansible.",AnsibleFailureReason.ParseArgumentsError, e);
     }

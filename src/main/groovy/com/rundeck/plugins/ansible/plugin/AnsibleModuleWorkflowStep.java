@@ -82,6 +82,7 @@ public class AnsibleModuleWorkflowStep implements StepPlugin, AnsibleDescribable
 
         try {
             runner = AnsibleRunner.buildAnsibleRunner(contextBuilder);
+            runner.setCustomTmpDirPath(AnsibleUtil.getCustomTmpPathDir(contextBuilder.getFramework()));
         } catch (ConfigurationException e) {
             throw new StepException("Error configuring Ansible runner: " + e.getMessage(), e, AnsibleException.AnsibleFailureReason.ParseArgumentsError);
         }

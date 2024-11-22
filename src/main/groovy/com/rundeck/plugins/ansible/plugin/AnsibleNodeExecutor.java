@@ -170,6 +170,7 @@ public class AnsibleNodeExecutor implements NodeExecutor, AnsibleDescribable, Pr
 
     try {
         runner = AnsibleRunner.buildAnsibleRunner(contextBuilder);
+        runner.setCustomTmpDirPath(AnsibleUtil.getCustomTmpPathDir(contextBuilder.getFramework()));
     } catch (ConfigurationException e) {
           return NodeExecutorResultImpl.createFailure(AnsibleException.AnsibleFailureReason.ParseArgumentsError, e.getMessage(), node);
     }
