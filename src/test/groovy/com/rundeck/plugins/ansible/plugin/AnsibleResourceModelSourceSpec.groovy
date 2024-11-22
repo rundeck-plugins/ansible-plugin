@@ -6,6 +6,7 @@ import com.dtolabs.rundeck.core.common.INodeSet
 import com.dtolabs.rundeck.core.resources.ResourceModelSource
 import com.dtolabs.rundeck.core.resources.ResourceModelSourceException
 import com.dtolabs.rundeck.core.storage.keys.KeyStorageTree
+import com.dtolabs.rundeck.core.utils.IPropertyLookup
 import com.rundeck.plugins.ansible.ansible.AnsibleDescribable
 import com.rundeck.plugins.ansible.ansible.AnsibleInventoryList
 import org.rundeck.app.spi.Services
@@ -30,6 +31,9 @@ class AnsibleResourceModelSourceSpec extends Specification {
         String usernameValue = 'test'
         String descValue = 'CentOS Linux'
         Framework framework = Mock(Framework) {
+            getPropertyLookup() >> Mock(IPropertyLookup){
+                getProperty("framework.tmp.dir") >> '/tmp'
+            }
             getBaseDir() >> Mock(File) {
                 getAbsolutePath() >> '/tmp'
             }
@@ -97,6 +101,9 @@ class AnsibleResourceModelSourceSpec extends Specification {
     void "ansible yaml data size parameter without an Exception"() {
         given:
         Framework framework = Mock(Framework) {
+            getPropertyLookup() >> Mock(IPropertyLookup){
+                getProperty("framework.tmp.dir") >> '/tmp'
+            }
             getBaseDir() >> Mock(File) {
                 getAbsolutePath() >> '/tmp'
             }

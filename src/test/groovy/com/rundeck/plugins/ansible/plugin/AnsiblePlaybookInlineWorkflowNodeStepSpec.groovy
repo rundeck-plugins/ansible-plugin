@@ -5,6 +5,7 @@ import com.dtolabs.rundeck.core.common.INodeEntry
 import com.dtolabs.rundeck.core.common.INodeSet
 import com.dtolabs.rundeck.core.execution.ExecutionContext
 import com.dtolabs.rundeck.core.execution.workflow.steps.node.NodeStepException
+import com.dtolabs.rundeck.core.utils.IPropertyLookup
 import com.dtolabs.rundeck.plugins.step.NodeStepPlugin
 import com.dtolabs.rundeck.plugins.step.PluginStepContext
 import org.junit.jupiter.api.Assertions
@@ -25,7 +26,11 @@ class AnsiblePlaybookInlineWorkflowNodeStepSpec extends Specification{
             getExecutionContext() >> Mock(ExecutionContext){
                 getDataContext() >> [:]
             }
-            getFramework() >> Mock(Framework)
+            getFramework() >> Mock(Framework){
+                getPropertyLookup() >> Mock(IPropertyLookup){
+                    getProperty("framework.tmp.dir") >> '/tmp'
+                }
+            }
             getNodes() >> Mock(INodeSet){
                 getNodes() >> []
             }
