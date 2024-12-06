@@ -10,18 +10,21 @@ import java.util.Collection;
 import java.util.HashMap;
 
 import com.google.gson.Gson;
+import com.rundeck.plugins.ansible.util.AnsibleUtil;
 
 public class AnsibleInventoryBuilder {
 
     private final Collection<INodeEntry> nodes;
+    private final String customTmpDirPath;
 
-    public AnsibleInventoryBuilder(Collection<INodeEntry> nodes) {
+    public AnsibleInventoryBuilder(Collection<INodeEntry> nodes, String customTmpDirPath ) {
         this.nodes = nodes;
+        this.customTmpDirPath = customTmpDirPath;
     }
 
     public File buildInventory() throws ConfigurationException {
         try {
-            File file = File.createTempFile("ansible-inventory", ".json");
+            File file = AnsibleUtil.createTemporaryFile("ansible-inventory", ".json","",customTmpDirPath);
             file.deleteOnExit();
             PrintWriter writer = new PrintWriter(file);
             AnsibleInventory ai = new AnsibleInventory();

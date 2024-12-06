@@ -128,8 +128,8 @@ public class AnsibleVault {
     }
 
 
-    public static File createVaultScriptAuth(String suffix) throws IOException {
-        File tempInternalVaultFile = File.createTempFile("ansible-runner", suffix + "-client.py");
+    public static File createVaultScriptAuth(String suffix, String path) throws IOException {
+        File tempInternalVaultFile = AnsibleUtil.createTemporaryFile("ansible-runner", suffix + "-client.py","",path);
 
         try {
             Files.copy(AnsibleUtil.class.getClassLoader().getResourceAsStream("vault-client.py"),

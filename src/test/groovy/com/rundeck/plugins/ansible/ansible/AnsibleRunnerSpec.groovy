@@ -45,6 +45,7 @@ class AnsibleRunnerSpec extends Specification{
 
         runner.processExecutorBuilder(processBuilder)
         runner.ansibleVault(ansibleVault)
+        runner.customTmpDirPath("/tmp")
 
         when:
         runner.build().run()
@@ -94,6 +95,7 @@ class AnsibleRunnerSpec extends Specification{
 
         runnerBuilder.processExecutorBuilder(processBuilder)
         runnerBuilder.ansibleVault(ansibleVault)
+        runnerBuilder.customTmpDirPath("/tmp")
 
         when:
         def result = runnerBuilder.build().run()
@@ -122,6 +124,7 @@ class AnsibleRunnerSpec extends Specification{
         runner.tempDirectory(Path.of(tmpDirectory.absolutePath))
         runner.sshPrivateKey(privateKey)
         runner.extraVars(extraVars)
+        runner.customTmpDirPath("/tmp")
 
         def process = Mock(Process){
             waitFor() >> 0
@@ -196,6 +199,7 @@ class AnsibleRunnerSpec extends Specification{
 
         when:
         AnsibleRunner runner = runnerBuilder.build()
+        runner.setCustomTmpDirPath("/tmp")
         runner.run()
 
         then:
@@ -245,6 +249,7 @@ class AnsibleRunnerSpec extends Specification{
 
         when:
         AnsibleRunner runner = runnerBuilder.build()
+        runner.setCustomTmpDirPath("/tmp")
         def result = runner.run()
 
         then:
@@ -293,6 +298,7 @@ class AnsibleRunnerSpec extends Specification{
 
         when:
         AnsibleRunner runner = runnerBuilder.build()
+        runner.setCustomTmpDirPath("/tmp")
         def result = runner.run()
 
         then:
@@ -342,6 +348,7 @@ class AnsibleRunnerSpec extends Specification{
 
         when:
         AnsibleRunner runner = runnerBuilder.build()
+        runner.setCustomTmpDirPath("/tmp")
         def result = runner.run()
 
         then:

@@ -292,6 +292,8 @@ public class AnsibleRunner {
     File tempBecameVarsFile ;
     File vaultPromptFile;
 
+    String customTmpDirPath;
+
     public void deleteTempDirectory(Path tempDirectory) throws IOException {
         Files.walkFileTree(tempDirectory, new SimpleFileVisitor<Path>() {
             @Override
@@ -333,11 +335,11 @@ public class AnsibleRunner {
         if (baseDirectory == null) {
             // Use a temporary directory and mark it for possible removal later
             this.usingTempDirectory = true;
-            baseDirectory = Files.createTempDirectory("ansible-rundeck");
+            baseDirectory = Files.createTempDirectory(Path.of(customTmpDirPath),"ansible-rundeck");
         }
 
         if(ansibleVault==null){
-            tempInternalVaultFile = AnsibleVault.createVaultScriptAuth("ansible-script-vault");
+            tempInternalVaultFile = AnsibleVault.createVaultScriptAuth("ansible-script-vault",customTmpDirPath);
             ansibleVault = AnsibleVault.builder()
                     .baseDirectory(baseDirectory)
                     .masterPassword(AnsibleUtil.randomString())
@@ -373,7 +375,7 @@ public class AnsibleRunner {
             } else if (type == AnsibleCommand.PlaybookPath) {
                 procArgs.add(playbook);
             } else if (type == AnsibleCommand.PlaybookInline) {
-                tempPlaybook = AnsibleUtil.createTemporaryFile("playbook", playbook);
+                tempPlaybook = AnsibleUtil.createTemporaryFile("","playbook", playbook,customTmpDirPath);
                 procArgs.add(tempPlaybook.getAbsolutePath());
             }
 
@@ -405,7 +407,7 @@ public class AnsibleRunner {
                 for (String limit : limits) {
                     sb.append(limit).append("\n");
                 }
-                tempFile = AnsibleUtil.createTemporaryFile("targets", sb.toString());
+                tempFile = AnsibleUtil.createTemporaryFile("","targets", sb.toString(),customTmpDirPath);
 
                 procArgs.add("-l");
                 procArgs.add("@" + tempFile.getAbsolutePath());
@@ -422,13 +424,13 @@ public class AnsibleRunner {
                     addeExtraVars = encryptExtraVarsKey(extraVars);
                 }
 
-                tempVarsFile = AnsibleUtil.createTemporaryFile("extra-vars", addeExtraVars);
+                tempVarsFile = AnsibleUtil.createTemporaryFile("","extra-vars", addeExtraVars,customTmpDirPath);
                 procArgs.add("--extra-vars" + "=" + "@" + tempVarsFile.getAbsolutePath());
             }
 
             if (sshPrivateKey != null && !sshPrivateKey.isEmpty()) {
                 String privateKeyData = sshPrivateKey.replaceAll("\r\n", "\n");
-                tempPkFile = AnsibleUtil.createTemporaryFile("id_rsa", privateKeyData);
+                tempPkFile = AnsibleUtil.createTemporaryFile("","id_rsa", privateKeyData,customTmpDirPath);
 
                 // Only the owner can read and write
                 Set<PosixFilePermission> perms = new HashSet<PosixFilePermission>();
@@ -454,7 +456,7 @@ public class AnsibleRunner {
                     finalextraVarsPassword = encryptExtraVarsKey(extraVarsPassword);
                 }
 
-                tempSshVarsFile = AnsibleUtil.createTemporaryFile("ssh-extra-vars", finalextraVarsPassword);
+                tempSshVarsFile = AnsibleUtil.createTemporaryFile("","ssh-extra-vars", finalextraVarsPassword,customTmpDirPath);
                 procArgs.add("--extra-vars" + "=" + "@" + tempSshVarsFile.getAbsolutePath());
             }
 
@@ -473,7 +475,7 @@ public class AnsibleRunner {
                         finalextraVarsPassword = encryptExtraVarsKey(extraVarsPassword);
                     }
 
-                    tempBecameVarsFile = AnsibleUtil.createTemporaryFile("become-extra-vars", finalextraVarsPassword);
+                    tempBecameVarsFile = AnsibleUtil.createTemporaryFile("","become-extra-vars", finalextraVarsPassword,customTmpDirPath);
                     procArgs.add("--extra-vars" + "=" + "@" + tempBecameVarsFile.getAbsolutePath());
                 }
             }
@@ -531,7 +533,7 @@ public class AnsibleRunner {
             List<VaultPrompt> stdinVariables = new ArrayList<>();
 
             if(useAnsibleVault || vaultPass != null ){
-                vaultPromptFile = File.createTempFile("vault-prompt", ".log");
+                vaultPromptFile = AnsibleUtil.createTemporaryFile("vault-prompt",".log","",customTmpDirPath);
             }
 
             if (useAnsibleVault) {
@@ -677,7 +679,7 @@ public class AnsibleRunner {
 
         File tempPassVarsFile = null;
         if (sshPassphrase != null && sshPassphrase.length() > 0) {
-            tempPassVarsFile = File.createTempFile("ansible-runner", "ssh-add-check");
+            tempPassVarsFile = AnsibleUtil.createTemporaryFile("","ssh-add-check","",customTmpDirPath);
             tempPassVarsFile.setExecutable(true);
 
             List<String> passScript = new ArrayList<>();

@@ -35,6 +35,7 @@ public class AnsibleInventoryList {
     private File tempVaultFile;
     private File vaultPromptFile;
     private File tempLimitFile;
+    private String customTmpDirPath;
 
     public static final String ANSIBLE_INVENTORY_COMMAND = "ansible-inventory";
 
@@ -139,7 +140,7 @@ public class AnsibleInventoryList {
         if (vaultPrompt == null) { return; }
 
         if(ansibleVault == null){
-            tempInternalVaultFile = AnsibleVault.createVaultScriptAuth("ansible-script-vault");
+            tempInternalVaultFile = AnsibleVault.createVaultScriptAuth("ansible-script-vault",customTmpDirPath);
             ansibleVault = AnsibleVault.builder()
                     .masterPassword(vaultPrompt.getVaultPassword())
                     .vaultPasswordScriptFile(tempInternalVaultFile)
@@ -165,7 +166,7 @@ public class AnsibleInventoryList {
             for (String limit : limits) {
                 sb.append(limit).append("\n");
             }
-            tempLimitFile = AnsibleUtil.createTemporaryFile("targets", sb.toString());
+            tempLimitFile = AnsibleUtil.createTemporaryFile("","targets", sb.toString(),customTmpDirPath);
 
             procArgs.add("-l");
             procArgs.add("@" + tempLimitFile.getAbsolutePath());

@@ -25,6 +25,7 @@ import com.rundeck.plugins.ansible.ansible.AnsibleException;
 import com.rundeck.plugins.ansible.ansible.AnsibleInventoryList;
 import com.rundeck.plugins.ansible.ansible.AnsibleRunner;
 import com.rundeck.plugins.ansible.ansible.InventoryList;
+import com.rundeck.plugins.ansible.util.AnsibleUtil;
 import com.rundeck.plugins.ansible.util.VaultPrompt;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -132,6 +133,8 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
 
   protected boolean encryptExtraVars = false;
 
+  protected  String customTmpDirPath;
+
   @Setter
   private AnsibleInventoryList.AnsibleInventoryListBuilder ansibleInventoryListBuilder = null;
 
@@ -189,7 +192,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     configDataContext.put("context", configdata);
     executionDataContext = ScriptDataContextUtil.createScriptDataContextForProject(framework, project);
     executionDataContext.putAll(configDataContext);
-
+    customTmpDirPath = AnsibleUtil.getCustomTmpPathDir(framework);
     inventory = resolveProperty(AnsibleDescribable.ANSIBLE_INVENTORY,null,configuration,executionDataContext);
     gatherFacts = "true".equals(resolveProperty(AnsibleDescribable.ANSIBLE_GATHER_FACTS,null,configuration,executionDataContext));
     ignoreErrors = "true".equals(resolveProperty(AnsibleDescribable.ANSIBLE_IGNORE_ERRORS,null,configuration,executionDataContext));
@@ -260,6 +263,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     if ("true".equals(System.getProperty("ansible.debug"))) {
       runnerBuilder.debug(true);
     }
+    runnerBuilder.customTmpDirPath(AnsibleUtil.getCustomTmpPathDir(framework));
 
     if (limit != null && limit.length() > 0) {
       List<String> limitList = new ArrayList<>();
@@ -420,7 +424,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     final Gson gson = new Gson();
     Path tempDirectory;
     try {
-      tempDirectory = Files.createTempDirectory("ansible-hosts");
+      tempDirectory = Files.createTempDirectory(Path.of(customTmpDirPath),"ansible-hosts");
     } catch (IOException e) {
       throw new ResourceModelSourceException("Error creating temporary directory: " + e.getMessage(), e);
     }
@@ -431,7 +435,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     } catch (IOException e) {
       throw new ResourceModelSourceException("Error copying files: " + e.getMessage(), e);
     }
-
+    runnerBuilder.customTmpDirPath(customTmpDirPath);
     runnerBuilder.tempDirectory(tempDirectory);
     runnerBuilder.retainTempDirectory(true);
 
@@ -881,7 +885,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     }
 
     AnsibleInventoryList inventoryList = this.ansibleInventoryListBuilder.build();
-
+    inventoryList.setCustomTmpDirPath(customTmpDirPath);
     try {
         return inventoryList.getNodeList();
     } catch (IOException | AnsibleException e) {
