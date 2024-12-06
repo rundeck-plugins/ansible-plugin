@@ -35,7 +35,6 @@ public class AnsibleResourceModelSourceFactory implements ResourceModelSourceFac
         builder.property(INVENTORY_PROP);
         builder.property(CONFIG_FILE_PATH);
         builder.property(GATHER_FACTS_PROP);
-        builder.property(YAML_DATA_SIZE_PROP);
         builder.property(IGNORE_ERRORS_PROP);
         builder.property(LIMIT_PROP);
         builder.property(DISABLE_LIMIT_PROP);
@@ -63,6 +62,9 @@ public class AnsibleResourceModelSourceFactory implements ResourceModelSourceFac
         builder.property(SSH_PASSPHRASE);
         builder.property(SSH_USE_AGENT);
         builder.property(BECOME_PASSWORD_STORAGE_PROP);
+
+        builder.property(YAML_DATA_SIZE_PROP);
+        builder.property(YAML_MAX_ALIASES_PROP);
 
         builder.mapping(ANSIBLE_INVENTORY,PROJ_PROP_PREFIX + ANSIBLE_INVENTORY);
         builder.frameworkMapping(ANSIBLE_INVENTORY,FWK_PROP_PREFIX + ANSIBLE_INVENTORY);
