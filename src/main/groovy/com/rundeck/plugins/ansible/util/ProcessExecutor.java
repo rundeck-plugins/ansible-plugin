@@ -69,6 +69,7 @@ public class ProcessExecutor {
             Thread stdinThread = new Thread(() -> {
                 try {
                     stdinw.write(vaultPrompt.getVaultPassword());
+                    stdinw.write(3); // end of text
                     stdinw.flush();
                 } catch (IOException e) {
                     throw new RuntimeException(e);
