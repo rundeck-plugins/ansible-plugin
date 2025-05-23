@@ -668,23 +668,12 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
               }
 
               if (hostVar.getValue() instanceof JsonPrimitive && ((JsonPrimitive) hostVar.getValue()).isString()) {
-                String strValue = hostVar.getValue().getAsString();
-
-                if ((strValue.trim().startsWith("{") && strValue.trim().endsWith("}")) ||
-                        (strValue.trim().startsWith("[") && strValue.trim().endsWith("]"))) {
-                  try {
-                    JsonElement parsed = JsonParser.parseString(strValue);
-                    node.setAttribute(hostVar.getKey(), gson.toJson(parsed));
-                  } catch (Exception e) {
-                    node.setAttribute(hostVar.getKey(), strValue);
-                  }
-                } else {
-                  node.setAttribute(hostVar.getKey(), strValue);
-                }
+                // Keep attribute as String, don't serialize as Json
+                node.setAttribute(hostVar.getKey(), hostVar.getValue().getAsString());
               } else {
+                // Serialize attribute as Json (JsonArray or JsonObject)
                 node.setAttribute(hostVar.getKey(), gson.toJson(hostVar.getValue()));
               }
-
             }
           }
 
