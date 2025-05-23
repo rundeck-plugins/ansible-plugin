@@ -1,105 +1,121 @@
 plugins {
-  id 'pl.allegro.tech.build.axion-release' version '1.17.2'
-  id 'maven-publish'
+    id 'java'
+    id 'groovy'
+    id 'idea'
+    alias(libs.plugins.axionRelease)
+    alias(libs.plugins.nexusPublish)
 }
 
-group = 'com.github.rundeck-plugins'
+group = 'org.rundeck.plugins'
 
+ext.pluginName = 'Ansible Integration'
+ext.publishDescription = 'This plugin brings basic Ansible support to Rundeck. It imports hosts from Ansible\'s inventory, including a bunch of facts, and can run modules and playbooks. There is also a node executor and file copier for your project.'
+ext.publishName = "Ansible Plugin ${project.version}"
+ext.githubSlug = 'rundeck-plugins/ansible-plugin'
+ext.developers = [
+    [id: 'gschueler', name: 'Greg Schueler', email: 'greg@rundeck.com'],
+    [id: 'daisuke-yoshimoto', name: 'Daisuke Yoshimoto', email: 'yoshimoto@gmail.com']
+]
 ext.rundeckPluginVersion = '1.2'
 ext.pluginClassNames = [
-  'com.rundeck.plugins.ansible.plugin.AnsibleResourceModelSourceFactory',
-  'com.rundeck.plugins.ansible.plugin.AnsibleNodeExecutor',
-  'com.rundeck.plugins.ansible.plugin.AnsibleFileCopier',
-  'com.rundeck.plugins.ansible.plugin.AnsiblePlaybookWorkflowStep',
-  'com.rundeck.plugins.ansible.plugin.AnsiblePlaybookInlineWorkflowStep',
-  'com.rundeck.plugins.ansible.plugin.AnsibleModuleWorkflowStep',
-  'com.rundeck.plugins.ansible.plugin.AnsiblePlaybookWorflowNodeStep',
-  'com.rundeck.plugins.ansible.plugin.AnsiblePlaybookInlineWorkflowNodeStep',
-  'com.rundeck.plugins.ansible.logging.AnsibleSetStatsFilterPlugin',
-  'com.rundeck.plugins.ansible.plugin.AnsiblePluginGroup'
+    'com.rundeck.plugins.ansible.plugin.AnsibleResourceModelSourceFactory',
+    'com.rundeck.plugins.ansible.plugin.AnsibleNodeExecutor',
+    'com.rundeck.plugins.ansible.plugin.AnsibleFileCopier',
+    'com.rundeck.plugins.ansible.plugin.AnsiblePlaybookWorkflowStep',
+    'com.rundeck.plugins.ansible.plugin.AnsiblePlaybookInlineWorkflowStep',
+    'com.rundeck.plugins.ansible.plugin.AnsibleModuleWorkflowStep',
+    'com.rundeck.plugins.ansible.plugin.AnsiblePlaybookWorflowNodeStep',
+    'com.rundeck.plugins.ansible.plugin.AnsiblePlaybookInlineWorkflowNodeStep',
+    'com.rundeck.plugins.ansible.logging.AnsibleSetStatsFilterPlugin',
+    'com.rundeck.plugins.ansible.plugin.AnsiblePluginGroup'
 ].join(',')
 
-apply plugin: 'java'
-apply plugin: 'groovy'
-sourceCompatibility = 1.11
-
 scmVersion {
-    ignoreUncommittedChanges = false
     tag {
         prefix = 'v'
         versionSeparator = ''
     }
+    ignoreUncommittedChanges = false
 }
 
-version = scmVersion.version
+allprojects {
+    project.version = scmVersion.version
+    apply from: "${rootDir}/gradle/java.gradle"
+}
 
 repositories {
-  mavenCentral()
-  mavenLocal()
+    mavenCentral()
 }
 
 configurations {
-  pluginLibs
+    pluginLibs
 
-  implementation {
-    extendsFrom pluginLibs
-  }
+    implementation {
+        extendsFrom pluginLibs
+    }
 }
 
 dependencies {
-  pluginLibs 'com.google.code.gson:gson:2.10.1'
-  implementation('org.rundeck:rundeck-core:5.1.1-20240305')
-  implementation 'org.codehaus.groovy:groovy-all:3.0.15'
-  pluginLibs group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: '2.16.1'
-  pluginLibs group: 'com.fasterxml.jackson.dataformat', name: 'jackson-dataformat-yaml', version: '2.16.1'
-  implementation "org.yaml:snakeyaml:2.2"
+    pluginLibs libs.gson
+    implementation(libs.rundeckCore) {
+        exclude group: "com.google.guava"
+    }
+    implementation libs.groovyAll
+    pluginLibs libs.jacksonCore
+    pluginLibs libs.jacksonYaml
+    implementation libs.snakeyaml
 
-  compileOnly 'org.projectlombok:lombok:1.18.30'
-  annotationProcessor 'org.projectlombok:lombok:1.18.30'
+    compileOnly libs.lombok
+    annotationProcessor libs.lombok
 
-  testCompileOnly 'org.projectlombok:lombok:1.18.30'
-  testAnnotationProcessor 'org.projectlombok:lombok:1.18.30'
+    testCompileOnly libs.lombok
+    testAnnotationProcessor libs.lombok
 
-  testImplementation "org.spockframework:spock-core:2.1-groovy-3.0"
-
-}
-
-tasks.withType(Test).configureEach {
-  useJUnitPlatform()
+    testImplementation libs.bundles.testLibs
 }
 
 task copyToLib(type: Copy) {
-  into "$buildDir/output/lib"
-  from configurations.pluginLibs
+    into "$buildDir/output/lib"
+    from configurations.pluginLibs
 }
 
 jar {
-  from "$buildDir/output"
-  manifest {
-    def libList = configurations.pluginLibs.collect{'lib/' + it.name}.join(' ')
-    attributes 'Rundeck-Plugin-Name' : 'Ansible Integration'
-    attributes 'Rundeck-Plugin-Description' : 'This plugin brings basic Ansible support to Rundeck. It imports hosts from Ansible\'s inventory, including a bunch of facts, and can run modules and playbooks. There is also a node executor and file copier for your project.'
-    attributes 'Rundeck-Plugin-Rundeck-Compatibility-Version': '3.0.1+'
-    attributes 'Rundeck-Plugin-Tags': 'java,node executor,resource model,workflow step,ansible'
-    attributes 'Rundeck-Plugin-License': 'MIT'
-    attributes 'Rundeck-Plugin-Source-Link': 'https://github.com/rundeck-plugins/ansible-plugin'
-    attributes 'Rundeck-Plugin-Target-Host-Compatibility': 'all'
-    attributes 'Rundeck-Plugin-Author': 'David Kirstein'
-    attributes 'Rundeck-Plugin-Classnames': pluginClassNames
-    attributes 'Rundeck-Plugin-File-Version': version
-    attributes 'Rundeck-Plugin-Version': rundeckPluginVersion
-    attributes 'Rundeck-Plugin-Archive': 'true'
-    attributes 'Rundeck-Plugin-Libs': "${libList}"
-    attributes 'Rundeck-Plugin-URL': 'https://github.com/rundeck-plugins/ansible-plugin'
-  }
-  dependsOn(copyToLib)
+    from "$buildDir/output"
+    manifest {
+        def libList = configurations.pluginLibs.collect{'lib/' + it.name}.join(' ')
+        attributes 'Rundeck-Plugin-Version': rundeckPluginVersion,
+                   'Rundeck-Plugin-Archive': 'true',
+                   'Rundeck-Plugin-File-Version': project.version,
+                   'Rundeck-Plugin-Name' : pluginName,
+                   'Rundeck-Plugin-Description' : publishDescription,
+                   'Rundeck-Plugin-Rundeck-Compatibility-Version': '3.0.1+',
+                   'Rundeck-Plugin-Tags': 'java,node executor,resource model,workflow step,ansible',
+                   'Rundeck-Plugin-License': 'MIT',
+                   'Rundeck-Plugin-Source-Link': 'https://github.com/rundeck-plugins/ansible-plugin',
+                   'Rundeck-Plugin-Target-Host-Compatibility': 'all',
+                   'Rundeck-Plugin-Author': 'David Kirstein',
+                   'Rundeck-Plugin-Classnames': pluginClassNames,
+                   'Rundeck-Plugin-URL': 'https://github.com/rundeck-plugins/ansible-plugin',
+                   'Rundeck-Plugin-Libs': "${libList}",
+                   'Rundeck-Plugin-Date': new Date().format("yyyy-MM-dd'T'HH:mm:ssX")
+    }
+    dependsOn(copyToLib)
 }
 
-publishing {
-  publications {
-    maven(MavenPublication) {
-      artifactId = 'ansible-plugin'
-      from components.java
-    }
-  }
+test {
+    useJUnitPlatform()
 }
+
+javadoc {
+    options.addStringOption('Xdoclint:none', '-quiet')
+    failOnError = false
+}
+
+nexusPublishing {
+    packageGroup = 'org.rundeck.plugins'
+    repositories {
+        sonatype()
+    }
+}
+
+apply from: "${rootDir}/gradle/publishing.gradle"

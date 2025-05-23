@@ -1,0 +1,34 @@
+[versions]
+axionRelease = "1.18.18"
+groovy = "3.0.24"
+rundeckCore = "5.10.0-20250312"
+nexusPublish = "2.0.0"
+spock = "2.3-groovy-3.0"
+gson = "2.10.1"
+jackson = "2.16.1"
+snakeyaml = "2.2"
+lombok = "1.18.30"
+cglib = "3.3.0"
+byteBuddy = "1.14.12"
+objenesis = "3.3"
+
+[libraries]
+rundeckCore = { group = "org.rundeck", name = "rundeck-core", version.ref = "rundeckCore" }
+groovyAll = { group = "org.codehaus.groovy", name = "groovy-all", version.ref = "groovy" }
+spockCore = { group = "org.spockframework", name = "spock-core", version.ref = "spock" }
+gson = { group = "com.google.code.gson", name = "gson", version.ref = "gson" }
+jacksonCore = { group = "com.fasterxml.jackson.core", name = "jackson-core", version.ref = "jackson" }
+jacksonYaml = { group = "com.fasterxml.jackson.dataformat", name = "jackson-dataformat-yaml", version.ref = "jackson" }
+snakeyaml = { group = "org.yaml", name = "snakeyaml", version.ref = "snakeyaml" }
+lombok = { group = "org.projectlombok", name = "lombok", version.ref = "lombok" }
+cglib = { group = "cglib", name = "cglib-nodep", version.ref = "cglib" }
+byteBuddy = { group = "net.bytebuddy", name = "byte-buddy", version.ref = "byteBuddy" }
+objenesis = { group = "org.objenesis", name = "objenesis", version.ref = "objenesis" }
+
+[bundles]
+testLibs = ["groovyAll", "spockCore", "cglib", "byteBuddy", "objenesis"]
+jacksonLibs = ["jacksonCore", "jacksonYaml"]
+
+[plugins]
+axionRelease = { id = "pl.allegro.tech.build.axion-release", version.ref = "axionRelease" }
+nexusPublish = { id = "io.github.gradle-nexus.publish-plugin", version.ref = "nexusPublish" }
