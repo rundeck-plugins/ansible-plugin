@@ -1,0 +1,39 @@
+<joblist>
+  <job>
+    <defaultTab>nodes</defaultTab>
+    <description></description>
+    <dispatch>
+      <excludePrecedence>true</excludePrecedence>
+      <keepgoing>false</keepgoing>
+      <rankOrder>ascending</rankOrder>
+      <successOnEmptyNodeFilter>false</successOnEmptyNodeFilter>
+      <threadcount>1</threadcount>
+    </dispatch>
+    <executionEnabled>true</executionEnabled>
+    <id>6b309548-bcc9-40d8-8c79-bfc0d1f1e49c</id>
+    <loglevel>INFO</loglevel>
+    <name>run-simple-script</name>
+    <nodeFilterEditable>false</nodeFilterEditable>
+    <nodefilters>
+      <filter>name: ssh-node </filter>
+    </nodefilters>
+    <nodesSelectedByDefault>true</nodesSelectedByDefault>
+    <plugins />
+    <scheduleEnabled>true</scheduleEnabled>
+    <sequence keepgoing='false' strategy='node-first'>
+      <command>
+        <script><![CDATA[ls -lrt 
+
+pwd
+
+df -h 
+
+ps -aux
+
+]]></script>
+        <scriptargs />
+      </command>
+    </sequence>
+    <uuid>6b309548-bcc9-40d8-8c79-bfc0d1f1e49c</uuid>
+  </job>
+</joblist>

@@ -32,6 +32,8 @@ import org.apache.commons.lang.StringUtils;
 import org.rundeck.app.spi.Services;
 import org.rundeck.storage.api.PathUtil;
 import org.rundeck.storage.api.StorageException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.SafeConstructor;
@@ -68,6 +70,7 @@ import static com.rundeck.plugins.ansible.ansible.InventoryList.NodeTag;
 @Slf4j
 public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRunnerPlugin {
 
+  private static final Logger logger = LoggerFactory.getLogger(AnsibleResourceModelSource.class);
   public static final String HOST_TPL_J2 = "host-tpl.j2";
   public static final String GATHER_HOSTS_YML = "gather-hosts.yml";
 
@@ -665,12 +668,23 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
               }
 
               if (hostVar.getValue() instanceof JsonPrimitive && ((JsonPrimitive) hostVar.getValue()).isString()) {
-                // Keep attribute as String, don't serialize as Json
-                node.setAttribute(hostVar.getKey(), hostVar.getValue().getAsString());
+                String strValue = hostVar.getValue().getAsString();
+
+                if ((strValue.trim().startsWith("{") && strValue.trim().endsWith("}")) ||
+                        (strValue.trim().startsWith("[") && strValue.trim().endsWith("]"))) {
+                  try {
+                    JsonElement parsed = JsonParser.parseString(strValue);
+                    node.setAttribute(hostVar.getKey(), gson.toJson(parsed));
+                  } catch (Exception e) {
+                    node.setAttribute(hostVar.getKey(), strValue);
+                  }
+                } else {
+                  node.setAttribute(hostVar.getKey(), strValue);
+                }
               } else {
-                // Serialize attribute as Json (JsonArray or JsonObject)
                 node.setAttribute(hostVar.getKey(), gson.toJson(hostVar.getValue()));
               }
+
             }
           }
 
@@ -801,9 +815,15 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     Map<String, Object> nodeValues = InventoryList.getType(hostNode.getValue());
 
     applyNodeTags(node, nodeValues);
+    Gson gson = new Gson();
+
     nodeValues.forEach((key, value) -> {
       if (value != null) {
-        node.setAttribute(key, value.toString());
+        if (value instanceof Map || value instanceof List) {
+          node.setAttribute(key, gson.toJson(value));
+        } else {
+          node.setAttribute(key, value.toString());
+        }
       }
     });
 

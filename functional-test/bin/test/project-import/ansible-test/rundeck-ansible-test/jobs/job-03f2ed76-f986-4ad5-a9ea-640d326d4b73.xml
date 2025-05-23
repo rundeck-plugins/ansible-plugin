@@ -1,0 +1,50 @@
+<joblist>
+  <job>
+    <context>
+      <options preserveOrder='true'>
+        <option name='password' secure='true' storagePath='keys/project/ansible-test/ssh-node.pass' valueExposed='true' />
+        <option name='username' value='rundeck' />
+      </options>
+    </context>
+    <defaultTab>nodes</defaultTab>
+    <description></description>
+    <dispatch>
+      <excludePrecedence>true</excludePrecedence>
+      <keepgoing>false</keepgoing>
+      <rankOrder>ascending</rankOrder>
+      <successOnEmptyNodeFilter>false</successOnEmptyNodeFilter>
+      <threadcount>1</threadcount>
+    </dispatch>
+    <executionEnabled>true</executionEnabled>
+    <group>Ansible</group>
+    <id>03f2ed76-f986-4ad5-a9ea-640d326d4b73</id>
+    <loglevel>INFO</loglevel>
+    <name>simple-file-playbook</name>
+    <nodeFilterEditable>false</nodeFilterEditable>
+    <nodefilters>
+      <filter>name: ssh-node </filter>
+    </nodefilters>
+    <nodesSelectedByDefault>true</nodesSelectedByDefault>
+    <plugins />
+    <scheduleEnabled>true</scheduleEnabled>
+    <sequence keepgoing='false' strategy='node-first'>
+      <command>
+        <node-step-plugin type='com.batix.rundeck.plugins.AnsiblePlaybookWorflowNodeStep'>
+          <configuration>
+            <entry key='ansible-base-dir-path' value='/home/rundeck/ansible' />
+            <entry key='ansible-become' value='false' />
+            <entry key='ansible-encrypt-extra-vars' value='true' />
+            <entry key='ansible-extra-vars' value='username: ${option.username}&#10;test: "functional-test"' />
+            <entry key='ansible-playbook' value='/home/rundeck/ansible/playbook.yaml' />
+            <entry key='ansible-ssh-auth-type' value='privateKey' />
+            <entry key='ansible-ssh-key-storage-path' value='keys/project/ansible-test/ssh-node.key' />
+            <entry key='ansible-ssh-passphrase-option' value='option.password' />
+            <entry key='ansible-ssh-use-agent' value='false' />
+            <entry key='ansible-ssh-user' value='rundeck' />
+          </configuration>
+        </node-step-plugin>
+      </command>
+    </sequence>
+    <uuid>03f2ed76-f986-4ad5-a9ea-640d326d4b73</uuid>
+  </job>
+</joblist>
