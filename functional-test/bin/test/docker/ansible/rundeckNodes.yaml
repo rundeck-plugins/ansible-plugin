@@ -1,6 +1,0 @@
-ssh-node-password:
-  nodename: ssh-node-password
-  hostname: ssh-node
-  osFamily: Linux
-  username: rundeck
-  tags: ''

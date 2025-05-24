@@ -1,8 +1,0 @@
-by:
-  urn: project:sshPasswordProject
-for:
-  storage:
-    - match: 
-        path: 'keys/project/sshPasswordProject/.*'
-      allow: [read] 
-description: Allow access to key storage
