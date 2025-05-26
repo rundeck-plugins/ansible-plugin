@@ -163,6 +163,67 @@ class AnsibleResourceModelSourceSpec extends Specification {
         then: "throws an exception because data is too big to be precessed"
         thrown(ResourceModelSourceException)
     }
+    void "structured data like ports is serialized as JSON when gather facts is false"() {
+        given:
+        def nodeName = 'NODE_JSON'
+        def structuredPorts = [
+                [port: 22, protocol: 'tcp', service: 'ssh', state: 'open'],
+                [port: 80, protocol: 'tcp', service: 'http', state: 'open']
+        ]
+
+        Framework framework = Mock(Framework) {
+            getPropertyLookup() >> Mock(IPropertyLookup){
+                getProperty("framework.tmp.dir") >> '/tmp'
+            }
+            getBaseDir() >> Mock(File) {
+                getAbsolutePath() >> '/tmp'
+            }
+        }
+        ResourceModelSource plugin = new AnsibleResourceModelSource(framework)
+        Properties config = new Properties()
+        config.put('project', 'project_1')
+        config.put(AnsibleDescribable.ANSIBLE_GATHER_FACTS, 'false')
+        plugin.configure(config)
+
+        Services services = Mock(Services) {
+            getService(KeyStorageTree.class) >> Mock(KeyStorageTree)
+        }
+        plugin.setServices(services)
+
+        def host = [(nodeName): [
+                'ports': structuredPorts
+        ]]
+        def hosts = ['hosts': host]
+        def groups = ['ungrouped': hosts]
+        def children = ['children': groups]
+        def all = ['all': children]
+
+        Yaml yaml = new Yaml()
+        String result = yaml.dump(all)
+
+        AnsibleInventoryListBuilder inventoryListBuilder = Mock(AnsibleInventoryListBuilder) {
+            build() >> Mock(AnsibleInventoryList) {
+                getNodeList() >> result
+            }
+        }
+
+        plugin.ansibleInventoryListBuilder = inventoryListBuilder
+
+        when:
+        INodeSet nodes = plugin.getNodes()
+        INodeEntry node = nodes.getNode(nodeName)
+
+        then:
+        node != null
+        node.getAttributes().containsKey("ports")
+
+        and:
+        def portsJson = node.getAttributes().get("ports")
+        portsJson.startsWith("[")
+        portsJson.contains("\"port\":22")
+        portsJson.contains("\"service\":\"ssh\"")
+    }
+
 
     void "tag hosts is empty"() {
         given:
