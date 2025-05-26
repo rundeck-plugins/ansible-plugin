@@ -73,6 +73,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
   private static final Logger logger = LoggerFactory.getLogger(AnsibleResourceModelSource.class);
   public static final String HOST_TPL_J2 = "host-tpl.j2";
   public static final String GATHER_HOSTS_YML = "gather-hosts.yml";
+  private final Gson gson = new Gson();
 
   @Setter
   private Framework framework;
@@ -804,7 +805,6 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     Map<String, Object> nodeValues = InventoryList.getType(hostNode.getValue());
 
     applyNodeTags(node, nodeValues);
-    Gson gson = new Gson();
 
     nodeValues.forEach((key, value) -> {
       if (value != null) {
