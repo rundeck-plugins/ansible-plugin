@@ -804,7 +804,6 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     Map<String, Object> nodeValues = InventoryList.getType(hostNode.getValue());
 
     applyNodeTags(node, nodeValues);
-    Gson gson = new Gson();
 
     nodeValues.forEach((key, value) -> {
       if (value != null) {
