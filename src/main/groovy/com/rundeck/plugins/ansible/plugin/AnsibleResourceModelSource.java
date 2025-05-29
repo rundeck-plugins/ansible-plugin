@@ -32,6 +32,8 @@ import org.apache.commons.lang.StringUtils;
 import org.rundeck.app.spi.Services;
 import org.rundeck.storage.api.PathUtil;
 import org.rundeck.storage.api.StorageException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.SafeConstructor;
@@ -68,8 +70,10 @@ import static com.rundeck.plugins.ansible.ansible.InventoryList.NodeTag;
 @Slf4j
 public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRunnerPlugin {
 
+  private static final Logger logger = LoggerFactory.getLogger(AnsibleResourceModelSource.class);
   public static final String HOST_TPL_J2 = "host-tpl.j2";
   public static final String GATHER_HOSTS_YML = "gather-hosts.yml";
+  private final Gson gson = new Gson();
 
   @Setter
   private Framework framework;
@@ -801,9 +805,14 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     Map<String, Object> nodeValues = InventoryList.getType(hostNode.getValue());
 
     applyNodeTags(node, nodeValues);
+
     nodeValues.forEach((key, value) -> {
       if (value != null) {
-        node.setAttribute(key, value.toString());
+        if (value instanceof Map || value instanceof List) {
+          node.setAttribute(key, gson.toJson(value));
+        } else {
+          node.setAttribute(key, value.toString());
+        }
       }
     });
 
