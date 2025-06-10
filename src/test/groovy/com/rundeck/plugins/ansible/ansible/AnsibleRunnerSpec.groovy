@@ -264,6 +264,54 @@ class AnsibleRunnerSpec extends Specification{
 
     }
 
+    def "test skip empty extra vars"() {
+        given:
+        String playbook = "test"
+        String privateKey = "privateKey"
+        String extraVars = "test: 123\nemptyVar: "  // emptyVar is empty → should be skipped
+
+        def runnerBuilder = AnsibleRunner.playbookInline(playbook)
+        runnerBuilder.encryptExtraVars(true)
+        runnerBuilder.sshPrivateKey(privateKey)
+        runnerBuilder.extraVars(extraVars)
+
+        def process = Mock(Process) {
+            waitFor() >> 0
+            getInputStream() >> new ByteArrayInputStream("".getBytes())
+            getOutputStream() >> new ByteArrayOutputStream()
+            getErrorStream() >> new ByteArrayInputStream("".getBytes())
+        }
+
+        def processExecutor = Mock(ProcessExecutor) {
+            run() >> process
+        }
+
+        def processBuilder = Mock(ProcessExecutor.ProcessExecutorBuilder) {
+            build() >> processExecutor
+        }
+
+        def ansibleVault = Mock(AnsibleVault) {
+            checkAnsibleVault() >> true
+            getVaultPasswordScriptFile() >> new File("vault-script-client.py")
+        }
+
+        runnerBuilder.processExecutorBuilder(processBuilder)
+        runnerBuilder.ansibleVault(ansibleVault)
+        runnerBuilder.customTmpDirPath("/tmp")
+
+        when:
+        AnsibleRunner runner = runnerBuilder.build()
+        def result = runner.run()
+
+        then:
+        // Only 1 encryptVariable call — "test" — "emptyVar" is skipped
+        1 * ansibleVault.encryptVariable(_,_) >> "!vault | value"
+        result == 0
+        !runner.getTempPlaybook().exists()
+        !runner.getTempVarsFile().exists()
+    }
+
+
     def "test password authentication with encrypted extra vars "(){
         given:
 
