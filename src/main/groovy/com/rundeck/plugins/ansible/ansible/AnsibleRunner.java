@@ -755,41 +755,61 @@ public class AnsibleRunner {
     public String encryptExtraVarsKey(String extraVars) throws Exception {
         Map<String, String> extraVarsMap = new HashMap<>();
         Map<String, String> encryptedExtraVarsMap = new HashMap<>();
-        try {
-            extraVarsMap = mapperYaml.readValue(extraVars, new TypeReference<Map<String, String>>() {
-            });
 
+        // Try parsing as YAML first
+        try {
+            extraVarsMap = mapperYaml.readValue(extraVars, new TypeReference<Map<String, String>>() {});
         } catch (Exception e) {
+            // If YAML fails, try parsing as JSON
             try {
-                extraVarsMap = mapperJson.readValue(extraVars, new TypeReference<Map<String, String>>() {
-                });
+                extraVarsMap = mapperJson.readValue(extraVars, new TypeReference<Map<String, String>>() {});
             } catch (Exception e2) {
                 throw new AnsibleException("ERROR: cannot parse extra var values: " + e2.getMessage(),
                         AnsibleException.AnsibleFailureReason.AnsibleNonZero);
             }
         }
 
+        // Validate that we got a valid map
+        if (extraVarsMap == null || extraVarsMap.isEmpty()) {
+            throw new AnsibleException("ERROR: extraVars is empty or could not be parsed.",
+                    AnsibleException.AnsibleFailureReason.AnsibleNonZero);
+        }
+
         try {
             for (Map.Entry<String, String> entry : extraVarsMap.entrySet()) {
                 String key = entry.getKey();
                 String value = entry.getValue();
+
+                // Skip null or empty values
+                if (value == null || value.trim().isEmpty()) {
+                    System.err.println("WARN: Skipping empty extra-var for key: " + key);
+                    continue;
+                }
+
                 String encryptedKey = ansibleVault.encryptVariable(key, value);
                 if (encryptedKey != null) {
                     encryptedExtraVarsMap.put(key, encryptedKey);
                 }
             }
         } catch (Exception e) {
-            throw new AnsibleException("ERROR: cannot parse extra var values: " + e.getMessage(),
+            throw new AnsibleException("ERROR: cannot encrypt extra var values: " + e.getMessage(),
                     AnsibleException.AnsibleFailureReason.AnsibleNonZero);
         }
 
+        // If no valid entries remain, also fail early
+        if (encryptedExtraVarsMap.isEmpty()) {
+            throw new AnsibleException("ERROR: all extraVars were empty or could not be encrypted.",
+                    AnsibleException.AnsibleFailureReason.AnsibleNonZero);
+        }
+
+        // Build the result string
         StringBuilder stringBuilder = new StringBuilder();
         encryptedExtraVarsMap.forEach((key, value) -> {
-            stringBuilder.append(key).append(":");
-            stringBuilder.append(" ").append(value).append("\n");
+            stringBuilder.append(key).append(":").append(" ").append(value).append("\n");
         });
 
         return stringBuilder.toString();
     }
+
 
 }

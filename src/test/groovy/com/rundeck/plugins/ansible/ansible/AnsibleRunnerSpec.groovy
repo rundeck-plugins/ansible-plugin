@@ -112,12 +112,14 @@ class AnsibleRunnerSpec extends Specification{
     }
 
 
-    def "test clean temporary directory"(){
+    def "test clean temporary directory"() {
         given:
         def tmpDirectory = File.createTempDir("ansible-runner-test-", "tmp")
         String playbook = "test"
         String privateKey = "privateKey"
-        String extraVars = "test: 123\ntest2: 456"
+
+        // IMPORTANT: At least one valid extra var so encryptVariable() is called
+        String extraVars = "test: 123\ntest2: "  // test2 empty, test valid
 
         def runner = AnsibleRunner.playbookInline(playbook)
         runner.encryptExtraVars(true)
@@ -126,25 +128,25 @@ class AnsibleRunnerSpec extends Specification{
         runner.extraVars(extraVars)
         runner.customTmpDirPath("/tmp")
 
-        def process = Mock(Process){
+        def process = Mock(Process) {
             waitFor() >> 0
-            getInputStream()>> new ByteArrayInputStream("".getBytes())
+            getInputStream() >> new ByteArrayInputStream("".getBytes())
             getOutputStream() >> new ByteArrayOutputStream()
             getErrorStream() >> new ByteArrayInputStream("".getBytes())
         }
 
-        def processExecutor = Mock(ProcessExecutor){
-            run()>>process
+        def processExecutor = Mock(ProcessExecutor) {
+            run() >> process
         }
 
-        def processBuilder = Mock(ProcessExecutor.ProcessExecutorBuilder){
+        def processBuilder = Mock(ProcessExecutor.ProcessExecutorBuilder) {
             build() >> processExecutor
         }
 
-        def ansibleVault = Mock(AnsibleVault){
+        def ansibleVault = Mock(AnsibleVault) {
             checkAnsibleVault() >> true
             getVaultPasswordScriptFile() >> new File("vault-script-client.py")
-            encryptVariable(_,_) >> { throw new Exception("Error encrypting value") }
+            encryptVariable(_ as String, _ as String) >> { throw new Exception("Error encrypting value") }  // should be called for "test"
         }
 
         runner.processExecutorBuilder(processBuilder)
@@ -155,43 +157,44 @@ class AnsibleRunnerSpec extends Specification{
 
         then:
         def e = thrown(Exception)
-        e.message.contains("cannot parse extra var values")
+        e.message.contains("cannot encrypt extra var values")  // <--- updated message (your new function throws "cannot encrypt")
 
         !tmpDirectory.exists()
     }
 
-    def "test clean temporary files when a exception is trigger"(){
-        given:
 
+    def "test clean temporary files when a exception is trigger"() {
+        given:
         String playbook = "test"
         String privateKey = "privateKey"
-        String extraVars = "test: 123\ntest2: 456"
+
+        // IMPORTANT: At least one valid extra var so encryptVariable() is called
+        String extraVars = "test: 123\ntest2: "  // test2 empty, test valid
 
         def runnerBuilder = AnsibleRunner.playbookInline(playbook)
         runnerBuilder.encryptExtraVars(true)
         runnerBuilder.sshPrivateKey(privateKey)
         runnerBuilder.extraVars(extraVars)
 
-        def process = Mock(Process){
+        def process = Mock(Process) {
             waitFor() >> 0
-            getInputStream()>> new ByteArrayInputStream("".getBytes())
+            getInputStream() >> new ByteArrayInputStream("".getBytes())
             getOutputStream() >> new ByteArrayOutputStream()
             getErrorStream() >> new ByteArrayInputStream("".getBytes())
         }
 
-        def processExecutor = Mock(ProcessExecutor){
-            run()>>process
+        def processExecutor = Mock(ProcessExecutor) {
+            run() >> process
         }
 
-        def processBuilder = Mock(ProcessExecutor.ProcessExecutorBuilder){
+        def processBuilder = Mock(ProcessExecutor.ProcessExecutorBuilder) {
             build() >> processExecutor
         }
 
-
-        def ansibleVault = Mock(AnsibleVault){
+        def ansibleVault = Mock(AnsibleVault) {
             checkAnsibleVault() >> true
             getVaultPasswordScriptFile() >> new File("vault-script-client.py")
-            encryptVariable(_,_) >> { throw new Exception("Error encrypting value") }
+            encryptVariable(_ as String, _ as String) >> { throw new Exception("Error encrypting value") }  // should be called for "test"
         }
 
         runnerBuilder.processExecutorBuilder(processBuilder)
@@ -204,12 +207,11 @@ class AnsibleRunnerSpec extends Specification{
 
         then:
         def e = thrown(Exception)
-        e.message.contains("cannot parse extra var values")
+        e.message.contains("cannot encrypt extra var values")  // <--- updated message
 
         !runner.getTempPlaybook().exists()
-
-
     }
+
 
     def "test clean temporary files when process finished"(){
         given:
@@ -261,6 +263,54 @@ class AnsibleRunnerSpec extends Specification{
 
 
     }
+
+    def "test skip empty extra vars"() {
+        given:
+        String playbook = "test"
+        String privateKey = "privateKey"
+        String extraVars = "test: 123\nemptyVar: "  // emptyVar is empty → should be skipped
+
+        def runnerBuilder = AnsibleRunner.playbookInline(playbook)
+        runnerBuilder.encryptExtraVars(true)
+        runnerBuilder.sshPrivateKey(privateKey)
+        runnerBuilder.extraVars(extraVars)
+
+        def process = Mock(Process) {
+            waitFor() >> 0
+            getInputStream() >> new ByteArrayInputStream("".getBytes())
+            getOutputStream() >> new ByteArrayOutputStream()
+            getErrorStream() >> new ByteArrayInputStream("".getBytes())
+        }
+
+        def processExecutor = Mock(ProcessExecutor) {
+            run() >> process
+        }
+
+        def processBuilder = Mock(ProcessExecutor.ProcessExecutorBuilder) {
+            build() >> processExecutor
+        }
+
+        def ansibleVault = Mock(AnsibleVault) {
+            checkAnsibleVault() >> true
+            getVaultPasswordScriptFile() >> new File("vault-script-client.py")
+        }
+
+        runnerBuilder.processExecutorBuilder(processBuilder)
+        runnerBuilder.ansibleVault(ansibleVault)
+        runnerBuilder.customTmpDirPath("/tmp")
+
+        when:
+        AnsibleRunner runner = runnerBuilder.build()
+        def result = runner.run()
+
+        then:
+        // Only 1 encryptVariable call — "test" — "emptyVar" is skipped
+        1 * ansibleVault.encryptVariable(_,_) >> "!vault | value"
+        result == 0
+        !runner.getTempPlaybook().exists()
+        !runner.getTempVarsFile().exists()
+    }
+
 
     def "test password authentication with encrypted extra vars "(){
         given:
