@@ -1,25 +1,19 @@
 name: Java CI
 
-on: [push]
+on: [push, pull_request]
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
-
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Get Fetch Tags
-        run: git -c protocol.version=2 fetch --tags --progress --no-recurse-submodules origin
-        if: "!contains(github.ref, 'refs/tags')"
-      - name: Set up JDK 1.11
-        uses: actions/setup-java@v1
+      - name: Set up JDK 11
+        uses: actions/setup-java@v4
         with:
-          java-version: 11
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
+          java-version: '11'
+          distribution: 'zulu'
       - name: Build with Gradle
         run: ./gradlew build
       - name: Copy Artifact for integration test
@@ -28,11 +22,9 @@ jobs:
         run: ./gradlew :functional-test:functionalTest
       - name: Get Release Version
         id: get_version
-        run: VERSION=$(./gradlew currentVersion -q -Prelease.quiet) && echo ::set-output name=VERSION::$VERSION
+        run: VERSION=$(./gradlew currentVersion -q -Prelease.quiet) && echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
       - name: Upload plugin jar
         uses: actions/upload-artifact@v4
         with:
-          # Artifact name
-          name: Grails-Plugin-${{ steps.get_version.outputs.VERSION }}
-          # Directory containing files to upload
+          name: ansible-plugin-${{ steps.get_version.outputs.VERSION }}
           path: build/libs/ansible-plugin-${{ steps.get_version.outputs.VERSION }}.jar
