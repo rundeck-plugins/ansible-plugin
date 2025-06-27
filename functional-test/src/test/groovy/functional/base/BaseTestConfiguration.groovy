@@ -23,6 +23,7 @@ class BaseTestConfiguration extends Specification{
     public static final String NODE_KEY_PASSPHRASE = "testpassphrase123"
     public static final String USER_VAULT_PASSWORD = "vault123"
     public static final String ENCRYPTED_INVENTORY_VAULT_PASSWORD = "123456"
+    public static final String USER_VAULT_PASSWORD_FILE_MULTILINE = "multiline\npassword\n"
 
     def startCompose() {
         if(rundeckEnvironment==null){
@@ -106,6 +107,10 @@ class BaseTestConfiguration extends Specification{
         //user vault password
         requestBody = RequestBody.create(USER_VAULT_PASSWORD.getBytes(), Client.MEDIA_TYPE_X_RUNDECK_PASSWORD)
         keyResult = client.apiCall {api-> api.createKeyStorage("project/$projectName/vault-user.pass", requestBody)}
+
+        //user vault password
+        requestBody = RequestBody.create(USER_VAULT_PASSWORD_FILE_MULTILINE.getBytes(), Client.MEDIA_TYPE_X_RUNDECK_PASSWORD)
+        keyResult = client.apiCall {api-> api.createKeyStorage("project/$projectName/vault-multiline.pass", requestBody)}
 
         //add encrypted inventory password
         requestBody = RequestBody.create(ENCRYPTED_INVENTORY_VAULT_PASSWORD.getBytes(), Client.MEDIA_TYPE_X_RUNDECK_PASSWORD)
