@@ -48,7 +48,7 @@ configurations {
 
 dependencies {
   pluginLibs 'com.google.code.gson:gson:2.10.1'
-  implementation('org.rundeck:rundeck-core:5.14.0-rc1-20250722')
+  implementation('org.rundeck:rundeck-core:5.15.0')
   implementation 'org.codehaus.groovy:groovy-all:3.0.15'
   pluginLibs group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: '2.16.1'
   pluginLibs group: 'com.fasterxml.jackson.dataformat', name: 'jackson-dataformat-yaml', version: '2.16.1'
