@@ -110,6 +110,7 @@ Become password configuration is very similar to ssh password, you can use eithe
 ## Installation ##
 
 - [Download the .jar file from GitHub](https://github.com/rundeck-plugins/ansible-plugin/releases) or compile it yourself (using Gradle, either your own the included wrapper)
+  - **Note**: This project now uses Gradle Version Catalogs for dependency management and includes security-hardened dependency versions
 - Copy the .jar file to your Rundeck plugins directory (`/var/lib/rundeck/libext` if you installed the .deb, for example)
 - Create a new project (this assumes you want every node in your project to be controlled via Ansible)
 - Choose "Ansible Resource Model Source" as the resource model source

@@ -1,2 +1,4 @@
+enableFeaturePreview('VERSION_CATALOGS')
+
 rootProject.name = 'ansible-plugin'
 include 'functional-test'

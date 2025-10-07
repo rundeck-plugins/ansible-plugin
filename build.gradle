@@ -40,6 +40,17 @@ repositories {
 
 configurations {
   pluginLibs
+  
+  // Security: Force resolution of vulnerable dependencies
+  all {
+    resolutionStrategy {
+      force 'org.apache.commons:commons-lang3:3.18.0'
+      force 'org.apache.commons:commons-compress:1.28.0'
+      force 'org.jetbrains.kotlin:kotlin-stdlib:2.1.0'
+      // Exclude old commons-lang to prevent conflicts
+      exclude group: 'commons-lang', module: 'commons-lang'
+    }
+  }
 
   implementation {
     extendsFrom pluginLibs
@@ -47,20 +58,24 @@ configurations {
 }
 
 dependencies {
-  pluginLibs 'com.google.code.gson:gson:2.10.1'
-  implementation('org.rundeck:rundeck-core:5.14.0-rc1-20250722')
-  implementation 'org.codehaus.groovy:groovy-all:3.0.15'
-  pluginLibs group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: '2.16.1'
-  pluginLibs group: 'com.fasterxml.jackson.dataformat', name: 'jackson-dataformat-yaml', version: '2.16.1'
-  implementation "org.yaml:snakeyaml:2.2"
+  pluginLibs libs.gson
+  implementation libs.rundeck.core
+  implementation libs.groovy.all
+  pluginLibs libs.jackson.core
+  pluginLibs libs.jackson.dataformat.yaml
+  implementation libs.snakeyaml
 
-  compileOnly 'org.projectlombok:lombok:1.18.30'
-  annotationProcessor 'org.projectlombok:lombok:1.18.30'
+  // Security: Explicit inclusion of secure versions
+  implementation libs.commons.lang3
+  implementation libs.commons.compress
 
-  testCompileOnly 'org.projectlombok:lombok:1.18.30'
-  testAnnotationProcessor 'org.projectlombok:lombok:1.18.30'
+  compileOnly libs.lombok
+  annotationProcessor libs.lombok
 
-  testImplementation "org.spockframework:spock-core:2.1-groovy-3.0"
+  testCompileOnly libs.lombok
+  testAnnotationProcessor libs.lombok
+
+  testImplementation libs.spock.core
 
 }
 
