@@ -16,15 +16,27 @@ configurations {
             canBeConsumed = false
         }
     }
+    
+    // Security: Force resolution of vulnerable dependencies
+    all {
+        resolutionStrategy {
+            force 'org.apache.commons:commons-compress:1.28.0'
+            force 'org.jetbrains.kotlin:kotlin-stdlib:2.1.0'
+        }
+    }
 }
 dependencies {
-    testImplementation "org.spockframework:spock-core:2.1-groovy-3.0"
+    testImplementation libs.spock.core
 
-    testImplementation "org.testcontainers:testcontainers:1.17.2"
-    testImplementation "org.testcontainers:spock:1.17.2"
-    testImplementation group: 'org.rundeck.api', name: 'rd-api-client', version: '2.0.8'
+    testImplementation libs.testcontainers
+    testImplementation libs.testcontainers.spock
+    testImplementation libs.rd.api.client
 
-    testImplementation group: 'com.jcraft', name: 'jsch', version: '0.1.55'
+    testImplementation libs.jsch
+
+    // Security: Explicit inclusion of secure versions to override transitive dependencies
+    testImplementation libs.commons.compress
+    testImplementation libs.kotlin.stdlib
 
 }
 

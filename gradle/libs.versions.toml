@@ -1,0 +1,39 @@
+[versions]
+# Security-fixed versions
+commons-lang3 = "3.18.0"
+commons-compress = "1.28.0"
+kotlin-stdlib = "2.1.0"
+
+# Current dependency versions (maintained for compatibility)
+gson = "2.10.1"
+jackson = "2.16.1"
+snakeyaml = "2.2"
+groovy = "3.0.15"
+lombok = "1.18.30"
+spock = "2.1-groovy-3.0"
+testcontainers = "1.19.0"
+rd-api-client = "2.0.8"
+jsch = "0.1.55"
+
+# Rundeck version
+rundeck-core = "5.16.0-20251006"
+
+[libraries]
+# Security overrides
+commons-lang3 = { module = "org.apache.commons:commons-lang3", version.ref = "commons-lang3" }
+commons-compress = { module = "org.apache.commons:commons-compress", version.ref = "commons-compress" }
+kotlin-stdlib = { module = "org.jetbrains.kotlin:kotlin-stdlib", version.ref = "kotlin-stdlib" }
+
+# Main dependencies
+gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
+jackson-core = { module = "com.fasterxml.jackson.core:jackson-core", version.ref = "jackson" }
+jackson-dataformat-yaml = { module = "com.fasterxml.jackson.dataformat:jackson-dataformat-yaml", version.ref = "jackson" }
+snakeyaml = { module = "org.yaml:snakeyaml", version.ref = "snakeyaml" }
+groovy-all = { module = "org.codehaus.groovy:groovy-all", version.ref = "groovy" }
+lombok = { module = "org.projectlombok:lombok", version.ref = "lombok" }
+spock-core = { module = "org.spockframework:spock-core", version.ref = "spock" }
+testcontainers = { module = "org.testcontainers:testcontainers", version.ref = "testcontainers" }
+testcontainers-spock = { module = "org.testcontainers:spock", version.ref = "testcontainers" }
+rd-api-client = { module = "org.rundeck.api:rd-api-client", version.ref = "rd-api-client" }
+jsch = { module = "com.jcraft:jsch", version.ref = "jsch" }
+rundeck-core = { module = "org.rundeck:rundeck-core", version.ref = "rundeck-core" }
