@@ -515,7 +515,9 @@ public class AnsibleRunner {
             if (type == AnsibleCommand.AdHoc){
                 processEnvironment.put("ANSIBLE_LOAD_CALLBACK_PLUGINS", "1");
                 processEnvironment.put("ANSIBLE_CALLBACKS_ENABLED", "ansible.builtin.tree");
-                processEnvironment.put("ANSIBLE_CALLBACK_TREE_DIR", baseDirectory.toFile().getAbsolutePath());
+                if (baseDirectory != null) {
+                    processEnvironment.put("ANSIBLE_CALLBACK_TREE_DIR", baseDirectory.toFile().getAbsolutePath());
+                }
             }
 
             if (configFile != null && !configFile.isEmpty()) {
