@@ -393,7 +393,8 @@ public class AnsibleRunner {
             }
 
             if (inventory != null && !inventory.isEmpty()) {
-                procArgs.add("--inventory-file" + "=" + inventory);
+                procArgs.add("-i");
+                procArgs.add(inventory);
             }
 
             if (limits != null && limits.size() == 1) {
