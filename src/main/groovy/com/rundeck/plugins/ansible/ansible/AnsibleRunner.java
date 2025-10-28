@@ -351,6 +351,7 @@ public class AnsibleRunner {
         List<String> procArgs = new ArrayList<>();
         Process proc = null;
 
+        final boolean isAdHoc = (type == AnsibleCommand.AdHoc);
         try {
 
             String ansibleCommand = type.command;
@@ -360,7 +361,7 @@ public class AnsibleRunner {
             procArgs.add(ansibleCommand);
 
             // parse arguments
-            if (type == AnsibleCommand.AdHoc) {
+            if (isAdHoc) {
                 procArgs.add("all");
 
                 procArgs.add("-m");
@@ -512,13 +513,7 @@ public class AnsibleRunner {
             //SET env variables
             Map<String, String> processEnvironment = new HashMap<>();
 
-            if (type == AnsibleCommand.AdHoc){
-                processEnvironment.put("ANSIBLE_LOAD_CALLBACK_PLUGINS", "1");
-                processEnvironment.put("ANSIBLE_CALLBACKS_ENABLED", "ansible.builtin.tree");
-                if (baseDirectory != null) {
-                    processEnvironment.put("ANSIBLE_CALLBACK_TREE_DIR", baseDirectory.toFile().getAbsolutePath());
-                }
-            }
+
 
             if (configFile != null && !configFile.isEmpty()) {
                 if (debug) {
@@ -530,6 +525,13 @@ public class AnsibleRunner {
 
             for (String optionName : this.options.keySet()) {
                 processEnvironment.put(optionName, this.options.get(optionName));
+            }
+            if (isAdHoc) {
+                processEnvironment.putIfAbsent("ANSIBLE_LOAD_CALLBACK_PLUGINS", "1");
+                processEnvironment.putIfAbsent("ANSIBLE_CALLBACKS_ENABLED", "ansible.builtin.tree");
+                if (baseDirectory != null) {
+                    processEnvironment.putIfAbsent("ANSIBLE_CALLBACK_TREE_DIR", baseDirectory.toFile().getAbsolutePath());
+                }
             }
 
             if (sshUseAgent && sshAgent != null) {
