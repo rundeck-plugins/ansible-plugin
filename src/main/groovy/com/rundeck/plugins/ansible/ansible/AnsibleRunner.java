@@ -370,8 +370,6 @@ public class AnsibleRunner {
                     procArgs.add("-a");
                     procArgs.add(arg);
                 }
-                procArgs.add("-t");
-                procArgs.add(baseDirectory.toFile().getAbsolutePath());
             } else if (type == AnsibleCommand.PlaybookPath) {
                 procArgs.add(playbook);
             } else if (type == AnsibleCommand.PlaybookInline) {
@@ -512,6 +510,12 @@ public class AnsibleRunner {
 
             //SET env variables
             Map<String, String> processEnvironment = new HashMap<>();
+
+            if (type == AnsibleCommand.AdHoc){
+                processEnvironment.put("ANSIBLE_LOAD_CALLBACK_PLUGINS", "1");
+                processEnvironment.put("ANSIBLE_CALLBACKS_ENABLED", "ansible.builtin.tree");
+                processEnvironment.put("ANSIBLE_CALLBACK_TREE_DIR", baseDirectory.toFile().getAbsolutePath());
+            }
 
             if (configFile != null && !configFile.isEmpty()) {
                 if (debug) {
