@@ -65,6 +65,20 @@ dependencies {
   pluginLibs libs.jackson.dataformat.yaml
   implementation libs.snakeyaml
 
+  components {
+    withModule("org.rundeck.api:rd-api-client") {
+      allVariants {
+        withDependencies { deps ->
+          deps.removeAll { it.group == "com.squareup.retrofit2" && it.name == "converter-jaxb" }
+          deps.removeAll { it.group == "javax.xml.bind" && it.name == "jaxb-api" }
+          deps.removeAll { it.group == "javax.activation" && it.name == "javax.activation-api" }
+        }
+      }
+    }
+  }
+
+  implementation "com.squareup.retrofit2:converter-gson:2.11.0"
+
   // Security: Explicit inclusion of secure versions
   implementation libs.commons.lang3
   implementation libs.commons.compress
