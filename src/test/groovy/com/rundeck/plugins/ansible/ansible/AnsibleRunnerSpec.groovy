@@ -408,4 +408,193 @@ class AnsibleRunnerSpec extends Specification{
         !runner.getTempSshVarsFile().exists()
         !runner.getTempBecameVarsFile().exists()
     }
+    def "adhoc: uses -i, no -t, and sets callback envs"() {
+        given:
+        def runnerBuilder = AnsibleRunner.adHoc("ansible.builtin.ping", null)
+                .inventory("/tmp/rdk-inv.ini")
+                .limits("target1")
+                .customTmpDirPath("/tmp")
+
+        def process = Mock(Process) {
+            waitFor() >> 0
+            getInputStream() >> new ByteArrayInputStream(new byte[0])
+            getOutputStream() >> new ByteArrayOutputStream()
+            getErrorStream() >> new ByteArrayInputStream(new byte[0])
+            destroy() >> { }
+        }
+        def processExecutor = Mock(ProcessExecutor) {
+            run() >> process
+        }
+
+        List capturedArgs = null
+        Map<String,String> capturedEnv = null
+
+        ProcessExecutor.ProcessExecutorBuilder processBuilder =
+                Mock(ProcessExecutor.ProcessExecutorBuilder)
+
+        // keep fluent chain by always returning the builder
+        processBuilder.build() >> processExecutor
+        processBuilder.procArgs(_ as List) >> { List a -> capturedArgs = new ArrayList(a); return processBuilder }
+        processBuilder.environmentVariables(_ as Map<String,String>) >> { Map<String,String> e -> capturedEnv = new HashMap<>(e); return processBuilder }
+        processBuilder.baseDirectory(_ as File) >> { File f -> return processBuilder }
+        processBuilder.stdinVariables(_ as List) >> { List v -> return processBuilder }
+        processBuilder.promptStdinLogFile(_ as File) >> { File f -> return processBuilder }
+        processBuilder.debug(_ as boolean) >> { boolean d -> return processBuilder }
+
+        runnerBuilder.processExecutorBuilder(processBuilder)
+
+        when:
+        def rc = runnerBuilder.build().run()
+
+        then:
+        rc == 0
+
+        // --- inventory & deprecation checks (flattened, robust) ---
+        def invPath = "/tmp/rdk-inv.ini"
+        assert capturedArgs != null : "proc args were null"
+
+        // Flatten in case the mock handed us a nested list (e.g., [[...]])
+        def flatArgs = capturedArgs.flatten().collect { it?.toString() }
+        println "Captured procArgs (flat): ${flatArgs}"
+
+        // preferred form: -i <path>
+        int iPos = flatArgs.indexOf("-i")
+        boolean hasDashISeparate = (iPos >= 0 && iPos + 1 < flatArgs.size() && flatArgs[iPos + 1] == invPath)
+
+        // defensive: -i=<path> or -i<path>
+        boolean hasDashIEquals = flatArgs.any { it == "-i=${invPath}" || it == "-i${invPath}" }
+
+        // must not use deprecated long flag (covers "--inventory-file" and "--inventory-file=/path")
+        boolean hasDeprecatedLong =
+                flatArgs.contains("--inventory-file") ||
+                        flatArgs.any { it.startsWith("--inventory-file=") }
+
+        assert (hasDashISeparate || hasDashIEquals) :
+                "Expected -i ${invPath} (or -i=${invPath}) in args, but got: ${flatArgs}"
+        assert !hasDeprecatedLong : "Found deprecated --inventory-file in args: ${flatArgs}"
+
+        // also ensure no '-t'
+        assert !flatArgs.contains("-t")
+
+        // env for ad-hoc tree replacement
+        assert capturedEnv != null : "env was null"
+        capturedEnv.get("ANSIBLE_LOAD_CALLBACK_PLUGINS") == "1"
+        capturedEnv.get("ANSIBLE_CALLBACKS_ENABLED") == "ansible.builtin.tree"
+        capturedEnv.get("ANSIBLE_CALLBACK_TREE_DIR") != null
+    }
+
+    def "playbook path: uses -i but does NOT set ad-hoc callback envs"() {
+        given:
+        def runnerBuilder = AnsibleRunner.playbookPath("/tmp/playbook.yml")
+                .inventory("/tmp/rdk-inv.ini")
+                .customTmpDirPath("/tmp")
+
+        def process = Mock(Process) {
+            waitFor() >> 0
+            getInputStream() >> new ByteArrayInputStream(new byte[0])
+            getOutputStream() >> new ByteArrayOutputStream()
+            getErrorStream() >> new ByteArrayInputStream(new byte[0])
+            destroy() >> { }
+        }
+        def processExecutor = Mock(ProcessExecutor) {
+            run() >> process
+        }
+
+        List capturedArgs = null
+        Map<String,String> capturedEnv = null
+
+        def processBuilder = Mock(ProcessExecutor.ProcessExecutorBuilder)
+        processBuilder.build() >> processExecutor
+        processBuilder.procArgs(_ as List) >> { List a -> capturedArgs = new ArrayList(a); return processBuilder }
+        processBuilder.environmentVariables(_ as Map<String,String>) >> { Map<String,String> e -> capturedEnv = new HashMap<>(e); return processBuilder }
+        processBuilder.baseDirectory(_ as File) >> { File f -> return processBuilder }
+        processBuilder.stdinVariables(_ as List) >> { List v -> return processBuilder }
+        processBuilder.promptStdinLogFile(_ as File) >> { File f -> return processBuilder }
+        processBuilder.debug(_ as boolean) >> { boolean d -> return processBuilder }
+
+        runnerBuilder.processExecutorBuilder(processBuilder)
+
+        when:
+        def rc = runnerBuilder.build().run()
+
+        then:
+        rc == 0
+        assert capturedArgs != null : "proc args were null"
+
+        // Flatten & stringify to avoid type surprises (and nested lists)
+        def flatArgs = capturedArgs.flatten().collect { it?.toString() }
+        println "Captured procArgs (flat): ${flatArgs}"
+
+        // inventory via -i (or -i=)
+        def invPath = "/tmp/rdk-inv.ini"
+        int iPos = flatArgs.indexOf("-i")
+        boolean hasDashISeparate = (iPos >= 0 && iPos + 1 < flatArgs.size() && flatArgs[iPos + 1] == invPath)
+        boolean hasDashIEquals   = flatArgs.any { it == "-i=${invPath}" || it == "-i${invPath}" }
+
+        // must not use deprecated long flag
+        boolean hasDeprecatedLong =
+                flatArgs.contains("--inventory-file") ||
+                        flatArgs.any { it.startsWith("--inventory-file=") }
+
+        assert (hasDashISeparate || hasDashIEquals) :
+                "Expected -i ${invPath} (or -i=${invPath}) in args, but got: ${flatArgs}"
+        assert !hasDeprecatedLong : "Found deprecated --inventory-file in args: ${flatArgs}"
+
+        // playbook path should NOT set the ad-hoc callback envs
+        assert capturedEnv != null : "env was null"
+        capturedEnv.get("ANSIBLE_LOAD_CALLBACK_PLUGINS") == null
+        capturedEnv.get("ANSIBLE_CALLBACKS_ENABLED") == null
+        capturedEnv.get("ANSIBLE_CALLBACK_TREE_DIR") == null
+    }
+
+
+    def "adhoc: respects user-provided callback envs (putIfAbsent)"() {
+        given:
+        def runnerBuilder = AnsibleRunner.adHoc("ansible.builtin.ping", null)
+                .inventory("/tmp/rdk-inv.ini")
+                .limits("target1")
+                .options([
+                        "ANSIBLE_CALLBACKS_ENABLED": "custom.callback",
+                        "ANSIBLE_LOAD_CALLBACK_PLUGINS": "0",
+                        "ANSIBLE_CALLBACK_TREE_DIR": "/tmp/custom-tree"
+                ])
+                .customTmpDirPath("/tmp")
+
+        def process = Mock(Process) {
+            waitFor() >> 0
+            getInputStream() >> new ByteArrayInputStream(new byte[0])
+            getOutputStream() >> new ByteArrayOutputStream()
+            getErrorStream() >> new ByteArrayInputStream(new byte[0])
+            destroy() >> { }
+        }
+        def processExecutor = Mock(ProcessExecutor) {
+            run() >> process
+        }
+
+        Map<String,String> capturedEnv = null
+
+        def processBuilder = Mock(ProcessExecutor.ProcessExecutorBuilder)
+        processBuilder.build() >> processExecutor
+        processBuilder.procArgs(_ as List<String>) >> { List<String> a -> return processBuilder }
+        processBuilder.environmentVariables(_ as Map<String,String>) >> { Map<String,String> e -> capturedEnv = new HashMap<>(e); return processBuilder }
+        processBuilder.baseDirectory(_ as File) >> { File f -> return processBuilder }
+        processBuilder.stdinVariables(_ as List) >> { List v -> return processBuilder }
+        processBuilder.promptStdinLogFile(_ as File) >> { File f -> return processBuilder }
+        processBuilder.debug(_ as boolean) >> { boolean d -> return processBuilder }
+
+        runnerBuilder.processExecutorBuilder(processBuilder)
+
+        when:
+        def rc = runnerBuilder.build().run()
+
+        then:
+        rc == 0
+        assert capturedEnv != null : "env was null"
+        // user-provided values win because putIfAbsent was used
+        capturedEnv.get("ANSIBLE_CALLBACKS_ENABLED") == "custom.callback"
+        capturedEnv.get("ANSIBLE_LOAD_CALLBACK_PLUGINS") == "0"
+        capturedEnv.get("ANSIBLE_CALLBACK_TREE_DIR") == "/tmp/custom-tree"
+    }
+
+
 }
