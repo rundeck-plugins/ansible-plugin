@@ -351,6 +351,7 @@ public class AnsibleRunner {
         List<String> procArgs = new ArrayList<>();
         Process proc = null;
 
+        final boolean isAdHoc = (type == AnsibleCommand.AdHoc);
         try {
 
             String ansibleCommand = type.command;
@@ -360,7 +361,7 @@ public class AnsibleRunner {
             procArgs.add(ansibleCommand);
 
             // parse arguments
-            if (type == AnsibleCommand.AdHoc) {
+            if (isAdHoc) {
                 procArgs.add("all");
 
                 procArgs.add("-m");
@@ -370,8 +371,6 @@ public class AnsibleRunner {
                     procArgs.add("-a");
                     procArgs.add(arg);
                 }
-                procArgs.add("-t");
-                procArgs.add(baseDirectory.toFile().getAbsolutePath());
             } else if (type == AnsibleCommand.PlaybookPath) {
                 procArgs.add(playbook);
             } else if (type == AnsibleCommand.PlaybookInline) {
@@ -395,7 +394,8 @@ public class AnsibleRunner {
             }
 
             if (inventory != null && !inventory.isEmpty()) {
-                procArgs.add("--inventory-file" + "=" + inventory);
+                procArgs.add("-i");
+                procArgs.add(inventory);
             }
 
             if (limits != null && limits.size() == 1) {
@@ -513,6 +513,8 @@ public class AnsibleRunner {
             //SET env variables
             Map<String, String> processEnvironment = new HashMap<>();
 
+
+
             if (configFile != null && !configFile.isEmpty()) {
                 if (debug) {
                     System.out.println(" ANSIBLE_CONFIG: " + configFile);
@@ -523,6 +525,16 @@ public class AnsibleRunner {
 
             for (String optionName : this.options.keySet()) {
                 processEnvironment.put(optionName, this.options.get(optionName));
+            }
+            if (isAdHoc) {
+                processEnvironment.putIfAbsent("ANSIBLE_LOAD_CALLBACK_PLUGINS", "1");
+                processEnvironment.putIfAbsent("ANSIBLE_CALLBACKS_ENABLED", "ansible.builtin.tree");
+                if (baseDirectory != null) {
+                    processEnvironment.putIfAbsent("ANSIBLE_CALLBACK_TREE_DIR", baseDirectory.toFile().getAbsolutePath());
+                }
+                // Legacy shim for 2.9–2.11:
+                // - whitelist instead of callbacks_enabled
+                processEnvironment.putIfAbsent("ANSIBLE_CALLBACK_WHITELIST", "tree");
             }
 
             if (sshUseAgent && sshAgent != null) {

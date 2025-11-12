@@ -65,6 +65,7 @@ dependencies {
   pluginLibs libs.jackson.dataformat.yaml
   implementation libs.snakeyaml
 
+
   // Security: Explicit inclusion of secure versions
   implementation libs.commons.lang3
   implementation libs.commons.compress
