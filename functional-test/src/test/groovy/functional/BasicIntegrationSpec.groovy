@@ -19,7 +19,7 @@ class BasicIntegrationSpec extends BaseTestConfiguration {
 
     def "ansible adhoc executor uses callback envs instead of -t"() {
         when:
-        // Reuse the existing node-executor job used in BasicIntegrationSpec
+
         def jobId = "6b309548-bcc9-40d8-8c79-bfc0d1f1e49c"
 
         JobRun request = new JobRun()
@@ -36,15 +36,15 @@ class BasicIntegrationSpec extends BaseTestConfiguration {
         executionState != null
         executionState.getExecutionState() == "SUCCEEDED"
 
-        // Our fix: no deprecation message about '-t' anywhere in the job logs
+        // no deprecation message about '-t' anywhere in the job logs
         logs.findAll { it.log.contains("DEPRECATION WARNING") && it.log.contains("'-t'") }.isEmpty()
 
-        // Optional: if you temporarily printed the env in AnsibleRunner, confirm our callback vars showed up.
-        // We make these soft assertions to avoid false negatives on environments that don't echo the env.
+        // Verify that the expected callback env vars were set.
+        //  assertions to avoid false negatives on environments that don't echo the env.
         def envLines = logs.findAll { it.log.contains("ANSIBLE_CALLBACKS_ENABLED") || it.log.contains("ANSIBLE_CALLBACK_TREE_DIR") }
         assert envLines == envLines // no-op; keep for readability
 
-        // Optional: if debug printed " procArgs: [...]" from AnsibleRunner, ensure '-t' isn't there either.
+        // if debug printed " procArgs: [...]" from AnsibleRunner, ensure '-t' isn't there either.
         def procArgsLines = logs.findAll { it.log.contains(" procArgs: [") }.collect { it.log }
         if (!procArgsLines.isEmpty()) {
             assert procArgsLines.every { !it.contains(" -t ") && !it.contains(",'-t',") }
