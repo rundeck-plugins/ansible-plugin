@@ -17,6 +17,42 @@ class BasicIntegrationSpec extends BaseTestConfiguration {
         configureRundeck(PROJ_NAME, DEFAULT_NODE_NAME)
     }
 
+    def "ansible adhoc executor uses callback envs instead of -t"() {
+        setup:
+        String ansibleNodeExecutorProjectName = "adhocNoTProject"
+        String nodeName = "ssh-node"
+        configureRundeck(ansibleNodeExecutorProjectName, nodeName)
+
+        when:
+        // This job should use an Ansible Ad-Hoc Node Executor (e.g. "ansible -m ping")
+        // Create or reference a job ID that runs ad-hoc module ping
+        def jobId = "adhoc-env-test-001" // replace with the actual job UUID if available
+        JobRun request = new JobRun()
+        request.loglevel = 'DEBUG'
+        def result = client.apiCall { api -> api.runJob(jobId, request) }
+        def executionId = result.id
+
+        def executionState = waitForJob(executionId)
+        def logs = getLogs(executionId)
+        Map<String, Integer> ansibleNodeExecutionStatus = TestUtil.getAnsibleNodeResult(logs)
+
+        then:
+        executionState != null
+        executionState.getExecutionState() == "SUCCEEDED"
+
+        // Should not log deprecated '-t' warning
+        logs.findAll { it.log.contains("DEPRECATION WARNING") }.isEmpty()
+
+        // Should have callback env variables printed (from debug)
+        logs.findAll { it.log.contains("ANSIBLE_CALLBACKS_ENABLED=ansible.builtin.tree") }.size() >= 1
+        logs.findAll { it.log.contains("ANSIBLE_CALLBACK_TREE_DIR") }.size() >= 1
+
+        // Confirm normal ad-hoc run stats
+        ansibleNodeExecutionStatus != null
+        ansibleNodeExecutionStatus.get("ok") > 0
+        ansibleNodeExecutionStatus.get("failed") == 0
+    }
+
     def "ansible node executor with ssh password"(){
         setup:
         String ansibleNodeExecutorProjectName = "sshPasswordProject"

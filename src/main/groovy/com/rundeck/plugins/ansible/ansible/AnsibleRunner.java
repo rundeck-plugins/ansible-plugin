@@ -532,6 +532,9 @@ public class AnsibleRunner {
                 if (baseDirectory != null) {
                     processEnvironment.putIfAbsent("ANSIBLE_CALLBACK_TREE_DIR", baseDirectory.toFile().getAbsolutePath());
                 }
+                // Legacy shim for 2.9–2.11:
+                // - whitelist instead of callbacks_enabled
+                processEnvironment.putIfAbsent("ANSIBLE_CALLBACK_WHITELIST", "tree");
             }
 
             if (sshUseAgent && sshAgent != null) {
