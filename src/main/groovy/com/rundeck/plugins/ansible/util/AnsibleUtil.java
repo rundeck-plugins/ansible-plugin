@@ -86,6 +86,16 @@ public class AnsibleUtil {
 
     }
 
+    public static List<String> getSecretsPathWorkflowSteps(AnsibleRunnerContextBuilder builder){
+        List<String> secretPaths = getSecretsPath(builder);
+        List<String> secretPathsNodes =builder.getListNodesKeyPath();
+
+        if(secretPathsNodes!=null && !secretPathsNodes.isEmpty()){
+            secretPaths.addAll(secretPathsNodes);
+        }
+        return secretPaths;
+    }
+
     public static Map<String, String> getRuntimeProperties(ExecutionContext context, String propertyPrefix) {
         Map<String, String> properties = null;
 

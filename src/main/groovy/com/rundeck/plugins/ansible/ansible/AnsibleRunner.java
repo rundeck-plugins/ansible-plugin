@@ -127,6 +127,15 @@ public class AnsibleRunner {
             ansibleRunnerBuilder.inventory(inventory);
         }
 
+        Boolean generateInventoryNodeAuth = contextBuilder.generateInventoryNodesAuth();
+        if(generateInventoryNodeAuth){
+            Map<String, Map<String, String>> nodesAuth = contextBuilder.getNodesAuthenticationMap();
+            if (nodesAuth != null && !nodesAuth.isEmpty()) {
+                ansibleRunnerBuilder.addNodeAuthToInventory(true);
+                ansibleRunnerBuilder.nodesAuthentication(nodesAuth);
+            }
+        }
+
         String limit = contextBuilder.getLimit();
         if (limit != null) {
             ansibleRunnerBuilder.limits(limit);
@@ -291,8 +300,12 @@ public class AnsibleRunner {
     File tempSshVarsFile ;
     File tempBecameVarsFile ;
     File vaultPromptFile;
+    File tempNodeAuthFile = null;
 
     String customTmpDirPath;
+
+    Boolean addNodeAuthToInventory;
+    Map<String, Map<String, String>> nodesAuthentication;
 
     public void deleteTempDirectory(Path tempDirectory) throws IOException {
         Files.walkFileTree(tempDirectory, new SimpleFileVisitor<Path>() {
@@ -396,6 +409,40 @@ public class AnsibleRunner {
             if (inventory != null && !inventory.isEmpty()) {
                 procArgs.add("-i");
                 procArgs.add(inventory);
+
+                if(addNodeAuthToInventory) {
+                    Map<String, String> hostUsers = new LinkedHashMap<>();
+                    Map<String, String> hostPasswords = new LinkedHashMap<>();
+                    nodesAuthentication.forEach((nodeName, authValues) -> {
+                        String user = authValues.get("ansible_user");
+                        String password = authValues.get("ansible_password");
+                        if (user != null) {
+                            hostUsers.put(nodeName, user);
+                        }
+                        if (password != null) {
+                            String encryptedPassword = password;
+                            if (useAnsibleVault) {
+                                try {
+                                    encryptedPassword = encryptExtraVarsKey(password);
+                                } catch (Exception e) {
+                                    throw new RuntimeException(e);
+                                }
+                            }
+                            hostPasswords.put(nodeName, encryptedPassword);
+                        }
+                    });
+                    // Build YAML structure
+                    Map<String, Object> yamlData = new LinkedHashMap<>();
+                    yamlData.put("host_passwords", hostPasswords);
+                    yamlData.put("host_users", hostUsers);
+                    try {
+                        String yamlContent = mapperYaml.writeValueAsString(yamlData);
+                        tempNodeAuthFile = AnsibleUtil.createTemporaryFile("", "all.yaml", yamlContent, customTmpDirPath);
+                    } catch (IOException e) {
+                        throw new RuntimeException("Failed to write all.yaml for node auth", e);
+                    }
+                }
+
             }
 
             if (limits != null && limits.size() == 1) {
@@ -512,8 +559,6 @@ public class AnsibleRunner {
 
             //SET env variables
             Map<String, String> processEnvironment = new HashMap<>();
-
-
 
             if (configFile != null && !configFile.isEmpty()) {
                 if (debug) {
@@ -661,6 +706,10 @@ public class AnsibleRunner {
 
             if(vaultPromptFile != null && !vaultPromptFile.delete()){
                 vaultPromptFile.deleteOnExit();
+            }
+
+            if (tempNodeAuthFile != null && !tempNodeAuthFile.delete()) {
+                tempNodeAuthFile.deleteOnExit();
             }
 
             if (usingTempDirectory && !retainTempDirectory) {
@@ -825,3 +874,4 @@ public class AnsibleRunner {
 
 
 }
+

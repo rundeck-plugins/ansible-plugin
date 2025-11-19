@@ -100,6 +100,7 @@ public interface AnsibleDescribable extends Describable {
     public static final String ANSIBLE_INVENTORY_INLINE = "ansible-inventory-inline";
     public static final String ANSIBLE_INVENTORY = "ansible-inventory";
     public static final String ANSIBLE_GENERATE_INVENTORY = "ansible-generate-inventory";
+    public static final String ANSIBLE_GENERATE_INVENTORY_NODES_AUTH = "ansible-generate-inventory-nodes-auth";
     public static final String ANSIBLE_MODULE = "ansible-module";
     public static final String ANSIBLE_MODULE_ARGS = "ansible-module-args";
     public static final String ANSIBLE_DEBUG = "ansible-debug";
@@ -232,6 +233,13 @@ public interface AnsibleDescribable extends Describable {
     .title("Generate inventory")
     .description("Generate Ansible inventory from Rundeck nodes.")
     .build();
+
+    static final Property GENERATE_INVENTORY_NODES_AUTH = PropertyBuilder.builder()
+            .booleanType(ANSIBLE_GENERATE_INVENTORY_NODES_AUTH)
+            .required(false)
+            .title("Generate inventory, pass node authentication from rundeck nodes")
+            .description("Pass authentication from rundeck nodes.")
+            .build();
 
     public static Property EXECUTABLE_PROP = PropertyUtil.freeSelect(
               ANSIBLE_EXECUTABLE,

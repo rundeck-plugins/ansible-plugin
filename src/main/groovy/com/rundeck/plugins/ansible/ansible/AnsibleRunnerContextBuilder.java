@@ -193,21 +193,26 @@ public class AnsibleRunnerContextBuilder {
 
             if (null != storagePath) {
                 //look up storage value
-                Path path = PathUtil.asPath(storagePath);
-                try {
-                    ResourceMeta contents = context.getStorageTree().getResource(path)
-                            .getContents();
-                    ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-                    contents.writeContent(byteArrayOutputStream);
-                    return byteArrayOutputStream.toString();
-                } catch (StorageException | IOException e) {
-                    throw new ConfigurationException("Failed to read the ssh password for " +
-                            "storage path: " + storagePath + ": " + e.getMessage());
-                }
+                return getPasswordFromPath(storagePath);
 
             } else {
                 return null;
             }
+        }
+    }
+
+    public String getPasswordFromPath(String storagePath) throws ConfigurationException {
+        //look up storage value
+        Path path = PathUtil.asPath(storagePath);
+        try {
+            ResourceMeta contents = context.getStorageTree().getResource(path)
+                    .getContents();
+            ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+            contents.writeContent(byteArrayOutputStream);
+            return byteArrayOutputStream.toString();
+        } catch (StorageException | IOException e) {
+            throw new ConfigurationException("Failed to read the ssh password for " +
+                    "storage path: " + storagePath + ": " + e.getMessage());
         }
     }
 
@@ -240,6 +245,23 @@ public class AnsibleRunnerContextBuilder {
                 getFrameworkProject(),
                 getFramework(),
                 getNode(),
+                getJobConf()
+        );
+
+        if (null != user && user.contains("${")) {
+            return DataContextUtils.replaceDataReferencesInString(user, getContext().getDataContext());
+        }
+        return user;
+    }
+
+    public String getSshNodeUser(INodeEntry node) {
+        final String user;
+        user = PropertyResolver.resolveProperty(
+                AnsibleDescribable.ANSIBLE_SSH_USER,
+                null,
+                getFrameworkProject(),
+                getFramework(),
+                node,
                 getJobConf()
         );
 
@@ -879,5 +901,85 @@ public class AnsibleRunnerContextBuilder {
             options.putAll(optionsContext);
         }
         return options;
+    }
+
+    public Map<String, Map<String, String>> getNodesAuthenticationMap(){
+
+        Map<String, Map<String, String>> authenticationNodesMap = new HashMap<>();
+
+        this.context.getNodes().forEach((node) -> {
+            String keyPath = PropertyResolver.resolveProperty(
+                    AnsibleDescribable.ANSIBLE_SSH_PASSWORD_STORAGE_PATH,
+                    null,
+                    getFrameworkProject(),
+                    getFramework(),
+                    node,
+                    getJobConf()
+            );
+
+            Map<String, String> auth = new HashMap<>();
+
+            if(null!=keyPath){
+                try {
+                    auth.put("ansible_password",getPasswordFromPath(keyPath) );
+                } catch (ConfigurationException e) {
+                    throw new RuntimeException(e);
+                }
+
+            }
+            String userName = getSshNodeUser(node);
+
+            if(null!=userName){
+                auth.put("ansible_user",userName );
+            }
+
+            authenticationNodesMap.put(node.getNodename(), auth);
+        });
+
+        return authenticationNodesMap;
+    }
+
+
+    public List<String> getListNodesKeyPath(){
+
+        List<String> secretPaths = new ArrayList<>();
+
+        this.context.getNodes().forEach((node) -> {
+            String keyPath = PropertyResolver.resolveProperty(
+                    AnsibleDescribable.ANSIBLE_SSH_KEYPATH,
+                    null,
+                    getFrameworkProject(),
+                    getFramework(),
+                    node,
+                    getJobConf()
+            );
+
+            if(null!=keyPath){
+                if(!secretPaths.contains(keyPath)){
+                    secretPaths.add(keyPath);
+                }
+
+            }
+        });
+
+        return secretPaths;
+    }
+
+
+    public Boolean generateInventoryNodesAuth() {
+        Boolean generateInventoryNodesAuth = null;
+        String sgenerateInventoryNodesAuth = PropertyResolver.resolveProperty(
+                AnsibleDescribable.ANSIBLE_GENERATE_INVENTORY_NODES_AUTH,
+                null,
+                getFrameworkProject(),
+                getFramework(),
+                getNode(),
+                getJobConf()
+        );
+
+        if (null != sgenerateInventoryNodesAuth) {
+            generateInventoryNodesAuth = Boolean.parseBoolean(sgenerateInventoryNodesAuth);
+        }
+        return generateInventoryNodesAuth;
     }
 }
