@@ -26,11 +26,23 @@ configurations {
     }
 }
 dependencies {
-    testImplementation libs.spock.core
+    // Exclude JUnit 4 with EPL-1.0 license - Spock uses JUnit Platform (JUnit 5) instead
+    testImplementation(libs.spock.core) {
+        exclude group: 'junit', module: 'junit'
+    }
 
-    testImplementation libs.testcontainers
-    testImplementation libs.testcontainers.spock
-    testImplementation libs.rd.api.client
+    // Exclude JUnit 4 from TestContainers - it's not needed when using Spock
+    testImplementation(libs.testcontainers) {
+        exclude group: 'junit', module: 'junit'
+    }
+    testImplementation(libs.testcontainers.spock) {
+        exclude group: 'junit', module: 'junit'
+    }
+
+    // Exclude JAXB with restrictive license from rd-api-client
+    testImplementation(libs.rd.api.client) {
+        exclude group: 'javax.xml.bind', module: 'jaxb-api'
+    }
 
     testImplementation libs.jsch
 

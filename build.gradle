@@ -59,12 +59,16 @@ configurations {
 
 dependencies {
   pluginLibs libs.gson
-  implementation libs.rundeck.core
+
+  // Exclude problematic JAXB dependency with restrictive license from rundeck-core
+  implementation(libs.rundeck.core) {
+    exclude group: 'javax.xml.bind', module: 'jaxb-api'
+  }
+
   implementation libs.groovy.all
   pluginLibs libs.jackson.core
   pluginLibs libs.jackson.dataformat.yaml
   implementation libs.snakeyaml
-
 
   // Security: Explicit inclusion of secure versions
   implementation libs.commons.lang3
@@ -76,7 +80,10 @@ dependencies {
   testCompileOnly libs.lombok
   testAnnotationProcessor libs.lombok
 
-  testImplementation libs.spock.core
+  // Exclude JUnit 4 with EPL-1.0 license - Spock uses JUnit Platform (JUnit 5) instead
+  testImplementation(libs.spock.core) {
+    exclude group: 'junit', module: 'junit'
+  }
 
 }
 
