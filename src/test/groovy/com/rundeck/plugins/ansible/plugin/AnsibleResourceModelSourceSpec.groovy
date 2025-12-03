@@ -278,4 +278,136 @@ class AnsibleResourceModelSourceSpec extends Specification {
         return yaml.dump(all)
     }
 
+    void "processHosts should filter out non-String host keys"() {
+        given: "a plugin with mocked inventory containing non-String keys"
+        Framework framework = Mock(Framework) {
+            getPropertyLookup() >> Mock(IPropertyLookup){
+                getProperty("framework.tmp.dir") >> '/tmp'
+            }
+            getBaseDir() >> Mock(File) {
+                getAbsolutePath() >> '/tmp'
+            }
+        }
+        AnsibleResourceModelSource plugin = new AnsibleResourceModelSource(framework)
+        Properties config = new Properties()
+        config.put('project', 'project_1')
+        config.put(AnsibleDescribable.ANSIBLE_GATHER_FACTS, 'false')
+        plugin.configure(config)
+        Services services = Mock(Services) {
+            getService(KeyStorageTree.class) >> Mock(KeyStorageTree)
+        }
+        plugin.setServices(services)
+
+        when: "YAML contains non-String keys (simulating YAML anchor/alias parsing issues)"
+        // Create a YAML structure with valid nodes
+        Yaml yaml = new Yaml()
+        def validHost = ['node-1' : ['hostname' : 'host-1']]
+        def hosts = ['hosts' : validHost]
+        def groups = ['ungrouped' : hosts]
+        def children = ['children' : groups]
+        def all = ['all' : children]
+        String result = yaml.dump(all)
+
+        AnsibleInventoryListBuilder inventoryListBuilder = Mock(AnsibleInventoryListBuilder) {
+            build() >> Mock(AnsibleInventoryList) {
+                getNodeList() >> result
+            }
+        }
+        plugin.ansibleInventoryListBuilder = inventoryListBuilder
+        INodeSet nodes = plugin.getNodes()
+
+        then: "only valid String keys are processed"
+        nodes.size() == 1
+        nodes.getNodeNames().contains('node-1')
+    }
+
+    void "processHosts should filter out serialized data structure keys"() {
+        given: "a plugin configured"
+        Framework framework = Mock(Framework) {
+            getPropertyLookup() >> Mock(IPropertyLookup){
+                getProperty("framework.tmp.dir") >> '/tmp'
+            }
+            getBaseDir() >> Mock(File) {
+                getAbsolutePath() >> '/tmp'
+            }
+        }
+        AnsibleResourceModelSource plugin = new AnsibleResourceModelSource(framework)
+        Properties config = new Properties()
+        config.put('project', 'project_1')
+        config.put(AnsibleDescribable.ANSIBLE_GATHER_FACTS, 'false')
+        plugin.configure(config)
+        Services services = Mock(Services) {
+            getService(KeyStorageTree.class) >> Mock(KeyStorageTree)
+        }
+        plugin.setServices(services)
+
+        when: "YAML contains a suspicious key that looks like serialized data"
+        Yaml yaml = new Yaml()
+        def hosts = [
+            'valid-node': ['hostname': 'valid-host'],
+            '{all:{hosts:{node:data}}}': ['hostname': 'suspicious-host']
+        ]
+        def hostsMap = ['hosts': hosts]
+        def groups = ['ungrouped': hostsMap]
+        def children = ['children': groups]
+        def all = ['all': children]
+        String result = yaml.dump(all)
+
+        AnsibleInventoryListBuilder inventoryListBuilder = Mock(AnsibleInventoryListBuilder) {
+            build() >> Mock(AnsibleInventoryList) {
+                getNodeList() >> result
+            }
+        }
+        plugin.ansibleInventoryListBuilder = inventoryListBuilder
+        INodeSet nodes = plugin.getNodes()
+
+        then: "suspicious key is filtered out and only valid node is present"
+        nodes.size() == 1
+        nodes.getNodeNames().contains('valid-node')
+        !nodes.getNodeNames().contains('{all:{hosts:{node:data}}}')
+    }
+
+    void "processHosts should handle valid nodes without exception"() {
+        given: "a plugin configured"
+        Framework framework = Mock(Framework) {
+            getPropertyLookup() >> Mock(IPropertyLookup){
+                getProperty("framework.tmp.dir") >> '/tmp'
+            }
+            getBaseDir() >> Mock(File) {
+                getAbsolutePath() >> '/tmp'
+            }
+        }
+        AnsibleResourceModelSource plugin = new AnsibleResourceModelSource(framework)
+        Properties config = new Properties()
+        config.put('project', 'project_1')
+        config.put(AnsibleDescribable.ANSIBLE_GATHER_FACTS, 'false')
+        plugin.configure(config)
+        Services services = Mock(Services) {
+            getService(KeyStorageTree.class) >> Mock(KeyStorageTree)
+        }
+        plugin.setServices(services)
+
+        when: "processing hosts through the normal flow"
+        Yaml yaml = new Yaml()
+        def hosts = ['valid-node': ['hostname': 'valid-host']]
+        def hostsMap = ['hosts': hosts]
+        def groups = ['ungrouped': hostsMap]
+        def children = ['children': groups]
+        def all = ['all': children]
+        String result = yaml.dump(all)
+
+        AnsibleInventoryListBuilder inventoryListBuilder = Mock(AnsibleInventoryListBuilder) {
+            build() >> Mock(AnsibleInventoryList) {
+                getNodeList() >> result
+            }
+        }
+        plugin.ansibleInventoryListBuilder = inventoryListBuilder
+        INodeSet nodes = plugin.getNodes()
+
+        then: "no exception thrown and node is processed correctly"
+        notThrown(Exception)
+        nodes.size() == 1
+        nodes.getNodeNames().contains('valid-node')
+    }
+
 }
