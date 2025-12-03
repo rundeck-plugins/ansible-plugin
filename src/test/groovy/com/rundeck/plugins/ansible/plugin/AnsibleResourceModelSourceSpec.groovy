@@ -278,8 +278,8 @@ class AnsibleResourceModelSourceSpec extends Specification {
         return yaml.dump(all)
     }
 
-    void "processHosts should filter out non-String host keys"() {
-        given: "a plugin with mocked inventory containing non-String keys"
+    void "processHosts should process valid String host keys without errors"() {
+        given: "a plugin with standard inventory"
         Framework framework = Mock(Framework) {
             getPropertyLookup() >> Mock(IPropertyLookup){
                 getProperty("framework.tmp.dir") >> '/tmp'
@@ -298,8 +298,10 @@ class AnsibleResourceModelSourceSpec extends Specification {
         }
         plugin.setServices(services)
 
-        when: "YAML contains non-String keys (simulating YAML anchor/alias parsing issues)"
-        // Create a YAML structure with valid nodes
+        when: "YAML contains valid String keys"
+        // Note: Testing non-String keys directly is difficult because Java's type system
+        // prevents creating Map<String, Object> with non-String keys. The defensive code
+        // handles the rare edge case where complex YAML anchor/alias patterns produce non-String keys during parsing.
         Yaml yaml = new Yaml()
         def validHost = ['node-1' : ['hostname' : 'host-1']]
         def hosts = ['hosts' : validHost]
@@ -316,7 +318,7 @@ class AnsibleResourceModelSourceSpec extends Specification {
         plugin.ansibleInventoryListBuilder = inventoryListBuilder
         INodeSet nodes = plugin.getNodes()
 
-        then: "only valid String keys are processed"
+        then: "valid String keys are processed successfully"
         nodes.size() == 1
         nodes.getNodeNames().contains('node-1')
     }
