@@ -67,7 +67,10 @@ public class AnsibleInventory {
       if (attributes.containsKey(g)) {
         String[] groupNames = attributes.get(g).toLowerCase().split(",");
         for (String groupName: groupNames) {
-          all.getOrAddChildHostGroup(groupName.trim()).addHost(nodeName);
+          // Sanitize group name: Ansible only allows letters, numbers, underscores, and hyphens
+          // Replace invalid characters (like colons) with underscores
+          String sanitizedGroupName = groupName.trim().replaceAll("[^a-z0-9_\\-]", "_");
+          all.getOrAddChildHostGroup(sanitizedGroupName).addHost(nodeName);
         }
       }
     }
