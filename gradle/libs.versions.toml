@@ -10,10 +10,8 @@ jackson = "2.16.1"
 snakeyaml = "2.2"
 groovy = "3.0.15"
 lombok = "1.18.30"
-# Updated Spock to use newer JUnit Platform (addresses EPL-2.0 license concern)
-spock = "2.3-groovy-3.0"
-# Updated TestContainers to latest (addresses JUnit 4 EPL-1.0 license concern)
-testcontainers = "1.20.4"
+spock = "2.1-groovy-3.0"
+testcontainers = "1.19.0"
 rd-api-client = "2.0.8"
 jsch = "0.1.55"
 
