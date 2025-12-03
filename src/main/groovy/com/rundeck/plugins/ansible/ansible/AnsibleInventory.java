@@ -59,7 +59,7 @@ public class AnsibleInventory {
     for (String r: reserved){
       attributes.remove(r);
     }
-    all.addHost(nodeName, host, attributes);
+
     // Create Ansible groups by attribute
     // Group by osFamily is needed for windows hosts setup
     String[] attributeGroups = { "osFamily", "tags" };
@@ -71,6 +71,11 @@ public class AnsibleInventory {
         }
       }
     }
+
+    //remove "tags" since it's reserved in Ansible and we've already used it for grouping
+    attributes.remove("tags");
+
+    all.addHost(nodeName, host, attributes);
     return this;
   }
 }
