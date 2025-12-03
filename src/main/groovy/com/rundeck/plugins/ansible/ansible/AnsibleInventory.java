@@ -68,7 +68,8 @@ public class AnsibleInventory {
         String[] groupNames = attributes.get(g).toLowerCase().split(",");
         for (String groupName: groupNames) {
           // Sanitize group name: Ansible only allows letters, numbers, underscores, and hyphens
-          // Replace invalid characters (like colons) with underscores
+          // Note: group names are already lowercased above, so we only need to match lowercase
+          // Replace invalid characters (like colons, spaces, special chars) with underscores
           String sanitizedGroupName = groupName.trim().replaceAll("[^a-z0-9_\\-]", "_");
           all.getOrAddChildHostGroup(sanitizedGroupName).addHost(nodeName);
         }

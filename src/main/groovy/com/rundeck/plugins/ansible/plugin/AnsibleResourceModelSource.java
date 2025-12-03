@@ -797,12 +797,17 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
         continue;
       }
 
-      // Additional validation: skip keys that look like serialized data structures
+      // Additional validation: skip keys that are JSON objects (likely serialized data structures)
       String hostKey = (String) hostKeyObj;
-      if (hostKey.startsWith("{") && hostKey.contains(":")) {
-        log.warn("Skipping host entry with suspicious key that looks like serialized data: {}",
-                 hostKey.length() > 100 ? hostKey.substring(0, 100) + "..." : hostKey);
-        continue;
+      try {
+        JsonElement jsonElement = JsonParser.parseString(hostKey);
+        if (jsonElement.isJsonObject()) {
+          log.warn("Skipping host entry with key that is a JSON object (likely serialized data): {}",
+                   hostKey.length() > 100 ? hostKey.substring(0, 100) + "..." : hostKey);
+          continue;
+        }
+      } catch (Exception e) {
+        // Not valid JSON - treat as a legitimate host key and continue processing
       }
 
       NodeEntryImpl node = createNodeEntry(hostNode);

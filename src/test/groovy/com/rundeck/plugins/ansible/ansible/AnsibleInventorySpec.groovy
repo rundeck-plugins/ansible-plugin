@@ -83,7 +83,7 @@ class AnsibleInventorySpec extends Specification {
         !json.contains("should_be_removed")
     }
 
-    void "addHost should create groups from osFamily attribute"() {
+    void "addHost should create groups from osFamily attribute and retain it in host variables"() {
         given: "an AnsibleInventory instance"
         AnsibleInventory inventory = new AnsibleInventory()
         Gson gson = new Gson()
@@ -91,11 +91,15 @@ class AnsibleInventorySpec extends Specification {
         when: "adding a host with osFamily attribute"
         Map<String, String> attributes = new HashMap<>()
         attributes.put("osFamily", "unix")
+        attributes.put("custom_attr", "test_value")
         inventory.addHost("test-node", "127.0.0.1", attributes)
 
-        then: "unix group should be created"
+        then: "unix group should be created AND osFamily should remain in host variables"
         String json = gson.toJson(inventory)
         json.contains("unix")
+        // osFamily should NOT be removed (unlike tags) - it's needed by other components
+        json.contains('"osFamily":"unix"')
+        json.contains("custom_attr")
     }
 
     void "addHost should handle multiple tags and create multiple groups"() {

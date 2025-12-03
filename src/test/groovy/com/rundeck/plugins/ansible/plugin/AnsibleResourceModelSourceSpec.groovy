@@ -321,7 +321,7 @@ class AnsibleResourceModelSourceSpec extends Specification {
         nodes.getNodeNames().contains('node-1')
     }
 
-    void "processHosts should filter out serialized data structure keys"() {
+    void "processHosts should filter out JSON object keys"() {
         given: "a plugin configured"
         Framework framework = Mock(Framework) {
             getPropertyLookup() >> Mock(IPropertyLookup){
@@ -341,11 +341,12 @@ class AnsibleResourceModelSourceSpec extends Specification {
         }
         plugin.setServices(services)
 
-        when: "YAML contains a suspicious key that looks like serialized data"
+        when: "YAML contains a key that is a valid JSON object (serialized data)"
         Yaml yaml = new Yaml()
         def hosts = [
             'valid-node': ['hostname': 'valid-host'],
-            '{all:{hosts:{node:data}}}': ['hostname': 'suspicious-host']
+            '{"inventory":"data","nested":{"key":"value"}}': ['hostname': 'json-object-key'],
+            '{simple-curly-name}': ['hostname': 'not-json-host']  // Not valid JSON, should be kept
         ]
         def hostsMap = ['hosts': hosts]
         def groups = ['ungrouped': hostsMap]
@@ -361,10 +362,11 @@ class AnsibleResourceModelSourceSpec extends Specification {
         plugin.ansibleInventoryListBuilder = inventoryListBuilder
         INodeSet nodes = plugin.getNodes()
 
-        then: "suspicious key is filtered out and only valid node is present"
-        nodes.size() == 1
+        then: "JSON object key is filtered out but valid nodes remain"
+        nodes.size() == 2
         nodes.getNodeNames().contains('valid-node')
-        !nodes.getNodeNames().contains('{all:{hosts:{node:data}}}')
+        nodes.getNodeNames().contains('{simple-curly-name}')  // Not valid JSON, so kept
+        !nodes.getNodeNames().contains('{"inventory":"data","nested":{"key":"value"}}')
     }
 
     void "processHosts should handle valid nodes without exception"() {
