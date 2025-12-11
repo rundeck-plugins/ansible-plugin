@@ -43,8 +43,6 @@ public class AnsiblePlaybookWorkflowStep implements StepPlugin, AnsibleDescribab
         builder.property(EXTRA_VARS_PROP);
         builder.property(CONFIG_ENCRYPT_EXTRA_VARS);
         builder.property(INVENTORY_INLINE_PROP);
-        builder.property(GENERATE_INVENTORY_PROP);
-        builder.property(GENERATE_INVENTORY_NODES_AUTH);
         builder.property(VAULT_KEY_FILE_PROP);
         builder.property(VAULT_KEY_STORAGE_PROP);
         builder.property(EXTRA_ATTRS_PROP);

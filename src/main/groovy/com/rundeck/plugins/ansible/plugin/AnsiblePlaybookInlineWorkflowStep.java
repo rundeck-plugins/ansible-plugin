@@ -43,8 +43,6 @@ public class AnsiblePlaybookInlineWorkflowStep implements StepPlugin, AnsibleDes
         builder.property(PLAYBOOK_INLINE_PROP);
         builder.property(EXTRA_VARS_PROP);
         builder.property(CONFIG_ENCRYPT_EXTRA_VARS);
-        builder.property(GENERATE_INVENTORY_PROP);
-        builder.property(GENERATE_INVENTORY_NODES_AUTH);
         builder.property(INVENTORY_INLINE_PROP);
         builder.property(VAULT_KEY_FILE_PROP);
         builder.property(VAULT_KEY_STORAGE_PROP);

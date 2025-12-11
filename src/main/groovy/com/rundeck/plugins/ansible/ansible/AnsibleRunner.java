@@ -128,7 +128,7 @@ public class AnsibleRunner {
         }
 
         Boolean generateInventoryNodeAuth = contextBuilder.generateInventoryNodesAuth();
-        if(generateInventoryNodeAuth){
+        if(generateInventoryNodeAuth != null && generateInventoryNodeAuth){
             Map<String, Map<String, String>> nodesAuth = contextBuilder.getNodesAuthenticationMap();
             if (nodesAuth != null && !nodesAuth.isEmpty()) {
                 ansibleRunnerBuilder.addNodeAuthToInventory(true);
@@ -300,11 +300,13 @@ public class AnsibleRunner {
     File tempSshVarsFile ;
     File tempBecameVarsFile ;
     File vaultPromptFile;
-    File tempNodeAuthFile = null;
+    File tempNodeAuthFile;
+    File groupVarsDir;
 
     String customTmpDirPath;
 
-    Boolean addNodeAuthToInventory;
+    @Builder.Default
+    Boolean addNodeAuthToInventory = false;
     Map<String, Map<String, String>> nodesAuthentication;
 
     public void deleteTempDirectory(Path tempDirectory) throws IOException {
@@ -410,7 +412,7 @@ public class AnsibleRunner {
                 procArgs.add("-i");
                 procArgs.add(inventory);
 
-                if(addNodeAuthToInventory) {
+                if(addNodeAuthToInventory != null && addNodeAuthToInventory && nodesAuthentication != null && !nodesAuthentication.isEmpty()) {
                     Map<String, String> hostUsers = new LinkedHashMap<>();
                     Map<String, String> hostPasswords = new LinkedHashMap<>();
                     nodesAuthentication.forEach((nodeName, authValues) -> {
@@ -437,7 +439,30 @@ public class AnsibleRunner {
                     yamlData.put("host_users", hostUsers);
                     try {
                         String yamlContent = mapperYaml.writeValueAsString(yamlData);
-                        tempNodeAuthFile = AnsibleUtil.createTemporaryFile("", "all.yaml", yamlContent, customTmpDirPath);
+
+                        // Create group_vars directory structure
+                        File inventoryFile = new File(inventory);
+                        File inventoryParentDir = inventoryFile.getParentFile();
+
+                        if (inventoryParentDir != null) {
+                            groupVarsDir = new File(inventoryParentDir, "group_vars");
+
+                            if (!groupVarsDir.exists()) {
+                                if (!groupVarsDir.mkdirs()) {
+                                    throw new RuntimeException("Failed to create group_vars directory at: " + groupVarsDir.getAbsolutePath());
+                                }
+                            }
+
+                            // Create all.yaml in group_vars directory
+                            tempNodeAuthFile = new File(groupVarsDir, "all.yaml");
+                            java.nio.file.Files.writeString(tempNodeAuthFile.toPath(), yamlContent);
+                            tempNodeAuthFile.deleteOnExit();
+                            groupVarsDir.deleteOnExit();
+                        } else {
+                            // Fallback to temp file if inventory has no parent directory
+                            tempNodeAuthFile = AnsibleUtil.createTemporaryFile("group_vars", "all.yaml", yamlContent, customTmpDirPath);
+                        }
+
                     } catch (IOException e) {
                         throw new RuntimeException("Failed to write all.yaml for node auth", e);
                     }
@@ -710,6 +735,12 @@ public class AnsibleRunner {
 
             if (tempNodeAuthFile != null && !tempNodeAuthFile.delete()) {
                 tempNodeAuthFile.deleteOnExit();
+            }
+
+            if (groupVarsDir != null && groupVarsDir.exists()) {
+                if (!groupVarsDir.delete()) {
+                    groupVarsDir.deleteOnExit();
+                }
             }
 
             if (usingTempDirectory && !retainTempDirectory) {
