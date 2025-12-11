@@ -946,7 +946,7 @@ public class AnsibleRunnerContextBuilder {
 
         this.context.getNodes().forEach((node) -> {
             String keyPath = PropertyResolver.resolveProperty(
-                    AnsibleDescribable.ANSIBLE_SSH_KEYPATH,
+                    AnsibleDescribable.ANSIBLE_SSH_PASSWORD_STORAGE_PATH,
                     null,
                     getFrameworkProject(),
                     getFramework(),
@@ -958,7 +958,6 @@ public class AnsibleRunnerContextBuilder {
                 if(!secretPaths.contains(keyPath)){
                     secretPaths.add(keyPath);
                 }
-
             }
         });
 
