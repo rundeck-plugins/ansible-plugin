@@ -278,4 +278,140 @@ class AnsibleResourceModelSourceSpec extends Specification {
         return yaml.dump(all)
     }
 
+    void "processHosts should process valid String host keys without errors"() {
+        given: "a plugin with standard inventory"
+        Framework framework = Mock(Framework) {
+            getPropertyLookup() >> Mock(IPropertyLookup){
+                getProperty("framework.tmp.dir") >> '/tmp'
+            }
+            getBaseDir() >> Mock(File) {
+                getAbsolutePath() >> '/tmp'
+            }
+        }
+        AnsibleResourceModelSource plugin = new AnsibleResourceModelSource(framework)
+        Properties config = new Properties()
+        config.put('project', 'project_1')
+        config.put(AnsibleDescribable.ANSIBLE_GATHER_FACTS, 'false')
+        plugin.configure(config)
+        Services services = Mock(Services) {
+            getService(KeyStorageTree.class) >> Mock(KeyStorageTree)
+        }
+        plugin.setServices(services)
+
+        when: "YAML contains valid String keys"
+        // Note: Testing non-String keys directly is difficult because Java's type system
+        // prevents creating Map<String, Object> with non-String keys. The defensive code
+        // handles the rare edge case where complex YAML anchor/alias patterns produce non-String keys during parsing.
+        Yaml yaml = new Yaml()
+        def validHost = ['node-1' : ['hostname' : 'host-1']]
+        def hosts = ['hosts' : validHost]
+        def groups = ['ungrouped' : hosts]
+        def children = ['children' : groups]
+        def all = ['all' : children]
+        String result = yaml.dump(all)
+
+        AnsibleInventoryListBuilder inventoryListBuilder = Mock(AnsibleInventoryListBuilder) {
+            build() >> Mock(AnsibleInventoryList) {
+                getNodeList() >> result
+            }
+        }
+        plugin.ansibleInventoryListBuilder = inventoryListBuilder
+        INodeSet nodes = plugin.getNodes()
+
+        then: "valid String keys are processed successfully"
+        nodes.size() == 1
+        nodes.getNodeNames().contains('node-1')
+    }
+
+    void "processHosts should filter out JSON object keys"() {
+        given: "a plugin configured"
+        Framework framework = Mock(Framework) {
+            getPropertyLookup() >> Mock(IPropertyLookup){
+                getProperty("framework.tmp.dir") >> '/tmp'
+            }
+            getBaseDir() >> Mock(File) {
+                getAbsolutePath() >> '/tmp'
+            }
+        }
+        AnsibleResourceModelSource plugin = new AnsibleResourceModelSource(framework)
+        Properties config = new Properties()
+        config.put('project', 'project_1')
+        config.put(AnsibleDescribable.ANSIBLE_GATHER_FACTS, 'false')
+        plugin.configure(config)
+        Services services = Mock(Services) {
+            getService(KeyStorageTree.class) >> Mock(KeyStorageTree)
+        }
+        plugin.setServices(services)
+
+        when: "YAML contains a key that is a valid JSON object (serialized data)"
+        Yaml yaml = new Yaml()
+        def hosts = [
+            'valid-node': ['hostname': 'valid-host'],
+            '{"inventory":"data","nested":{"key":"value"}}': ['hostname': 'json-object-key'],
+            '{simple-curly-name}': ['hostname': 'not-json-host']  // Not valid JSON, should be kept
+        ]
+        def hostsMap = ['hosts': hosts]
+        def groups = ['ungrouped': hostsMap]
+        def children = ['children': groups]
+        def all = ['all': children]
+        String result = yaml.dump(all)
+
+        AnsibleInventoryListBuilder inventoryListBuilder = Mock(AnsibleInventoryListBuilder) {
+            build() >> Mock(AnsibleInventoryList) {
+                getNodeList() >> result
+            }
+        }
+        plugin.ansibleInventoryListBuilder = inventoryListBuilder
+        INodeSet nodes = plugin.getNodes()
+
+        then: "JSON object key is filtered out but valid nodes remain"
+        nodes.size() == 2
+        nodes.getNodeNames().contains('valid-node')
+        nodes.getNodeNames().contains('{simple-curly-name}')  // Not valid JSON, so kept
+        !nodes.getNodeNames().contains('{"inventory":"data","nested":{"key":"value"}}')
+    }
+
+    void "processHosts should handle valid nodes without exception"() {
+        given: "a plugin configured"
+        Framework framework = Mock(Framework) {
+            getPropertyLookup() >> Mock(IPropertyLookup){
+                getProperty("framework.tmp.dir") >> '/tmp'
+            }
+            getBaseDir() >> Mock(File) {
+                getAbsolutePath() >> '/tmp'
+            }
+        }
+        AnsibleResourceModelSource plugin = new AnsibleResourceModelSource(framework)
+        Properties config = new Properties()
+        config.put('project', 'project_1')
+        config.put(AnsibleDescribable.ANSIBLE_GATHER_FACTS, 'false')
+        plugin.configure(config)
+        Services services = Mock(Services) {
+            getService(KeyStorageTree.class) >> Mock(KeyStorageTree)
+        }
+        plugin.setServices(services)
+
+        when: "processing hosts through the normal flow"
+        Yaml yaml = new Yaml()
+        def hosts = ['valid-node': ['hostname': 'valid-host']]
+        def hostsMap = ['hosts': hosts]
+        def groups = ['ungrouped': hostsMap]
+        def children = ['children': groups]
+        def all = ['all': children]
+        String result = yaml.dump(all)
+
+        AnsibleInventoryListBuilder inventoryListBuilder = Mock(AnsibleInventoryListBuilder) {
+            build() >> Mock(AnsibleInventoryList) {
+                getNodeList() >> result
+            }
+        }
+        plugin.ansibleInventoryListBuilder = inventoryListBuilder
+        INodeSet nodes = plugin.getNodes()
+
+        then: "no exception thrown and node is processed correctly"
+        notThrown(Exception)
+        nodes.size() == 1
+        nodes.getNodeNames().contains('valid-node')
+    }
+
 }
