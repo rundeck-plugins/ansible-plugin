@@ -1,3 +1,8 @@
+> [!TIP]
+> This fork main purpose is to forward the RUNDECK variables (such as RD_JOB_USERNAME, etc.) to the Ansible playbook. One reason is to give the ansible playbook the ability to proper identify who is running the playbook.
+
+---
+
 [![Gitter](https://img.shields.io/gitter/room/rundeck-ansible-plugin/Lobby.svg)](https://gitter.im/rundeck-ansible-plugin/Lobby) [Read more about Rundeck + Ansible](https://www.rundeck.com/ansible)
 
 Please [report](https://github.com/rundeck-plugins/ansible-plugin/issues) any errors or suggestions!
