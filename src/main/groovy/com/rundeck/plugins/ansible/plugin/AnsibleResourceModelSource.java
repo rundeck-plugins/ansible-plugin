@@ -25,6 +25,7 @@ import com.rundeck.plugins.ansible.ansible.AnsibleInventoryList;
 import com.rundeck.plugins.ansible.ansible.AnsibleRunner;
 import com.rundeck.plugins.ansible.ansible.InventoryList;
 import com.rundeck.plugins.ansible.util.AnsibleUtil;
+import com.rundeck.plugins.ansible.util.VaultAwareConstructor;
 import com.rundeck.plugins.ansible.util.VaultPrompt;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -36,7 +37,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
-import org.yaml.snakeyaml.constructor.SafeConstructor;
 import org.yaml.snakeyaml.error.YAMLException;
 
 import java.io.BufferedReader;
@@ -719,7 +719,8 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     snakeOptions.setCodePointLimit(codePointLimit);
     // max aliases. Default value is 1000
     snakeOptions.setMaxAliasesForCollections(yamlMaxAliases);
-    Yaml yaml = new Yaml(new SafeConstructor(snakeOptions));
+    // Use VaultAwareConstructor to handle Ansible's !vault tag (fixes GitHub issue #385)
+    Yaml yaml = new Yaml(new VaultAwareConstructor(snakeOptions));
 
     String listResp = getNodesFromInventory(runnerBuilder);
 
