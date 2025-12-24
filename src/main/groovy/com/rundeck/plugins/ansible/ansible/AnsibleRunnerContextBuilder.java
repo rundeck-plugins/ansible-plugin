@@ -209,7 +209,7 @@ public class AnsibleRunnerContextBuilder {
                     .getContents();
             ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
             contents.writeContent(byteArrayOutputStream);
-            return byteArrayOutputStream.toString();
+            return byteArrayOutputStream.toString("UTF-8");
         } catch (StorageException | IOException e) {
             throw new ConfigurationException("Failed to read the ssh password for " +
                     "storage path: " + storagePath + ": " + e.getMessage());
@@ -907,6 +907,8 @@ public class AnsibleRunnerContextBuilder {
 
         Map<String, Map<String, String>> authenticationNodesMap = new HashMap<>();
 
+        System.err.println("DEBUG: getNodesAuthenticationMap called");
+
         this.context.getNodes().forEach((node) -> {
             String keyPath = PropertyResolver.resolveProperty(
                     AnsibleDescribable.ANSIBLE_SSH_PASSWORD_STORAGE_PATH,
@@ -917,17 +919,28 @@ public class AnsibleRunnerContextBuilder {
                     getJobConf()
             );
 
+            System.err.println("DEBUG: Node " + node.getNodename() + " keyPath: " + keyPath);
+
             Map<String, String> auth = new HashMap<>();
 
             if(null!=keyPath){
                 try {
-                    auth.put("ansible_password",getPasswordFromPath(keyPath) );
+                    String password = getPasswordFromPath(keyPath);
+                    System.err.println("DEBUG: Retrieved password for " + node.getNodename() + ": " + (password != null ? password.substring(0, Math.min(3, password.length())) + "..." : "null"));
+                    System.err.println("DEBUG: Password length: " + (password != null ? password.length() : 0));
+                    System.err.println("DEBUG: Password bytes: " + (password != null ? java.util.Arrays.toString(password.getBytes("UTF-8")) : "null"));
+                    auth.put("ansible_password", password);
                 } catch (ConfigurationException e) {
+                    System.err.println("DEBUG: Error retrieving password for " + node.getNodename() + ": " + e.getMessage());
                     throw new RuntimeException(e);
+                } catch (Exception e2) {
+                    System.err.println("DEBUG: Unexpected error: " + e2.getMessage());
+                    throw new RuntimeException(e2);
                 }
 
             }
             String userName = getSshNodeUser(node);
+            System.err.println("DEBUG: Node " + node.getNodename() + " userName: " + userName);
 
             if(null!=userName){
                 auth.put("ansible_user",userName );
@@ -936,6 +949,7 @@ public class AnsibleRunnerContextBuilder {
             authenticationNodesMap.put(node.getNodename(), auth);
         });
 
+        System.err.println("DEBUG: authenticationNodesMap has " + authenticationNodesMap.size() + " entries");
         return authenticationNodesMap;
     }
 
