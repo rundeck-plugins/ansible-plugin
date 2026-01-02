@@ -8,15 +8,17 @@ kotlin-stdlib = "2.1.0"
 gson = "2.10.1"
 jackson = "2.16.1"
 snakeyaml = "2.2"
-groovy = "3.0.15"
+groovy = "4.0.29"
 lombok = "1.18.30"
-spock = "2.1-groovy-3.0"
+spock = "2.4-groovy-4.0"
 testcontainers = "1.19.0"
 rd-api-client = "2.0.8"
 jsch = "0.1.55"
+cglib = "3.3.0"
+objenesis = "1.4"
 
 # Rundeck version
-rundeck-core = "5.16.0-20251006"
+rundeck-core = "6.0.0-SNAPSHOT"
 
 [libraries]
 # Security overrides
@@ -29,7 +31,7 @@ gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
 jackson-core = { module = "com.fasterxml.jackson.core:jackson-core", version.ref = "jackson" }
 jackson-dataformat-yaml = { module = "com.fasterxml.jackson.dataformat:jackson-dataformat-yaml", version.ref = "jackson" }
 snakeyaml = { module = "org.yaml:snakeyaml", version.ref = "snakeyaml" }
-groovy-all = { module = "org.codehaus.groovy:groovy-all", version.ref = "groovy" }
+groovy-all = { module = "org.apache.groovy:groovy-all", version.ref = "groovy" }
 lombok = { module = "org.projectlombok:lombok", version.ref = "lombok" }
 spock-core = { module = "org.spockframework:spock-core", version.ref = "spock" }
 testcontainers = { module = "org.testcontainers:testcontainers", version.ref = "testcontainers" }
@@ -37,3 +39,5 @@ testcontainers-spock = { module = "org.testcontainers:spock", version.ref = "tes
 rd-api-client = { module = "org.rundeck.api:rd-api-client", version.ref = "rd-api-client" }
 jsch = { module = "com.jcraft:jsch", version.ref = "jsch" }
 rundeck-core = { module = "org.rundeck:rundeck-core", version.ref = "rundeck-core" }
+cglib-nodep = { module = "cglib:cglib-nodep", version.ref = "cglib" }
+objenesis = { module = "org.objenesis:objenesis", version.ref = "objenesis" }

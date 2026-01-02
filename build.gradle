@@ -21,7 +21,8 @@ ext.pluginClassNames = [
 
 apply plugin: 'java'
 apply plugin: 'groovy'
-sourceCompatibility = 1.11
+sourceCompatibility = 17
+targetCompatibility = 17
 
 scmVersion {
     ignoreUncommittedChanges = false
@@ -32,10 +33,12 @@ scmVersion {
 }
 
 version = scmVersion.version
+// Override version for Grails 7 upgrade
+version = '4.0.12-grails7-upgrade-test'
 
 repositories {
+  mavenLocal()  // Must be FIRST for Grails 7 development
   mavenCentral()
-  mavenLocal()
 }
 
 configurations {
@@ -77,11 +80,22 @@ dependencies {
   testAnnotationProcessor libs.lombok
 
   testImplementation libs.spock.core
+  testImplementation libs.cglib.nodep
+  testImplementation libs.objenesis
 
 }
 
 tasks.withType(Test).configureEach {
   useJUnitPlatform()
+  
+  // Java 17+ module access for cglib/Spock mocking
+  jvmArgs = [
+    '--add-opens=java.base/java.lang=ALL-UNNAMED',
+    '--add-opens=java.base/java.util=ALL-UNNAMED',
+    '--add-opens=java.base/java.lang.reflect=ALL-UNNAMED',
+    '--add-opens=java.base/java.io=ALL-UNNAMED',
+    '--add-opens=java.base/java.net=ALL-UNNAMED'
+  ]
 }
 
 task copyToLib(type: Copy) {
