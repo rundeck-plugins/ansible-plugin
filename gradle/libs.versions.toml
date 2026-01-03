@@ -18,7 +18,7 @@ cglib = "3.3.0"
 objenesis = "1.4"
 
 # Rundeck version
-rundeck-core = "6.0.0-SNAPSHOT"
+rundeck-core = "5.18.0-20251216"
 
 [libraries]
 # Security overrides
