@@ -274,9 +274,7 @@ class AnsibleResourceModelSourceSpec extends Specification {
             getPropertyLookup() >> Mock(IPropertyLookup){
                 getProperty("framework.tmp.dir") >> '/tmp'
             }
-            getBaseDir() >> Mock(File) {
-                getAbsolutePath() >> '/tmp'
-            }
+            getBaseDir() >> new File('/tmp')
         }
         AnsibleResourceModelSource plugin = new AnsibleResourceModelSource(framework)
         Properties config = new Properties()
@@ -319,9 +317,7 @@ class AnsibleResourceModelSourceSpec extends Specification {
             getPropertyLookup() >> Mock(IPropertyLookup){
                 getProperty("framework.tmp.dir") >> '/tmp'
             }
-            getBaseDir() >> Mock(File) {
-                getAbsolutePath() >> '/tmp'
-            }
+            getBaseDir() >> new File('/tmp')
         }
         AnsibleResourceModelSource plugin = new AnsibleResourceModelSource(framework)
         Properties config = new Properties()
@@ -367,9 +363,7 @@ class AnsibleResourceModelSourceSpec extends Specification {
             getPropertyLookup() >> Mock(IPropertyLookup){
                 getProperty("framework.tmp.dir") >> '/tmp'
             }
-            getBaseDir() >> Mock(File) {
-                getAbsolutePath() >> '/tmp'
-            }
+            getBaseDir() >> new File('/tmp')
         }
         AnsibleResourceModelSource plugin = new AnsibleResourceModelSource(framework)
         Properties config = new Properties()
