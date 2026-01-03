@@ -786,6 +786,30 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     }
 
     for (Map.Entry<String, Object> hostNode : hosts.entrySet()) {
+      // Filter out invalid host keys that aren't Strings (can occur with YAML anchors/aliases)
+      Object hostKeyObj = hostNode.getKey();
+      if (hostKeyObj == null) {
+        log.warn("Skipping host entry with null key");
+        continue;
+      }
+      if (!(hostKeyObj instanceof String)) {
+        log.warn("Skipping invalid host entry with non-String key: {}", hostKeyObj.getClass().getName());
+        continue;
+      }
+
+      // Additional validation: skip keys that are JSON objects (likely serialized data structures)
+      String hostKey = (String) hostKeyObj;
+      try {
+        JsonElement jsonElement = JsonParser.parseString(hostKey);
+        if (jsonElement.isJsonObject()) {
+          log.warn("Skipping host entry with key that is a JSON object (likely serialized data): {}",
+                   hostKey.length() > 100 ? hostKey.substring(0, 100) + "..." : hostKey);
+          continue;
+        }
+      } catch (Exception e) {
+        // Not valid JSON - treat as a legitimate host key and continue processing
+      }
+
       NodeEntryImpl node = createNodeEntry(hostNode);
       addNode(node, tags);
     }
