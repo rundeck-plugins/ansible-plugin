@@ -433,41 +433,58 @@ public class AnsibleRunner {
                     });
 
                     // Build YAML content using helper method
+                    System.err.println("DEBUG: Building group_vars YAML with " + hostPasswords.size() + " passwords and " + hostUsers.size() + " users");
                     String yamlContent = buildGroupVarsYaml(hostPasswords, hostUsers);
+                    System.err.println("DEBUG: YAML content built successfully, length: " + yamlContent.length());
 
                     try {
 
                         // Create group_vars directory structure
                         File inventoryFile = new File(inventory);
-
                         System.err.println("DEBUG: inventoryFile: " + inventoryFile.getAbsolutePath());
+                        System.err.println("DEBUG: inventory file exists: " + inventoryFile.exists());
 
                         File inventoryParentDir = inventoryFile.getParentFile();
+                        System.err.println("DEBUG: inventoryParentDir: " + (inventoryParentDir != null ? inventoryParentDir.getAbsolutePath() : "null"));
 
                         if (inventoryParentDir != null) {
                             groupVarsDir = new File(inventoryParentDir, "group_vars");
+                            System.err.println("DEBUG: group_vars directory path: " + groupVarsDir.getAbsolutePath());
 
                             if (!groupVarsDir.exists()) {
+                                System.err.println("DEBUG: Creating group_vars directory");
                                 if (!groupVarsDir.mkdirs()) {
                                     throw new RuntimeException("Failed to create group_vars directory at: " + groupVarsDir.getAbsolutePath());
                                 }
+                                System.err.println("DEBUG: group_vars directory created successfully");
+                            } else {
+                                System.err.println("DEBUG: group_vars directory already exists");
                             }
 
                             // Create all.yaml in group_vars directory
                             tempNodeAuthFile = new File(groupVarsDir, "all.yaml");
+                            System.err.println("DEBUG: Writing all.yaml to: " + tempNodeAuthFile.getAbsolutePath());
                             java.nio.file.Files.writeString(tempNodeAuthFile.toPath(), yamlContent);
+                            System.err.println("DEBUG: all.yaml written successfully, file size: " + tempNodeAuthFile.length() + " bytes");
                         } else {
                             // Fallback to temp file if inventory has no parent directory
+                            System.err.println("DEBUG: No parent directory, using temporary file");
                             tempNodeAuthFile = AnsibleUtil.createTemporaryFile("group_vars", "all.yaml", yamlContent, customTmpDirPath);
+                            System.err.println("DEBUG: Temporary all.yaml created at: " + tempNodeAuthFile.getAbsolutePath());
                         }
 
                         System.err.println("DEBUG: tempNodeAuthFile: " + tempNodeAuthFile.getAbsolutePath());
+                        System.err.println("DEBUG: tempNodeAuthFile exists: " + tempNodeAuthFile.exists());
+                        System.err.println("DEBUG: tempNodeAuthFile readable: " + tempNodeAuthFile.canRead());
 
                         //set extra vars to resolve the host specific authentication
+                        System.err.println("DEBUG: Adding ansible extra vars for host-specific auth");
                         procArgs.add("-e ansible_user=\"{{ host_users[inventory_hostname] }}\"");
                         procArgs.add("-e ansible_password=\"{{ host_passwords[inventory_hostname] }}\"");
 
                     } catch (IOException e) {
+                        System.err.println("ERROR: Failed to write all.yaml: " + e.getMessage());
+                        e.printStackTrace();
                         throw new RuntimeException("Failed to write all.yaml for node auth", e);
                     }
                 }
@@ -858,17 +875,31 @@ public class AnsibleRunner {
      * @return YAML content string ready to be written to all.yaml
      */
     private String buildGroupVarsYaml(Map<String, String> hostPasswords, Map<String, String> hostUsers) {
+        System.err.println("DEBUG: buildGroupVarsYaml called with " + hostPasswords.size() + " hosts");
+
         StringBuilder yamlContent = new StringBuilder();
         yamlContent.append("host_passwords:\n");
 
         for (Map.Entry<String, String> entry : hostPasswords.entrySet()) {
-            yamlContent.append("  ").append(entry.getKey()).append(": ");
+            String originalKey = entry.getKey();
+            String escapedKey = escapeYamlKey(originalKey);
+            System.err.println("DEBUG: Processing host: " + originalKey + " -> escaped: " + escapedKey);
+
+            yamlContent.append("  ").append(escapedKey).append(": ");
             String vaultValue = entry.getValue();
+
+            // Validate vault format
+            if (!isValidVaultFormat(vaultValue)) {
+                System.err.println("ERROR: Invalid vault format for host: " + originalKey);
+                throw new RuntimeException("Invalid vault format for host: " + originalKey);
+            }
+            System.err.println("DEBUG: Vault format validated for host: " + originalKey);
 
             // The vault value already contains "!vault |\n" followed by the encrypted content
             // We just need to split and indent properly (4 spaces for vault content lines)
             if (vaultValue.contains("\n")) {
                 String[] lines = vaultValue.split("\n", -1);
+                System.err.println("DEBUG: Vault value has " + lines.length + " lines for host: " + originalKey);
                 for (int i = 0; i < lines.length; i++) {
                     if (i == 0) {
                         // First line: "!vault |"
@@ -880,17 +911,111 @@ public class AnsibleRunner {
                 }
             } else {
                 // Single line value (shouldn't happen with vault, but handle it)
+                System.err.println("DEBUG: Single line vault value for host: " + originalKey);
                 yamlContent.append(vaultValue).append("\n");
             }
         }
 
         yamlContent.append("\nhost_users:\n");
         for (Map.Entry<String, String> entry : hostUsers.entrySet()) {
-            yamlContent.append("  ").append(entry.getKey()).append(": ")
-                       .append(entry.getValue()).append("\n");
+            String originalKey = entry.getKey();
+            String originalValue = entry.getValue();
+            String escapedKey = escapeYamlKey(originalKey);
+            String escapedValue = escapeYamlValue(originalValue);
+            System.err.println("DEBUG: Adding user - host: " + originalKey + " -> " + escapedKey + ", user: " + originalValue + " -> " + escapedValue);
+
+            yamlContent.append("  ").append(escapedKey).append(": ")
+                       .append(escapedValue).append("\n");
         }
 
-        return yamlContent.toString();
+        String result = yamlContent.toString();
+        System.err.println("DEBUG: Generated YAML content (" + result.length() + " bytes):");
+        System.err.println("DEBUG: ========== YAML START ==========");
+        System.err.println(result);
+        System.err.println("DEBUG: ========== YAML END ==========");
+
+        return result;
+    }
+
+    /**
+     * Escapes YAML special characters in keys.
+     * If the key contains special characters, wraps it in quotes.
+     *
+     * @param key The key to escape
+     * @return Escaped key safe for YAML
+     */
+    private String escapeYamlKey(String key) {
+        // YAML special characters that require quoting
+        if (key.matches(".*[:\\[\\]{}#&*!|>'\"%@`].*") ||
+            key.startsWith("-") ||
+            key.startsWith("?") ||
+            key.matches("^[0-9].*")) {
+            // Escape any existing quotes and wrap in quotes
+            return "\"" + key.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
+        }
+        return key;
+    }
+
+    /**
+     * Escapes YAML special characters in values.
+     * If the value contains special characters, wraps it in quotes.
+     *
+     * @param value The value to escape
+     * @return Escaped value safe for YAML
+     */
+    private String escapeYamlValue(String value) {
+        // Check if value needs quoting
+        if (value.matches(".*[:\\[\\]{}#&*!|>'\"%@`].*") ||
+            value.startsWith("-") ||
+            value.startsWith("?") ||
+            value.trim().isEmpty()) {
+            // Escape any existing quotes and wrap in quotes
+            return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
+        }
+        return value;
+    }
+
+    /**
+     * Validates that a string is in proper Ansible vault format.
+     * Expected format: "!vault |\n" followed by vault-encrypted content
+     *
+     * @param vaultValue The vault value to validate
+     * @return true if valid vault format, false otherwise
+     */
+    private boolean isValidVaultFormat(String vaultValue) {
+        if (vaultValue == null || vaultValue.trim().isEmpty()) {
+            return false;
+        }
+
+        // Must start with "!vault" (case insensitive)
+        String trimmed = vaultValue.trim();
+        if (!trimmed.toLowerCase().startsWith("!vault")) {
+            return false;
+        }
+
+        // For multiline vault values, should contain the pipe character and newline
+        if (vaultValue.contains("\n")) {
+            // Check if it follows the "!vault |" format
+            String firstLine = vaultValue.split("\n", 2)[0];
+            if (!firstLine.trim().matches("!vault\\s*\\|?")) {
+                return false;
+            }
+
+            // Should have encrypted content after the first line
+            String[] lines = vaultValue.split("\n");
+            if (lines.length < 2) {
+                return false;
+            }
+
+            // Vault content lines should not be empty (except maybe the last one)
+            for (int i = 1; i < lines.length - 1; i++) {
+                if (lines[i].trim().isEmpty()) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
     }
 
     public String encryptExtraVarsKey(String extraVars) throws Exception {
