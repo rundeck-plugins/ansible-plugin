@@ -1018,31 +1018,17 @@ public class AnsibleRunnerContextBuilder {
 
 
     public Boolean generateInventoryNodesAuth() {
-        Boolean generateInventoryNodesAuth = null;
-        String sgenerateInventoryNodesAuth = PropertyResolver.resolveProperty(
-                AnsibleDescribable.ANSIBLE_GENERATE_INVENTORY_NODES_AUTH,
-                null,
-                getFrameworkProject(),
-                getFramework(),
-                getNode(),
-                getJobConf()
-        );
-
-        if (null != sgenerateInventoryNodesAuth) {
-            generateInventoryNodesAuth = Boolean.parseBoolean(sgenerateInventoryNodesAuth);
+        // Only use plugin group configuration
+        if (this.pluginGroup != null && this.pluginGroup.getGenerateInventoryNodesAuth() != null) {
+            Boolean generateInventoryNodesAuth = this.pluginGroup.getGenerateInventoryNodesAuth();
+            this.context.getExecutionLogger().log(
+                    4, "Using plugin group configuration for generateInventoryNodesAuth: " + generateInventoryNodesAuth
+            );
+            return generateInventoryNodesAuth;
         }
 
-        // Fallback to plugin group configuration if not set
-        if (generateInventoryNodesAuth == null || !generateInventoryNodesAuth) {
-            if (this.pluginGroup != null && this.pluginGroup.getGenerateInventoryNodesAuth() != null && this.pluginGroup.getGenerateInventoryNodesAuth()) {
-                this.context.getExecutionLogger().log(
-                        4, "plugin group set getGenerateInventoryNodesAuth: " + this.pluginGroup.getGenerateInventoryNodesAuth()
-                );
-                generateInventoryNodesAuth = this.pluginGroup.getGenerateInventoryNodesAuth();
-            }
-        }
-
-        return generateInventoryNodesAuth;
+        // Default to false if not configured
+        return false;
     }
 
     /**

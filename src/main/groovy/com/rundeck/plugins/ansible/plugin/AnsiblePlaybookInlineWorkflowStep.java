@@ -70,8 +70,6 @@ public class AnsiblePlaybookInlineWorkflowStep implements StepPlugin, AnsibleDes
         // Project and framework level mappings for inventory generation
         builder.mapping(ANSIBLE_GENERATE_INVENTORY, PROJ_PROP_PREFIX + ANSIBLE_GENERATE_INVENTORY);
         builder.frameworkMapping(ANSIBLE_GENERATE_INVENTORY, FWK_PROP_PREFIX + ANSIBLE_GENERATE_INVENTORY);
-        builder.mapping(ANSIBLE_GENERATE_INVENTORY_NODES_AUTH, PROJ_PROP_PREFIX + ANSIBLE_GENERATE_INVENTORY_NODES_AUTH);
-        builder.frameworkMapping(ANSIBLE_GENERATE_INVENTORY_NODES_AUTH, FWK_PROP_PREFIX + ANSIBLE_GENERATE_INVENTORY_NODES_AUTH);
 
         DESC = builder.build();
     }
