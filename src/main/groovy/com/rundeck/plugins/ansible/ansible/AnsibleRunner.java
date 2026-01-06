@@ -6,6 +6,7 @@ import com.rundeck.plugins.ansible.util.*;
 import com.dtolabs.rundeck.core.utils.SSHAgentProcess;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
 import lombok.Builder;
 import lombok.Data;
 
@@ -125,15 +126,6 @@ public class AnsibleRunner {
         String inventory = contextBuilder.getInventory();
         if (inventory != null) {
             ansibleRunnerBuilder.inventory(inventory);
-        }
-
-        Boolean generateInventoryNodeAuth = contextBuilder.generateInventoryNodesAuth();
-        if(generateInventoryNodeAuth != null && generateInventoryNodeAuth){
-            Map<String, Map<String, String>> nodesAuth = contextBuilder.getNodesAuthenticationMap();
-            if (nodesAuth != null && !nodesAuth.isEmpty()) {
-                ansibleRunnerBuilder.addNodeAuthToInventory(true);
-                ansibleRunnerBuilder.nodesAuthentication(nodesAuth);
-            }
         }
 
         String limit = contextBuilder.getLimit();
@@ -284,7 +276,12 @@ public class AnsibleRunner {
     @Builder.Default
     private boolean useAnsibleVault = false;
 
-    static ObjectMapper mapperYaml = new ObjectMapper(new YAMLFactory());
+    static ObjectMapper mapperYaml = new ObjectMapper(
+        new YAMLFactory()
+            .enable(YAMLGenerator.Feature.LITERAL_BLOCK_STYLE)
+            .disable(YAMLGenerator.Feature.WRITE_DOC_START_MARKER)
+            .enable(YAMLGenerator.Feature.MINIMIZE_QUOTES)
+    );
     static ObjectMapper mapperJson = new ObjectMapper();
 
     private ProcessExecutor.ProcessExecutorBuilder processExecutorBuilder;
@@ -399,8 +396,8 @@ public class AnsibleRunner {
             // 3) become-password is used for node authentication
             if (encryptExtraVars && extraVars != null && !extraVars.isEmpty() ||
                 sshUsePassword ||
-                (become && becomePassword != null && !becomePassword.isEmpty())) {
-
+                (become && becomePassword != null && !becomePassword.isEmpty()) ||
+                (addNodeAuthToInventory != null && addNodeAuthToInventory)){
                 useAnsibleVault = ansibleVault.checkAnsibleVault();
 
                 if(!useAnsibleVault) {
@@ -413,6 +410,7 @@ public class AnsibleRunner {
                 procArgs.add(inventory);
 
                 if(addNodeAuthToInventory != null && addNodeAuthToInventory && nodesAuthentication != null && !nodesAuthentication.isEmpty()) {
+
                     Map<String, String> hostUsers = new LinkedHashMap<>();
                     Map<String, String> hostPasswords = new LinkedHashMap<>();
                     nodesAuthentication.forEach((nodeName, authValues) -> {
@@ -425,7 +423,7 @@ public class AnsibleRunner {
                             String encryptedPassword = password;
                             if (useAnsibleVault) {
                                 try {
-                                    encryptedPassword = encryptExtraVarsKey(password);
+                                    encryptedPassword = ansibleVault.encryptVariable("ansible_password", password);
                                 } catch (Exception e) {
                                     throw new RuntimeException(e);
                                 }
@@ -433,15 +431,17 @@ public class AnsibleRunner {
                             hostPasswords.put(nodeName, encryptedPassword);
                         }
                     });
-                    // Build YAML structure
-                    Map<String, Object> yamlData = new LinkedHashMap<>();
-                    yamlData.put("host_passwords", hostPasswords);
-                    yamlData.put("host_users", hostUsers);
+
+                    // Build YAML content using helper method
+                    String yamlContent = buildGroupVarsYaml(hostPasswords, hostUsers);
+
                     try {
-                        String yamlContent = mapperYaml.writeValueAsString(yamlData);
 
                         // Create group_vars directory structure
                         File inventoryFile = new File(inventory);
+
+                        System.err.println("DEBUG: inventoryFile: " + inventoryFile.getAbsolutePath());
+
                         File inventoryParentDir = inventoryFile.getParentFile();
 
                         if (inventoryParentDir != null) {
@@ -456,12 +456,16 @@ public class AnsibleRunner {
                             // Create all.yaml in group_vars directory
                             tempNodeAuthFile = new File(groupVarsDir, "all.yaml");
                             java.nio.file.Files.writeString(tempNodeAuthFile.toPath(), yamlContent);
-                            tempNodeAuthFile.deleteOnExit();
-                            groupVarsDir.deleteOnExit();
                         } else {
                             // Fallback to temp file if inventory has no parent directory
                             tempNodeAuthFile = AnsibleUtil.createTemporaryFile("group_vars", "all.yaml", yamlContent, customTmpDirPath);
                         }
+
+                        System.err.println("DEBUG: tempNodeAuthFile: " + tempNodeAuthFile.getAbsolutePath());
+
+                        //set extra vars to resolve the host specific authentication
+                        procArgs.add("-e ansible_user=\"{{ host_users[inventory_hostname] }}\"");
+                        procArgs.add("-e ansible_password=\"{{ host_passwords[inventory_hostname] }}\"");
 
                     } catch (IOException e) {
                         throw new RuntimeException("Failed to write all.yaml for node auth", e);
@@ -843,6 +847,51 @@ public class AnsibleRunner {
         return true;
     }
 
+
+    /**
+     * Builds YAML content for Ansible group_vars with vault-encrypted passwords and host users.
+     * This method manually constructs the YAML because Jackson cannot properly handle Ansible's
+     * custom !vault tag, which would result in an extra | character.
+     *
+     * @param hostPasswords Map of host names to vault-encrypted password strings
+     * @param hostUsers Map of host names to usernames
+     * @return YAML content string ready to be written to all.yaml
+     */
+    private String buildGroupVarsYaml(Map<String, String> hostPasswords, Map<String, String> hostUsers) {
+        StringBuilder yamlContent = new StringBuilder();
+        yamlContent.append("host_passwords:\n");
+
+        for (Map.Entry<String, String> entry : hostPasswords.entrySet()) {
+            yamlContent.append("  ").append(entry.getKey()).append(": ");
+            String vaultValue = entry.getValue();
+
+            // The vault value already contains "!vault |\n" followed by the encrypted content
+            // We just need to split and indent properly (4 spaces for vault content lines)
+            if (vaultValue.contains("\n")) {
+                String[] lines = vaultValue.split("\n", -1);
+                for (int i = 0; i < lines.length; i++) {
+                    if (i == 0) {
+                        // First line: "!vault |"
+                        yamlContent.append(lines[i]).append("\n");
+                    } else if (i < lines.length - 1 || !lines[i].isEmpty()) {
+                        // Vault content: indent with 4 spaces
+                        yamlContent.append("    ").append(lines[i]).append("\n");
+                    }
+                }
+            } else {
+                // Single line value (shouldn't happen with vault, but handle it)
+                yamlContent.append(vaultValue).append("\n");
+            }
+        }
+
+        yamlContent.append("\nhost_users:\n");
+        for (Map.Entry<String, String> entry : hostUsers.entrySet()) {
+            yamlContent.append("  ").append(entry.getKey()).append(": ")
+                       .append(entry.getValue()).append("\n");
+        }
+
+        return yamlContent.toString();
+    }
 
     public String encryptExtraVarsKey(String extraVars) throws Exception {
         Map<String, String> extraVarsMap = new HashMap<>();

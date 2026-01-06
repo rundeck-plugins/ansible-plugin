@@ -37,6 +37,10 @@ public class AnsiblePlaybookInlineWorkflowStep implements StepPlugin, AnsibleDes
         builder.name(SERVICE_PROVIDER_NAME);
         builder.title("Ansible Playbook Inline");
         builder.description("Runs an Inline Ansible Playbook.");
+        builder.metadata(
+                "automaticWorkflowStepRunnerAssociation",
+                "true"
+        );
 
         builder.property(BINARIES_DIR_PATH_PROP);
         builder.property(BASE_DIR_PROP);
@@ -93,8 +97,19 @@ public class AnsiblePlaybookInlineWorkflowStep implements StepPlugin, AnsibleDes
                 configuration,
                 pluginGroup);
 
+
         try {
             runner = AnsibleRunner.buildAnsibleRunner(contextBuilder);
+
+            Boolean generateInventoryNodeAuth = contextBuilder.generateInventoryNodesAuth();
+            if(generateInventoryNodeAuth != null && generateInventoryNodeAuth){
+                Map<String, Map<String, String>> nodesAuth = contextBuilder.getNodesAuthenticationMap();
+                if (nodesAuth != null && !nodesAuth.isEmpty()) {
+                    runner.setAddNodeAuthToInventory(true);
+                    runner.setNodesAuthentication(nodesAuth);
+                }
+            }
+
             runner.setCustomTmpDirPath(AnsibleUtil.getCustomTmpPathDir(contextBuilder.getFramework()));
         } catch (ConfigurationException e) {
             throw new StepException("Error configuring Ansible runner: " + e.getMessage(), e, AnsibleException.AnsibleFailureReason.ParseArgumentsError);
@@ -132,7 +147,7 @@ public class AnsiblePlaybookInlineWorkflowStep implements StepPlugin, AnsibleDes
     @Override
     public List<String> listSecretsPathWorkflowStep(ExecutionContext context, Map<String, Object> configuration) {
         AnsibleRunnerContextBuilder builder = new AnsibleRunnerContextBuilder(context, context.getFramework(), context.getNodes(), configuration);
-        return AnsibleUtil.getSecretsPath(builder);
+        return AnsibleUtil.getSecretsPathWorkflowSteps(builder);
     }
 
     @Override

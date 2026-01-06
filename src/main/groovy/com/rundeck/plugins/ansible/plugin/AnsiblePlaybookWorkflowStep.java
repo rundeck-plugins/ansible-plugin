@@ -36,7 +36,10 @@ public class AnsiblePlaybookWorkflowStep implements StepPlugin, AnsibleDescribab
         builder.name(SERVICE_PROVIDER_NAME);
         builder.title("Ansible Playbook");
         builder.description("Runs an Ansible Playbook.");
-
+        builder.metadata(
+                "automaticWorkflowStepRunnerAssociation",
+                "true"
+        );
         builder.property(BINARIES_DIR_PATH_PROP);
         builder.property(BASE_DIR_PROP);
         builder.property(PLAYBOOK_PATH_PROP);
@@ -94,6 +97,16 @@ public class AnsiblePlaybookWorkflowStep implements StepPlugin, AnsibleDescribab
 
         try {
             runner = AnsibleRunner.buildAnsibleRunner(contextBuilder);
+
+            Boolean generateInventoryNodeAuth = contextBuilder.generateInventoryNodesAuth();
+            if(generateInventoryNodeAuth != null && generateInventoryNodeAuth){
+                Map<String, Map<String, String>> nodesAuth = contextBuilder.getNodesAuthenticationMap();
+                if (nodesAuth != null && !nodesAuth.isEmpty()) {
+                    runner.setAddNodeAuthToInventory(true);
+                    runner.setNodesAuthentication(nodesAuth);
+                }
+            }
+
             runner.setCustomTmpDirPath(AnsibleUtil.getCustomTmpPathDir(contextBuilder.getFramework()));
         } catch (ConfigurationException e) {
             throw new StepException("Error configuring Ansible runner: " + e.getMessage(), e, AnsibleException.AnsibleFailureReason.ParseArgumentsError);

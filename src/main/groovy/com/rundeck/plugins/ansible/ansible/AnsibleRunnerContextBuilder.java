@@ -256,15 +256,7 @@ public class AnsibleRunnerContextBuilder {
 
     public String getSshNodeUser(INodeEntry node) {
         final String user;
-        user = PropertyResolver.resolveProperty(
-                AnsibleDescribable.ANSIBLE_SSH_USER,
-                null,
-                getFrameworkProject(),
-                getFramework(),
-                node,
-                getJobConf()
-        );
-
+        user = node.getUsername();
         if (null != user && user.contains("${")) {
             return DataContextUtils.replaceDataReferencesInString(user, getContext().getDataContext());
         }
