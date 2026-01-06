@@ -40,6 +40,7 @@ public class AnsibleRunnerContextBuilder {
     private final Map<String, Object> jobConf;
     private final Collection<INodeEntry> nodes;
     private final Collection<File> tempFiles;
+    private File executionSpecificDir;
 
     private AnsiblePluginGroup pluginGroup;
 
@@ -610,6 +611,17 @@ public class AnsibleRunnerContextBuilder {
         if (null != sgenerateInventory) {
             generateInventory = Boolean.parseBoolean(sgenerateInventory);
         }
+
+        // Fallback to plugin group configuration if not set
+        if (generateInventory == null || !generateInventory) {
+            if (this.pluginGroup != null && this.pluginGroup.getGenerateInventory() != null && this.pluginGroup.getGenerateInventory()) {
+                this.context.getExecutionLogger().log(
+                        4, "plugin group set getGenerateInventory: " + this.pluginGroup.getGenerateInventory()
+                );
+                generateInventory = this.pluginGroup.getGenerateInventory();
+            }
+        }
+
         return generateInventory;
     }
 
@@ -620,7 +632,8 @@ public class AnsibleRunnerContextBuilder {
 
 
         if (isGenerated != null && isGenerated) {
-            File tempInventory = new AnsibleInventoryBuilder(this.nodes, AnsibleUtil.getCustomTmpPathDir(framework)).buildInventory();
+            String executionSpecificDir = getExecutionSpecificTmpDir();
+            File tempInventory = new AnsibleInventoryBuilder(this.nodes, executionSpecificDir).buildInventory();
             tempFiles.add(tempInventory);
             inventory = tempInventory.getAbsolutePath();
             return inventory;
@@ -640,7 +653,8 @@ public class AnsibleRunnerContextBuilder {
             the builder gets the nodes from rundeck in rundeck node format and converts to ansible inventory
             we don't want that, we simply want the list we provided in ansible format
              */
-            File tempInventory = new AnsibleInlineInventoryBuilder(inline_inventory,AnsibleUtil.getCustomTmpPathDir(framework)).buildInventory();
+            String executionSpecificDir = getExecutionSpecificTmpDir();
+            File tempInventory = new AnsibleInlineInventoryBuilder(inline_inventory, executionSpecificDir).buildInventory();
             tempFiles.add(tempInventory);
             inventory = tempInventory.getAbsolutePath();
             return inventory;
@@ -769,12 +783,53 @@ public class AnsibleRunnerContextBuilder {
 
 
     public void cleanupTempFiles() {
+        System.err.println("DEBUG: cleanupTempFiles called");
+
+        // Clean up individual temp files
         for (File temp : tempFiles) {
             if (!getDebug()) {
+                System.err.println("DEBUG: Deleting temp file: " + temp.getAbsolutePath());
                 temp.delete();
             }
         }
         tempFiles.clear();
+
+        // Clean up execution-specific directory (including group_vars)
+        if (executionSpecificDir != null && executionSpecificDir.exists()) {
+            System.err.println("DEBUG: Execution-specific directory exists: " + executionSpecificDir.getAbsolutePath());
+            if (!getDebug()) {
+                System.err.println("DEBUG: Deleting execution-specific directory recursively");
+                deleteDirectoryRecursively(executionSpecificDir);
+                System.err.println("DEBUG: Execution-specific directory deleted");
+            } else {
+                System.err.println("DEBUG: Skipping cleanup due to debug mode");
+            }
+        } else {
+            System.err.println("DEBUG: No execution-specific directory to cleanup");
+        }
+    }
+
+    /**
+     * Recursively deletes a directory and all its contents.
+     *
+     * @param directory The directory to delete
+     */
+    private void deleteDirectoryRecursively(File directory) {
+        if (directory == null || !directory.exists()) {
+            return;
+        }
+
+        File[] files = directory.listFiles();
+        if (files != null) {
+            for (File file : files) {
+                if (file.isDirectory()) {
+                    deleteDirectoryRecursively(file);
+                } else {
+                    file.delete();
+                }
+            }
+        }
+        directory.delete();
     }
 
     public Boolean getUseSshAgent() {
@@ -985,6 +1040,59 @@ public class AnsibleRunnerContextBuilder {
         if (null != sgenerateInventoryNodesAuth) {
             generateInventoryNodesAuth = Boolean.parseBoolean(sgenerateInventoryNodesAuth);
         }
+
+        // Fallback to plugin group configuration if not set
+        if (generateInventoryNodesAuth == null || !generateInventoryNodesAuth) {
+            if (this.pluginGroup != null && this.pluginGroup.getGenerateInventoryNodesAuth() != null && this.pluginGroup.getGenerateInventoryNodesAuth()) {
+                this.context.getExecutionLogger().log(
+                        4, "plugin group set getGenerateInventoryNodesAuth: " + this.pluginGroup.getGenerateInventoryNodesAuth()
+                );
+                generateInventoryNodesAuth = this.pluginGroup.getGenerateInventoryNodesAuth();
+            }
+        }
+
         return generateInventoryNodesAuth;
+    }
+
+    /**
+     * Creates and returns an execution-specific temporary directory path.
+     * This ensures that each execution has its own isolated directory for inventory and group_vars,
+     * preventing conflicts when multiple workflow step executions run in parallel.
+     *
+     * @return The path to the execution-specific directory
+     */
+    private String getExecutionSpecificTmpDir() {
+        // Return cached directory if already created
+        if (executionSpecificDir != null) {
+            System.err.println("DEBUG: Using cached execution-specific directory: " + executionSpecificDir.getAbsolutePath());
+            return executionSpecificDir.getAbsolutePath();
+        }
+
+        String executionId = null;
+
+        // Get execution ID from data context
+        if (context.getDataContext() != null && context.getDataContext().get("job") != null) {
+            executionId = context.getDataContext().get("job").get("execid");
+            System.err.println("DEBUG: Execution ID from context: " + executionId);
+        }
+
+        // Get base tmp directory
+        String baseTmpDir = AnsibleUtil.getCustomTmpPathDir(framework);
+
+        // Create execution-specific directory
+        if (executionId != null && !executionId.isEmpty()) {
+            executionSpecificDir = new File(baseTmpDir, "ansible-exec-" + executionId);
+            if (!executionSpecificDir.exists()) {
+                System.err.println("DEBUG: Creating execution-specific directory: " + executionSpecificDir.getAbsolutePath());
+                executionSpecificDir.mkdirs();
+            } else {
+                System.err.println("DEBUG: Execution-specific directory already exists: " + executionSpecificDir.getAbsolutePath());
+            }
+            return executionSpecificDir.getAbsolutePath();
+        }
+
+        // Fallback to base tmp dir if execution ID is not available
+        System.err.println("DEBUG: No execution ID found, falling back to base tmp dir: " + baseTmpDir);
+        return baseTmpDir;
     }
 }
