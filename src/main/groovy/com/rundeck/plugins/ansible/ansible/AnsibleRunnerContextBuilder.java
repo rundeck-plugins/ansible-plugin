@@ -783,8 +783,6 @@ public class AnsibleRunnerContextBuilder {
 
 
     public void cleanupTempFiles() {
-        System.err.println("DEBUG: cleanupTempFiles called");
-
         // Clean up individual temp files
         for (File temp : tempFiles) {
             if (!getDebug()) {
@@ -796,7 +794,9 @@ public class AnsibleRunnerContextBuilder {
 
         // Clean up execution-specific directory (including group_vars)
         if (executionSpecificDir != null && executionSpecificDir.exists()) {
-            System.err.println("DEBUG: Execution-specific directory exists: " + executionSpecificDir.getAbsolutePath());
+            if (getDebug()) {
+                System.err.println("DEBUG: Execution-specific directory exists: " + executionSpecificDir.getAbsolutePath());
+            }
             if (!getDebug()) {
                 System.err.println("DEBUG: Deleting execution-specific directory recursively");
                 deleteDirectoryRecursively(executionSpecificDir);
@@ -954,8 +954,6 @@ public class AnsibleRunnerContextBuilder {
 
         Map<String, Map<String, String>> authenticationNodesMap = new HashMap<>();
 
-        System.err.println("DEBUG: getNodesAuthenticationMap called");
-
         this.context.getNodes().forEach((node) -> {
             String keyPath = PropertyResolver.resolveProperty(
                     AnsibleDescribable.ANSIBLE_SSH_PASSWORD_STORAGE_PATH,
@@ -966,16 +964,11 @@ public class AnsibleRunnerContextBuilder {
                     getJobConf()
             );
 
-            System.err.println("DEBUG: Node " + node.getNodename() + " keyPath: " + keyPath);
-
             Map<String, String> auth = new HashMap<>();
 
             if(null!=keyPath){
                 try {
                     String password = getPasswordFromPath(keyPath);
-                    System.err.println("DEBUG: Retrieved password for " + node.getNodename() + ": " + (password != null ? password.substring(0, Math.min(3, password.length())) + "..." : "null"));
-                    System.err.println("DEBUG: Password length: " + (password != null ? password.length() : 0));
-                    System.err.println("DEBUG: Password bytes: " + (password != null ? java.util.Arrays.toString(password.getBytes("UTF-8")) : "null"));
                     auth.put("ansible_password", password);
                 } catch (ConfigurationException e) {
                     System.err.println("DEBUG: Error retrieving password for " + node.getNodename() + ": " + e.getMessage());
@@ -987,7 +980,6 @@ public class AnsibleRunnerContextBuilder {
 
             }
             String userName = getSshNodeUser(node);
-            System.err.println("DEBUG: Node " + node.getNodename() + " userName: " + userName);
 
             if(null!=userName){
                 auth.put("ansible_user",userName );
@@ -996,7 +988,6 @@ public class AnsibleRunnerContextBuilder {
             authenticationNodesMap.put(node.getNodename(), auth);
         });
 
-        System.err.println("DEBUG: authenticationNodesMap has " + authenticationNodesMap.size() + " entries");
         return authenticationNodesMap;
     }
 
@@ -1073,7 +1064,10 @@ public class AnsibleRunnerContextBuilder {
         // Get execution ID from data context
         if (context.getDataContext() != null && context.getDataContext().get("job") != null) {
             executionId = context.getDataContext().get("job").get("execid");
-            System.err.println("DEBUG: Execution ID from context: " + executionId);
+
+            if (getDebug()) {
+                System.err.println("DEBUG: Execution ID from context: " + executionId);
+            }
         }
 
         // Get base tmp directory
@@ -1083,16 +1077,15 @@ public class AnsibleRunnerContextBuilder {
         if (executionId != null && !executionId.isEmpty()) {
             executionSpecificDir = new File(baseTmpDir, "ansible-exec-" + executionId);
             if (!executionSpecificDir.exists()) {
-                System.err.println("DEBUG: Creating execution-specific directory: " + executionSpecificDir.getAbsolutePath());
+                if (getDebug()) {
+                    System.err.println("DEBUG: Creating execution-specific directory: " + executionSpecificDir.getAbsolutePath());
+                }
                 executionSpecificDir.mkdirs();
             } else {
                 System.err.println("DEBUG: Execution-specific directory already exists: " + executionSpecificDir.getAbsolutePath());
             }
             return executionSpecificDir.getAbsolutePath();
         }
-
-        // Fallback to base tmp dir if execution ID is not available
-        System.err.println("DEBUG: No execution ID found, falling back to base tmp dir: " + baseTmpDir);
         return baseTmpDir;
     }
 }

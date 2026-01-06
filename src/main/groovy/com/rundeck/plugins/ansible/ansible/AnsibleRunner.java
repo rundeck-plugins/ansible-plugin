@@ -433,52 +433,62 @@ public class AnsibleRunner {
                     });
 
                     // Build YAML content using helper method
-                    System.err.println("DEBUG: Building group_vars YAML with " + hostPasswords.size() + " passwords and " + hostUsers.size() + " users");
                     String yamlContent = buildGroupVarsYaml(hostPasswords, hostUsers);
-                    System.err.println("DEBUG: YAML content built successfully, length: " + yamlContent.length());
+
+                    if(debug){
+                        System.err.println("DEBUG: Building group_vars YAML with " + hostPasswords.size() + " passwords and " + hostUsers.size() + " users");
+                        System.err.println("DEBUG: YAML content built successfully, length: " + yamlContent.length());
+                    }
 
                     try {
 
                         // Create group_vars directory structure
                         File inventoryFile = new File(inventory);
-                        System.err.println("DEBUG: inventoryFile: " + inventoryFile.getAbsolutePath());
-                        System.err.println("DEBUG: inventory file exists: " + inventoryFile.exists());
-
                         File inventoryParentDir = inventoryFile.getParentFile();
-                        System.err.println("DEBUG: inventoryParentDir: " + (inventoryParentDir != null ? inventoryParentDir.getAbsolutePath() : "null"));
+
+                        if(debug) {
+                            System.err.println("DEBUG: inventoryFile: " + inventoryFile.getAbsolutePath());
+                            System.err.println("DEBUG: inventory file exists: " + inventoryFile.exists());
+                            System.err.println("DEBUG: inventoryParentDir: " + (inventoryParentDir != null ? inventoryParentDir.getAbsolutePath() : "null"));
+                        }
 
                         if (inventoryParentDir != null) {
                             groupVarsDir = new File(inventoryParentDir, "group_vars");
-                            System.err.println("DEBUG: group_vars directory path: " + groupVarsDir.getAbsolutePath());
+                            if(debug) {
+                                System.err.println("DEBUG: group_vars directory path: " + groupVarsDir.getAbsolutePath());
+                            }
 
                             if (!groupVarsDir.exists()) {
-                                System.err.println("DEBUG: Creating group_vars directory");
                                 if (!groupVarsDir.mkdirs()) {
                                     throw new RuntimeException("Failed to create group_vars directory at: " + groupVarsDir.getAbsolutePath());
                                 }
-                                System.err.println("DEBUG: group_vars directory created successfully");
-                            } else {
-                                System.err.println("DEBUG: group_vars directory already exists");
                             }
 
                             // Create all.yaml in group_vars directory
                             tempNodeAuthFile = new File(groupVarsDir, "all.yaml");
-                            System.err.println("DEBUG: Writing all.yaml to: " + tempNodeAuthFile.getAbsolutePath());
                             java.nio.file.Files.writeString(tempNodeAuthFile.toPath(), yamlContent);
-                            System.err.println("DEBUG: all.yaml written successfully, file size: " + tempNodeAuthFile.length() + " bytes");
+
+                            if(debug) {
+                                System.err.println("DEBUG: Writing all.yaml to: " + tempNodeAuthFile.getAbsolutePath());
+                                System.err.println("DEBUG: all.yaml written successfully, file size: " + tempNodeAuthFile.length() + " bytes");
+                            }
                         } else {
                             // Fallback to temp file if inventory has no parent directory
-                            System.err.println("DEBUG: No parent directory, using temporary file");
                             tempNodeAuthFile = AnsibleUtil.createTemporaryFile("group_vars", "all.yaml", yamlContent, customTmpDirPath);
-                            System.err.println("DEBUG: Temporary all.yaml created at: " + tempNodeAuthFile.getAbsolutePath());
+
+                            if(debug) {
+                                System.err.println("DEBUG: No parent directory, using temporary file");
+                                System.err.println("DEBUG: Temporary all.yaml created at: " + tempNodeAuthFile.getAbsolutePath());
+                            }
                         }
 
-                        System.err.println("DEBUG: tempNodeAuthFile: " + tempNodeAuthFile.getAbsolutePath());
-                        System.err.println("DEBUG: tempNodeAuthFile exists: " + tempNodeAuthFile.exists());
-                        System.err.println("DEBUG: tempNodeAuthFile readable: " + tempNodeAuthFile.canRead());
+                        if(debug) {
+                            System.err.println("DEBUG: tempNodeAuthFile: " + tempNodeAuthFile.getAbsolutePath());
+                            System.err.println("DEBUG: tempNodeAuthFile exists: " + tempNodeAuthFile.exists());
+                            System.err.println("DEBUG: tempNodeAuthFile readable: " + tempNodeAuthFile.canRead());
+                        }
 
                         //set extra vars to resolve the host specific authentication
-                        System.err.println("DEBUG: Adding ansible extra vars for host-specific auth");
                         procArgs.add("-e ansible_user=\"{{ host_users[inventory_hostname] }}\"");
                         procArgs.add("-e ansible_password=\"{{ host_passwords[inventory_hostname] }}\"");
 
@@ -875,7 +885,6 @@ public class AnsibleRunner {
      * @return YAML content string ready to be written to all.yaml
      */
     private String buildGroupVarsYaml(Map<String, String> hostPasswords, Map<String, String> hostUsers) {
-        System.err.println("DEBUG: buildGroupVarsYaml called with " + hostPasswords.size() + " hosts");
 
         StringBuilder yamlContent = new StringBuilder();
         yamlContent.append("host_passwords:\n");
@@ -883,7 +892,6 @@ public class AnsibleRunner {
         for (Map.Entry<String, String> entry : hostPasswords.entrySet()) {
             String originalKey = entry.getKey();
             String escapedKey = escapeYamlKey(originalKey);
-            System.err.println("DEBUG: Processing host: " + originalKey + " -> escaped: " + escapedKey);
 
             yamlContent.append("  ").append(escapedKey).append(": ");
             String vaultValue = entry.getValue();
@@ -893,13 +901,10 @@ public class AnsibleRunner {
                 System.err.println("ERROR: Invalid vault format for host: " + originalKey);
                 throw new RuntimeException("Invalid vault format for host: " + originalKey);
             }
-            System.err.println("DEBUG: Vault format validated for host: " + originalKey);
-
             // The vault value already contains "!vault |\n" followed by the encrypted content
             // We just need to split and indent properly (4 spaces for vault content lines)
             if (vaultValue.contains("\n")) {
                 String[] lines = vaultValue.split("\n", -1);
-                System.err.println("DEBUG: Vault value has " + lines.length + " lines for host: " + originalKey);
                 for (int i = 0; i < lines.length; i++) {
                     if (i == 0) {
                         // First line: "!vault |"
@@ -922,17 +927,18 @@ public class AnsibleRunner {
             String originalValue = entry.getValue();
             String escapedKey = escapeYamlKey(originalKey);
             String escapedValue = escapeYamlValue(originalValue);
-            System.err.println("DEBUG: Adding user - host: " + originalKey + " -> " + escapedKey + ", user: " + originalValue + " -> " + escapedValue);
-
             yamlContent.append("  ").append(escapedKey).append(": ")
                        .append(escapedValue).append("\n");
         }
 
         String result = yamlContent.toString();
-        System.err.println("DEBUG: Generated YAML content (" + result.length() + " bytes):");
-        System.err.println("DEBUG: ========== YAML START ==========");
-        System.err.println(result);
-        System.err.println("DEBUG: ========== YAML END ==========");
+
+        if(debug){
+            System.err.println("DEBUG: Generated YAML content (" + result.length() + " bytes):");
+            System.err.println("DEBUG: ========== YAML START ==========");
+            System.err.println(result);
+            System.err.println("DEBUG: ========== YAML END ==========");
+        }
 
         return result;
     }
