@@ -37,7 +37,14 @@ version = scmVersion.version
 version = '4.0.13-grails7-upgrade-test'
 
 repositories {
-  mavenLocal()  // Must be FIRST for Grails 7 development
+  mavenLocal()
+    maven {
+        name = 'Central Portal Snapshots'
+        url = 'https://central.sonatype.com/repository/maven-snapshots/'
+        content {
+            includeGroup('org.rundeck')
+        }
+    }  // Must be FIRST for Grails 7 development
     maven {
         name = 'Central Portal Snapshots'
         url = 'https://central.sonatype.com/repository/maven-snapshots/'
