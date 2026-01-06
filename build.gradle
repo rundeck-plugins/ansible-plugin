@@ -34,7 +34,7 @@ scmVersion {
 
 version = scmVersion.version
 // Override version for Grails 7 upgrade
-version = '4.0.12-grails7-upgrade-test'
+version = '4.0.13-grails7-upgrade-test'
 
 repositories {
   mavenLocal()  // Must be FIRST for Grails 7 development
