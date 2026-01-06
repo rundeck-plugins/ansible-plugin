@@ -612,16 +612,6 @@ public class AnsibleRunnerContextBuilder {
             generateInventory = Boolean.parseBoolean(sgenerateInventory);
         }
 
-        // Fallback to plugin group configuration if not set
-        if (generateInventory == null || !generateInventory) {
-            if (this.pluginGroup != null && this.pluginGroup.getGenerateInventory() != null && this.pluginGroup.getGenerateInventory()) {
-                this.context.getExecutionLogger().log(
-                        4, "plugin group set getGenerateInventory: " + this.pluginGroup.getGenerateInventory()
-                );
-                generateInventory = this.pluginGroup.getGenerateInventory();
-            }
-        }
-
         return generateInventory;
     }
 
@@ -798,14 +788,14 @@ public class AnsibleRunnerContextBuilder {
                 System.err.println("DEBUG: Execution-specific directory exists: " + executionSpecificDir.getAbsolutePath());
             }
             if (!getDebug()) {
-                System.err.println("DEBUG: Deleting execution-specific directory recursively");
                 deleteDirectoryRecursively(executionSpecificDir);
-                System.err.println("DEBUG: Execution-specific directory deleted");
             } else {
                 System.err.println("DEBUG: Skipping cleanup due to debug mode");
             }
         } else {
-            System.err.println("DEBUG: No execution-specific directory to cleanup");
+            if (getDebug()) {
+                System.err.println("DEBUG: No execution-specific directory to cleanup");
+            }
         }
     }
 
@@ -1018,17 +1008,39 @@ public class AnsibleRunnerContextBuilder {
 
 
     public Boolean generateInventoryNodesAuth() {
-        // Only use plugin group configuration
-        if (this.pluginGroup != null && this.pluginGroup.getGenerateInventoryNodesAuth() != null) {
-            Boolean generateInventoryNodesAuth = this.pluginGroup.getGenerateInventoryNodesAuth();
-            this.context.getExecutionLogger().log(
-                    4, "Using plugin group configuration for generateInventoryNodesAuth: " + generateInventoryNodesAuth
-            );
-            return generateInventoryNodesAuth;
+        Boolean generateInventoryNodesAuth = null;
+
+        if(getDebug()) {
+            System.err.println("DEBUG: Resolving property ANSIBLE_GENERATE_INVENTORY_NODES_AUTH");
+            System.err.println("DEBUG: Property key: " + AnsibleDescribable.ANSIBLE_GENERATE_INVENTORY_NODES_AUTH);
+            System.err.println("DEBUG: Framework project: " + getFrameworkProject());
         }
 
-        // Default to false if not configured
-        return false;
+        String sgenerateInventoryNodesAuth = PropertyResolver.resolveProperty(
+                AnsibleDescribable.ANSIBLE_GENERATE_INVENTORY_NODES_AUTH,
+                null,
+                getFrameworkProject(),
+                getFramework(),
+                getNode(),
+                getJobConf()
+        );
+
+        if(getDebug()) {
+            System.err.println("DEBUG: PropertyResolver returned: " + sgenerateInventoryNodesAuth);
+        }
+
+        if (null != sgenerateInventoryNodesAuth) {
+            generateInventoryNodesAuth = Boolean.parseBoolean(sgenerateInventoryNodesAuth);
+            if(getDebug()) {
+                System.err.println("DEBUG: Parsed to boolean: " + generateInventoryNodesAuth);
+            }
+        } else {
+            if(getDebug()) {
+                System.err.println("DEBUG: Property not found, returning null");
+            }
+        }
+
+        return generateInventoryNodesAuth;
     }
 
     /**
@@ -1068,7 +1080,9 @@ public class AnsibleRunnerContextBuilder {
                 }
                 executionSpecificDir.mkdirs();
             } else {
-                System.err.println("DEBUG: Execution-specific directory already exists: " + executionSpecificDir.getAbsolutePath());
+                if (getDebug()) {
+                    System.err.println("DEBUG: Execution-specific directory already exists: " + executionSpecificDir.getAbsolutePath());
+                }
             }
             return executionSpecificDir.getAbsolutePath();
         }

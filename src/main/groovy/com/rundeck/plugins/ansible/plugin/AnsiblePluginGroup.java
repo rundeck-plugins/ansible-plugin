@@ -39,22 +39,6 @@ public class AnsiblePluginGroup implements PluginGroup, Describable {
         this.encryptExtraVars = encryptExtraVars;
     }
 
-    public Boolean getGenerateInventory() {
-        return generateInventory;
-    }
-
-    public void setGenerateInventory(Boolean generateInventory) {
-        this.generateInventory = generateInventory;
-    }
-
-    public Boolean getGenerateInventoryNodesAuth() {
-        return generateInventoryNodesAuth;
-    }
-
-    public void setGenerateInventoryNodesAuth(Boolean generateInventoryNodesAuth) {
-        this.generateInventoryNodesAuth = generateInventoryNodesAuth;
-    }
-
     @PluginProperty(
             title = "Ansible config file path",
             description = "Set ansible config file path."
@@ -72,18 +56,6 @@ public class AnsiblePluginGroup implements PluginGroup, Describable {
             description = "Encrypt the value of the extra vars keys."
     )
     Boolean encryptExtraVars;
-
-    @PluginProperty(
-            title = "Generate inventory",
-            description = "Generate an Ansible inventory from the targeted nodes."
-    )
-    Boolean generateInventory;
-
-    @PluginProperty(
-            title = "Generate inventory with node authentication",
-            description = "Add node-specific authentication credentials to the generated inventory via group_vars."
-    )
-    Boolean generateInventoryNodesAuth;
 
     @Override
     public Description getDescription() {

@@ -68,6 +68,8 @@ public class AnsiblePlaybookWorkflowStep implements StepPlugin, AnsibleDescribab
         // Project and framework level mappings for inventory generation
         builder.mapping(ANSIBLE_GENERATE_INVENTORY, PROJ_PROP_PREFIX + ANSIBLE_GENERATE_INVENTORY);
         builder.frameworkMapping(ANSIBLE_GENERATE_INVENTORY, FWK_PROP_PREFIX + ANSIBLE_GENERATE_INVENTORY);
+        builder.mapping(ANSIBLE_GENERATE_INVENTORY_NODES_AUTH, PROJ_PROP_PREFIX + ANSIBLE_GENERATE_INVENTORY_NODES_AUTH);
+        builder.frameworkMapping(ANSIBLE_GENERATE_INVENTORY_NODES_AUTH, FWK_PROP_PREFIX + ANSIBLE_GENERATE_INVENTORY_NODES_AUTH);
 
         DESC = builder.build();
     }
@@ -104,11 +106,31 @@ public class AnsiblePlaybookWorkflowStep implements StepPlugin, AnsibleDescribab
             runner = AnsibleRunner.buildAnsibleRunner(contextBuilder);
 
             Boolean generateInventoryNodeAuth = contextBuilder.generateInventoryNodesAuth();
+
+            boolean isDebug = context.getDataContext().get("job").get("loglevel").equals("DEBUG");
+
+            if(isDebug) {
+                System.err.println("DEBUG: generateInventoryNodesAuth returned: " + generateInventoryNodeAuth);
+            }
+
             if(generateInventoryNodeAuth != null && generateInventoryNodeAuth){
+                if(isDebug) {
+                    System.err.println("DEBUG: Node auth is enabled, getting authentication map");
+                }
                 Map<String, Map<String, String>> nodesAuth = contextBuilder.getNodesAuthenticationMap();
+                if(isDebug) {
+                    System.err.println("DEBUG: Retrieved " + (nodesAuth != null ? nodesAuth.size() : 0) + " node authentications");
+                }
                 if (nodesAuth != null && !nodesAuth.isEmpty()) {
                     runner.setAddNodeAuthToInventory(true);
                     runner.setNodesAuthentication(nodesAuth);
+                    if(isDebug) {
+                        System.err.println("DEBUG: Set node authentication on runner");
+                    }
+                }
+            } else {
+                if(isDebug) {
+                    System.err.println("DEBUG: Node auth is NOT enabled");
                 }
             }
 
