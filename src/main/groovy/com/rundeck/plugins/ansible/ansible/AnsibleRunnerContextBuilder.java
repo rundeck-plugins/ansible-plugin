@@ -775,7 +775,7 @@ public class AnsibleRunnerContextBuilder {
     public void cleanupTempFiles() {
         // Clean up individual temp files
         for (File temp : tempFiles) {
-            if (!getDebug()) {
+            if (getDebug()) {
                 System.err.println("DEBUG: Deleting temp file: " + temp.getAbsolutePath());
             }
             temp.delete();
