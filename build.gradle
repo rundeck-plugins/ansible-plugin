@@ -34,7 +34,7 @@ scmVersion {
 
 version = scmVersion.version
 // Override version for Grails 7 upgrade
-version = '4.0.15-grails7-upgrade-test'
+version = '4.0.16-grails7-upgrade-test'
 
 repositories {
   mavenLocal()
@@ -63,7 +63,7 @@ configurations {
   // Security: Force resolution of vulnerable dependencies
   all {
     resolutionStrategy {
-      force 'org.apache.commons:commons-lang3:3.18.0'
+      force 'org.apache.commons:commons-lang3:3.17.0'
       force 'org.apache.commons:commons-compress:1.28.0'
       force 'org.jetbrains.kotlin:kotlin-stdlib:2.1.0'
       // Exclude old commons-lang to prevent conflicts
