@@ -777,8 +777,8 @@ public class AnsibleRunnerContextBuilder {
         for (File temp : tempFiles) {
             if (!getDebug()) {
                 System.err.println("DEBUG: Deleting temp file: " + temp.getAbsolutePath());
-                temp.delete();
             }
+            temp.delete();
         }
         tempFiles.clear();
 
@@ -787,15 +787,7 @@ public class AnsibleRunnerContextBuilder {
             if (getDebug()) {
                 System.err.println("DEBUG: Execution-specific directory exists: " + executionSpecificDir.getAbsolutePath());
             }
-            if (!getDebug()) {
-                deleteDirectoryRecursively(executionSpecificDir);
-            } else {
-                System.err.println("DEBUG: Skipping cleanup due to debug mode");
-            }
-        } else {
-            if (getDebug()) {
-                System.err.println("DEBUG: No execution-specific directory to cleanup");
-            }
+            deleteDirectoryRecursively(executionSpecificDir);
         }
     }
 
