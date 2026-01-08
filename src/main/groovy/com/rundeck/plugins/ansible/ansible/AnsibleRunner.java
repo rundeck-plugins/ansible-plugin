@@ -884,7 +884,7 @@ public class AnsibleRunner {
      * @param hostUsers Map of host names to usernames
      * @return YAML content string ready to be written to all.yaml
      */
-    private String buildGroupVarsYaml(Map<String, String> hostPasswords, Map<String, String> hostUsers) {
+    String buildGroupVarsYaml(Map<String, String> hostPasswords, Map<String, String> hostUsers) {
 
         StringBuilder yamlContent = new StringBuilder();
         yamlContent.append("host_passwords:\n");
@@ -950,13 +950,13 @@ public class AnsibleRunner {
      * @param key The key to escape
      * @return Escaped key safe for YAML
      */
-    private String escapeYamlKey(String key) {
-        // YAML special characters that require quoting
-        if (key.matches(".*[:\\[\\]{}#&*!|>'\"%@`].*") ||
+    String escapeYamlKey(String key) {
+        // YAML special characters that require quoting (including backslash)
+        if (key.matches(".*[:\\[\\]{}#&*!|>'\"%@`\\\\].*") ||
             key.startsWith("-") ||
             key.startsWith("?") ||
             key.matches("^[0-9].*")) {
-            // Escape any existing quotes and wrap in quotes
+            // Escape any existing backslashes and quotes, then wrap in quotes
             return "\"" + key.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
         }
         return key;
@@ -969,13 +969,13 @@ public class AnsibleRunner {
      * @param value The value to escape
      * @return Escaped value safe for YAML
      */
-    private String escapeYamlValue(String value) {
-        // Check if value needs quoting
-        if (value.matches(".*[:\\[\\]{}#&*!|>'\"%@`].*") ||
+    String escapeYamlValue(String value) {
+        // Check if value needs quoting (including backslash)
+        if (value.matches(".*[:\\[\\]{}#&*!|>'\"%@`\\\\].*") ||
             value.startsWith("-") ||
             value.startsWith("?") ||
             value.trim().isEmpty()) {
-            // Escape any existing quotes and wrap in quotes
+            // Escape any existing backslashes and quotes, then wrap in quotes
             return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
         }
         return value;
@@ -988,7 +988,7 @@ public class AnsibleRunner {
      * @param vaultValue The vault value to validate
      * @return true if valid vault format, false otherwise
      */
-    private boolean isValidVaultFormat(String vaultValue) {
+    boolean isValidVaultFormat(String vaultValue) {
         if (vaultValue == null || vaultValue.trim().isEmpty()) {
             return false;
         }

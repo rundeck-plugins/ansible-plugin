@@ -1042,7 +1042,7 @@ public class AnsibleRunnerContextBuilder {
      *
      * @return The path to the execution-specific directory
      */
-    private String getExecutionSpecificTmpDir() {
+    String getExecutionSpecificTmpDir() {
         // Return cached directory if already created
         if (executionSpecificDir != null) {
             System.err.println("DEBUG: Using cached execution-specific directory: " + executionSpecificDir.getAbsolutePath());

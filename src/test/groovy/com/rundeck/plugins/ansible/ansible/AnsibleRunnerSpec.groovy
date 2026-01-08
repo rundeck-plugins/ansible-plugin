@@ -597,4 +597,169 @@ class AnsibleRunnerSpec extends Specification{
     }
 
 
+    def "escapeYamlKey: should quote keys with special characters"() {
+        given:
+        def builder = AnsibleRunner.playbookInline("test")
+        builder.customTmpDirPath("/tmp")
+        def runner = builder.build()
+
+        expect:
+        runner.escapeYamlKey(key) == expectedResult
+
+        where:
+        key                  || expectedResult
+        "simple-key"         || "simple-key"
+        "key:with:colons"    || "\"key:with:colons\""
+        "key[brackets]"      || "\"key[brackets]\""
+        "key{braces}"        || "\"key{braces}\""
+        "key#hash"           || "\"key#hash\""
+        "key&ampersand"      || "\"key&ampersand\""
+        "key*asterisk"       || "\"key*asterisk\""
+        "key!exclamation"    || "\"key!exclamation\""
+        "key|pipe"           || "\"key|pipe\""
+        "-starts-with-dash"  || "\"-starts-with-dash\""
+        "?starts-with-q"     || "\"?starts-with-q\""
+        "123numeric"         || "\"123numeric\""
+        "key with spaces"    || "key with spaces"  // spaces are handled differently
+    }
+
+    def "escapeYamlValue: should quote values with special characters"() {
+        given:
+        def builder = AnsibleRunner.playbookInline("test")
+        builder.customTmpDirPath("/tmp")
+        def runner = builder.build()
+
+        expect:
+        runner.escapeYamlValue(value) == expectedResult
+
+        where:
+        value                || expectedResult
+        "simple-value"       || "simple-value"
+        "value:colon"        || "\"value:colon\""
+        "value[bracket]"     || "\"value[bracket]\""
+        "   "                || "\"   \""  // empty/whitespace should be quoted
+        "value@at"           || "\"value@at\""
+        "-starts-dash"       || "\"-starts-dash\""
+    }
+
+    def "escapeYamlKey: should escape backslashes and quotes"() {
+        given:
+        def builder = AnsibleRunner.playbookInline("test")
+        builder.customTmpDirPath("/tmp")
+        def runner = builder.build()
+
+        expect:
+        runner.escapeYamlKey('key"with"quotes') == '"key\\"with\\"quotes"'
+        runner.escapeYamlKey('key\\backslash') == '"key\\\\backslash"'
+    }
+
+    def "isValidVaultFormat: should validate vault format correctly"() {
+        given:
+        def builder = AnsibleRunner.playbookInline("test")
+        builder.customTmpDirPath("/tmp")
+        def runner = builder.build()
+
+        expect:
+        runner.isValidVaultFormat(vaultValue) == expectedResult
+
+        where:
+        vaultValue                                    || expectedResult
+        "!vault |\n  encryptedcontent"                || true
+        "!vault |\n  line1\n  line2"                  || true
+        "!vault\n  content"                           || true  // without pipe
+        "not a vault"                                 || false
+        null                                          || false
+        ""                                            || false
+        "!vault"                                      || true  // minimal valid
+        "!vault |\n"                                  || false // no content
+    }
+
+    def "buildGroupVarsYaml: should create valid YAML with host passwords and users"() {
+        given:
+        def builder = AnsibleRunner.playbookInline("test")
+        builder.customTmpDirPath("/tmp")
+        def runner = builder.build()
+
+        def hostPasswords = [
+                "web-server-1": "!vault |\n  encrypted1",
+                "db-server-1": "!vault |\n  encrypted2"
+        ]
+        def hostUsers = [
+                "web-server-1": "webadmin",
+                "db-server-1": "dbadmin"
+        ]
+
+        when:
+        def yaml = runner.buildGroupVarsYaml(hostPasswords, hostUsers)
+
+        then:
+        yaml.contains("host_passwords:")
+        yaml.contains("web-server-1: !vault |")
+        yaml.contains("    encrypted1")
+        yaml.contains("db-server-1: !vault |")
+        yaml.contains("    encrypted2")
+        yaml.contains("host_users:")
+        yaml.contains("web-server-1: webadmin")
+        yaml.contains("db-server-1: dbadmin")
+    }
+
+    def "buildGroupVarsYaml: should escape special characters in node names"() {
+        given:
+        def builder = AnsibleRunner.playbookInline("test")
+        builder.customTmpDirPath("/tmp")
+        def runner = builder.build()
+
+        def hostPasswords = [
+                "web:server:1": "!vault |\n  encrypted"
+        ]
+        def hostUsers = [
+                "web:server:1": "admin"
+        ]
+
+        when:
+        def yaml = runner.buildGroupVarsYaml(hostPasswords, hostUsers)
+
+        then:
+        yaml.contains('"web:server:1": !vault |')
+        yaml.contains('"web:server:1": admin')
+    }
+
+    def "buildGroupVarsYaml: should throw exception for invalid vault format"() {
+        given:
+        def builder = AnsibleRunner.playbookInline("test")
+        builder.customTmpDirPath("/tmp")
+        def runner = builder.build()
+
+        def hostPasswords = [
+                "web-server-1": "not-a-vault-value"
+        ]
+        def hostUsers = [
+                "web-server-1": "admin"
+        ]
+
+        when:
+        runner.buildGroupVarsYaml(hostPasswords, hostUsers)
+
+        then:
+        def e = thrown(RuntimeException)
+        e.message.contains("Invalid vault format for host: web-server-1")
+    }
+
+    def "buildGroupVarsYaml: should handle empty host lists"() {
+        given:
+        def builder = AnsibleRunner.playbookInline("test")
+        builder.customTmpDirPath("/tmp")
+        def runner = builder.build()
+
+        def hostPasswords = [:]
+        def hostUsers = [:]
+
+        when:
+        def yaml = runner.buildGroupVarsYaml(hostPasswords, hostUsers)
+
+        then:
+        yaml.contains("host_passwords:")
+        yaml.contains("host_users:")
+    }
+
 }
