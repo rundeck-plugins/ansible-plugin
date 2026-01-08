@@ -552,7 +552,11 @@ public class AnsibleRunner {
             }
 
             if (sshUsePassword) {
-                String extraVarsPassword = "ansible_password: " + sshPass;
+                // Escape special characters in the password to prevent YAML parsing errors
+                String escapedPassword = escapePasswordForYaml(sshPass);
+
+                // Wrap in quotes to preserve special characters
+                String extraVarsPassword = "ansible_password: \"" + escapedPassword + "\"";
                 String finalextraVarsPassword = extraVarsPassword;
 
                 if(useAnsibleVault){
@@ -571,7 +575,11 @@ public class AnsibleRunner {
                 procArgs.add("--become");
 
                 if (becomePassword != null && !becomePassword.isEmpty()) {
-                    String extraVarsPassword = "ansible_become_password: " + becomePassword;
+                    // Escape special characters in the password to prevent YAML parsing errors
+                    String escapedPassword = escapePasswordForYaml(becomePassword);
+
+                    // Wrap in quotes to preserve special characters
+                    String extraVarsPassword = "ansible_become_password: \"" + escapedPassword + "\"";
                     String finalextraVarsPassword = extraVarsPassword;
 
                     if (useAnsibleVault) {
@@ -979,6 +987,22 @@ public class AnsibleRunner {
             return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
         }
         return value;
+    }
+
+    /**
+     * Escapes a password value for safe use in YAML.
+     * Always wraps the password in quotes and escapes special characters to prevent YAML parsing errors.
+     *
+     * @param password The password to escape
+     * @return Escaped and quoted password safe for YAML
+     */
+    String escapePasswordForYaml(String password) {
+        // Escape special characters in the password to prevent YAML parsing errors
+        return password
+            .replace("\\", "\\\\")
+            .replace("\"", "\\\"")
+            .replace("\n", "\\n")
+            .replace("\r", "\\r");
     }
 
     /**
