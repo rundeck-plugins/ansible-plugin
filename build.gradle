@@ -3,7 +3,7 @@ plugins {
   id 'maven-publish'
 }
 
-group = 'com.github.rundeck-plugins'
+group = 'com.rundeck.plugins'
 
 ext.rundeckPluginVersion = '1.2'
 ext.pluginClassNames = [
@@ -27,14 +27,12 @@ targetCompatibility = 17
 scmVersion {
     ignoreUncommittedChanges = false
     tag {
-        prefix = 'v'
+        prefix = ''           // NO "v" prefix - see PLUGIN_TAGGING_ARCHITECTURE.md
         versionSeparator = ''
     }
 }
 
-version = scmVersion.version
-// Override version for Grails 7 upgrade
-version = '4.0.16-grails7-upgrade-test'
+version = scmVersion.version  // Dynamic version from git tag
 
 repositories {
   mavenLocal()
@@ -144,8 +142,24 @@ jar {
 publishing {
   publications {
     maven(MavenPublication) {
+      groupId = 'com.rundeck.plugins'
       artifactId = 'ansible-plugin'
+      version = project.version
       from components.java
+    }
+  }
+  
+  repositories {
+    maven {
+      name = "PackageCloudTest"
+      url = uri("https://packagecloud.io/pagerduty/rundeckpro-test/maven2")
+      authentication {
+        header(HttpHeaderAuthentication)
+      }
+      credentials(HttpHeaderCredentials) {
+        name = "Authorization"
+        value = "Bearer " + (System.getenv("PKGCLD_WRITE_TOKEN") ?: project.findProperty("pkgcldWriteToken"))
+      }
     }
   }
 }
