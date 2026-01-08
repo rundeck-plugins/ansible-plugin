@@ -43,8 +43,6 @@ public class AnsiblePlaybookInlineWorkflowNodeStep implements NodeStepPlugin, An
         builder.property(PLAYBOOK_INLINE_PROP);
         builder.property(EXTRA_VARS_PROP);
         builder.property(CONFIG_ENCRYPT_EXTRA_VARS);
-        builder.property(GENERATE_INVENTORY_PROP);
-        builder.property(GENERATE_INVENTORY_NODES_AUTH);
         builder.property(VAULT_KEY_FILE_PROP);
         builder.property(VAULT_KEY_STORAGE_PROP);
         builder.property(EXTRA_ATTRS_PROP);
@@ -123,13 +121,7 @@ public class AnsiblePlaybookInlineWorkflowNodeStep implements NodeStepPlugin, An
     @Override
     public List<String> listSecretsPathWorkflowNodeStep(ExecutionContext context, INodeEntry node, Map<String, Object> configuration) {
         AnsibleRunnerContextBuilder builder = new AnsibleRunnerContextBuilder(node, context, context.getFramework(), configuration);
-        List<String> secretPaths = AnsibleUtil.getSecretsPath(builder);
-        List<String> secretPathsNodes = builder.getListNodesKeyPath();
-
-        if(secretPathsNodes != null && !secretPathsNodes.isEmpty()){
-            secretPaths.addAll(secretPathsNodes);
-        }
-        return secretPaths;
+        return AnsibleUtil.getSecretsPath(builder);
     }
 
     @Override
