@@ -762,4 +762,244 @@ class AnsibleRunnerSpec extends Specification{
         yaml.contains("host_users:")
     }
 
+    def "escapePasswordForYaml: should escape special characters"() {
+        given:
+        def builder = AnsibleRunner.playbookInline("test")
+        builder.customTmpDirPath("/tmp")
+        def runner = builder.build()
+
+        expect:
+        runner.escapePasswordForYaml(password) == expectedResult
+
+        where:
+        password                  || expectedResult
+        "simple"                  || "simple"
+        "p@ssword"                || "p@ssword"
+        "pass:word"               || "pass:word"
+        "pass#word"               || "pass#word"
+        'pass"word'               || 'pass\\"word'
+        'pass\\word'              || 'pass\\\\word'
+        'pass\nword'              || 'pass\\nword'
+        'pass\rword'              || 'pass\\rword'
+        'pass"\\word'             || 'pass\\"\\\\word'
+        "p@ss:w#rd!"              || "p@ss:w#rd!"
+        '"\\'                     || '\\"\\\\'
+        ""                        || ""
+    }
+
+    def "escapePasswordForYaml: should handle complex passwords"() {
+        given:
+        def builder = AnsibleRunner.playbookInline("test")
+        builder.customTmpDirPath("/tmp")
+        def runner = builder.build()
+
+        when:
+        def result = runner.escapePasswordForYaml('My"P@ss\\word\n2024')
+
+        then:
+        result == 'My\\"P@ss\\\\word\\n2024'
+    }
+
+    def "ssh password with special characters should be escaped and quoted"() {
+        given:
+        String playbook = "test"
+        String password = 'p@ss"word:123'
+
+        def runnerBuilder = AnsibleRunner.playbookInline(playbook)
+        runnerBuilder.sshPass(password)
+        runnerBuilder.sshUser("user")
+        runnerBuilder.sshUsePassword(true)
+
+        def process = Mock(Process) {
+            waitFor() >> 0
+            getInputStream() >> new ByteArrayInputStream("".getBytes())
+            getOutputStream() >> new ByteArrayOutputStream()
+            getErrorStream() >> new ByteArrayInputStream("".getBytes())
+        }
+
+        def processExecutor = Mock(ProcessExecutor) {
+            run() >> process
+        }
+
+        List<String> capturedArgs = null
+        ProcessExecutor.ProcessExecutorBuilder processBuilder = Mock(ProcessExecutor.ProcessExecutorBuilder)
+
+        // Configure fluent builder responses
+        processBuilder.build() >> processExecutor
+        processBuilder.procArgs(_ as List) >> { List args ->
+            capturedArgs = new ArrayList(args)
+            return processBuilder
+        }
+        processBuilder.environmentVariables(_ as Map) >> { Map e -> return processBuilder }
+        processBuilder.baseDirectory(_ as File) >> { File f -> return processBuilder }
+        processBuilder.stdinVariables(_ as List) >> { List v -> return processBuilder }
+        processBuilder.promptStdinLogFile(_ as File) >> { File f -> return processBuilder }
+        processBuilder.debug(_ as boolean) >> { boolean d -> return processBuilder }
+
+        def ansibleVault = Mock(AnsibleVault) {
+            checkAnsibleVault() >> true
+            getVaultPasswordScriptFile() >> new File("vault-script-client.py")
+        }
+
+        runnerBuilder.processExecutorBuilder(processBuilder)
+        runnerBuilder.ansibleVault(ansibleVault)
+
+        when:
+        AnsibleRunner runner = runnerBuilder.build()
+        runner.setCustomTmpDirPath("/tmp")
+        def result = runner.run()
+
+        then:
+        result == 0
+        1 * ansibleVault.encryptVariable(_, _) >> "!vault | value"
+        capturedArgs != null
+        // Flatten and verify --extra-vars argument exists
+        def flatArgs = capturedArgs.flatten().collect { it?.toString() }
+        flatArgs.any { it.contains("--extra-vars") }
+    }
+
+    def "become password with special characters should be escaped and quoted"() {
+        given:
+        String playbook = "test"
+        String becomePass = 'admin"pass\\123'
+
+        def runnerBuilder = AnsibleRunner.playbookInline(playbook)
+        runnerBuilder.become(true)
+        runnerBuilder.becomeUser("root")
+        runnerBuilder.becomePassword(becomePass)
+        runnerBuilder.becomeMethod("sudo")
+
+        def process = Mock(Process) {
+            waitFor() >> 0
+            getInputStream() >> new ByteArrayInputStream("".getBytes())
+            getOutputStream() >> new ByteArrayOutputStream()
+            getErrorStream() >> new ByteArrayInputStream("".getBytes())
+        }
+
+        def processExecutor = Mock(ProcessExecutor) {
+            run() >> process
+        }
+
+        List<String> capturedArgs = null
+        ProcessExecutor.ProcessExecutorBuilder processBuilder = Mock(ProcessExecutor.ProcessExecutorBuilder)
+
+        // Configure fluent builder responses
+        processBuilder.build() >> processExecutor
+        processBuilder.procArgs(_ as List) >> { List args ->
+            capturedArgs = new ArrayList(args)
+            return processBuilder
+        }
+        processBuilder.environmentVariables(_ as Map) >> { Map e -> return processBuilder }
+        processBuilder.baseDirectory(_ as File) >> { File f -> return processBuilder }
+        processBuilder.stdinVariables(_ as List) >> { List v -> return processBuilder }
+        processBuilder.promptStdinLogFile(_ as File) >> { File f -> return processBuilder }
+        processBuilder.debug(_ as boolean) >> { boolean d -> return processBuilder }
+
+        def ansibleVault = Mock(AnsibleVault) {
+            checkAnsibleVault() >> true
+            getVaultPasswordScriptFile() >> new File("vault-script-client.py")
+        }
+
+        runnerBuilder.processExecutorBuilder(processBuilder)
+        runnerBuilder.ansibleVault(ansibleVault)
+
+        when:
+        AnsibleRunner runner = runnerBuilder.build()
+        runner.setCustomTmpDirPath("/tmp")
+        def result = runner.run()
+
+        then:
+        result == 0
+        1 * ansibleVault.encryptVariable(_, _) >> "!vault | value"
+        capturedArgs != null
+        // Flatten and verify arguments
+        def flatArgs = capturedArgs.flatten().collect { it?.toString() }
+        flatArgs.contains("--become")
+        flatArgs.any { it.contains("--extra-vars") }
+    }
+
+    def "escapePasswordForYaml: should preserve passwords without special chars"() {
+        given:
+        def builder = AnsibleRunner.playbookInline("test")
+        builder.customTmpDirPath("/tmp")
+        def runner = builder.build()
+
+        when:
+        def result = runner.escapePasswordForYaml("simplePassword123")
+
+        then:
+        result == "simplePassword123"
+    }
+
+    def "escapePasswordForYaml: should handle multiple escape sequences"() {
+        given:
+        def builder = AnsibleRunner.playbookInline("test")
+        builder.customTmpDirPath("/tmp")
+        def runner = builder.build()
+
+        when:
+        // Password with quote, backslash, and newline
+        def result = runner.escapePasswordForYaml('test"\\pass\n')
+
+        then:
+        // Each special char should be escaped
+        result == 'test\\"\\\\pass\\n'
+    }
+
+    def "both ssh and become passwords with special chars should work together"() {
+        given:
+        String playbook = "test"
+        String sshPass = 'ssh"pass:123'
+        String becomePass = 'sudo\\pass#456'
+
+        def runnerBuilder = AnsibleRunner.playbookInline(playbook)
+        runnerBuilder.sshPass(sshPass)
+        runnerBuilder.sshUser("user")
+        runnerBuilder.sshUsePassword(true)
+        runnerBuilder.become(true)
+        runnerBuilder.becomeUser("root")
+        runnerBuilder.becomePassword(becomePass)
+        runnerBuilder.becomeMethod("sudo")
+
+        def process = Mock(Process) {
+            waitFor() >> 0
+            getInputStream() >> new ByteArrayInputStream("".getBytes())
+            getOutputStream() >> new ByteArrayOutputStream()
+            getErrorStream() >> new ByteArrayInputStream("".getBytes())
+        }
+
+        def processExecutor = Mock(ProcessExecutor) {
+            run() >> process
+        }
+
+        ProcessExecutor.ProcessExecutorBuilder processBuilder = Mock(ProcessExecutor.ProcessExecutorBuilder)
+
+        // Configure fluent builder responses
+        processBuilder.build() >> processExecutor
+        processBuilder.procArgs(_ as List) >> { List args -> return processBuilder }
+        processBuilder.environmentVariables(_ as Map) >> { Map e -> return processBuilder }
+        processBuilder.baseDirectory(_ as File) >> { File f -> return processBuilder }
+        processBuilder.stdinVariables(_ as List) >> { List v -> return processBuilder }
+        processBuilder.promptStdinLogFile(_ as File) >> { File f -> return processBuilder }
+        processBuilder.debug(_ as boolean) >> { boolean d -> return processBuilder }
+
+        def ansibleVault = Mock(AnsibleVault) {
+            checkAnsibleVault() >> true
+            getVaultPasswordScriptFile() >> new File("vault-script-client.py")
+        }
+
+        runnerBuilder.processExecutorBuilder(processBuilder)
+        runnerBuilder.ansibleVault(ansibleVault)
+
+        when:
+        AnsibleRunner runner = runnerBuilder.build()
+        runner.setCustomTmpDirPath("/tmp")
+        def result = runner.run()
+
+        then:
+        result == 0
+        // Both passwords should be encrypted
+        2 * ansibleVault.encryptVariable(_, _) >> "!vault | value"
+    }
+
 }
