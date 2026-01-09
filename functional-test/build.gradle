@@ -42,7 +42,14 @@ dependencies {
 
 tasks.register('functionalTest', Test) {
     useJUnitPlatform()
-    systemProperty('RUNDECK_TEST_IMAGE', "rundeck/rundeck:5.1.1")
+    systemProperty('RUNDECK_TEST_IMAGE', "rundeck/rundeck:5.18.0")
+
+    // Docker configuration for Testcontainers
+    // For Rancher Desktop on macOS: Use /Users/<username>/.rd/docker.sock
+    // For Docker Desktop on macOS: Use /var/run/docker.sock
+    // For Linux: Use /var/run/docker.sock
+    // You can also configure this via ~/.testcontainers.properties (see functional-test/README.md)
+
     description = "Run Ansible integration tests"
 }
 

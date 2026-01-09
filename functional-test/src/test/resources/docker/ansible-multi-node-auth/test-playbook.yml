@@ -1,0 +1,39 @@
+---
+- name: Multi-Node Authentication Test Playbook
+  hosts: all
+  gather_facts: yes
+  tasks:
+    - name: Ping all nodes
+      ping:
+
+    - name: Get hostname
+      command: hostname
+      register: node_hostname
+
+    - name: Display connection info
+      debug:
+        msg: "Successfully connected to {{ node_hostname.stdout }} as {{ ansible_user_id }}"
+
+    - name: Create test file
+      file:
+        path: "/tmp/multi_node_test_{{ inventory_hostname }}.txt"
+        state: touch
+        mode: '0644'
+
+    - name: Write test content
+      copy:
+        content: "Multi-node authentication test passed on {{ inventory_hostname }}\n"
+        dest: "/tmp/multi_node_test_{{ inventory_hostname }}.txt"
+
+    - name: Verify file exists
+      stat:
+        path: "/tmp/multi_node_test_{{ inventory_hostname }}.txt"
+      register: test_file_stat
+
+    - name: Assert test file was created
+      assert:
+        that:
+          - test_file_stat.stat.exists
+          - test_file_stat.stat.isreg
+        success_msg: "Test file created successfully on {{ inventory_hostname }}"
+        fail_msg: "Failed to create test file on {{ inventory_hostname }}"

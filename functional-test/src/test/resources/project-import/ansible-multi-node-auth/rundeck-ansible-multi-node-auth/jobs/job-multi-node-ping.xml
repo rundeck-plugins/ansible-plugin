@@ -1,0 +1,36 @@
+<joblist>
+  <job>
+    <defaultTab>nodes</defaultTab>
+    <description>Test multi-node authentication with different passwords</description>
+    <dispatch>
+      <excludePrecedence>true</excludePrecedence>
+      <keepgoing>true</keepgoing>
+      <rankOrder>ascending</rankOrder>
+      <successOnEmptyNodeFilter>false</successOnEmptyNodeFilter>
+      <threadcount>3</threadcount>
+    </dispatch>
+    <executionEnabled>true</executionEnabled>
+    <id>a1b2c3d4-e5f6-7890-abcd-ef1234567890</id>
+    <loglevel>INFO</loglevel>
+    <name>multi-node-ping-test</name>
+    <nodeFilterEditable>false</nodeFilterEditable>
+    <nodefilters>
+      <filter>name: ssh-node.*</filter>
+    </nodefilters>
+    <nodesSelectedByDefault>true</nodesSelectedByDefault>
+    <plugins />
+    <scheduleEnabled>true</scheduleEnabled>
+    <sequence keepgoing='false' strategy='node-first'>
+      <command>
+        <script><![CDATA[#!/bin/bash
+echo "Testing node: $(hostname)"
+echo "Current user: $(whoami)"
+echo "Node authenticated successfully!"
+pwd
+]]></script>
+        <scriptargs />
+      </command>
+    </sequence>
+    <uuid>a1b2c3d4-e5f6-7890-abcd-ef1234567890</uuid>
+  </job>
+</joblist>
