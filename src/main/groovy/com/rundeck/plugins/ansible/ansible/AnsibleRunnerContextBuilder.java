@@ -953,10 +953,14 @@ public class AnsibleRunnerContextBuilder {
                     String password = getPasswordFromPath(keyPath);
                     auth.put("ansible_password", password);
                 } catch (ConfigurationException e) {
-                    System.err.println("DEBUG: Error retrieving password for " + node.getNodename() + ": " + e.getMessage());
+                    if (getDebug()) {
+                        System.err.println("DEBUG: Error retrieving password for " + node.getNodename() + ": " + e.getMessage());
+                    }
                     throw new RuntimeException(e);
                 } catch (Exception e2) {
-                    System.err.println("DEBUG: Unexpected error: " + e2.getMessage());
+                    if (getDebug()) {
+                        System.err.println("DEBUG: Unexpected error: " + e2.getMessage());
+                    }
                     throw new RuntimeException(e2);
                 }
 
@@ -1045,7 +1049,9 @@ public class AnsibleRunnerContextBuilder {
     String getExecutionSpecificTmpDir() {
         // Return cached directory if already created
         if (executionSpecificDir != null) {
-            System.err.println("DEBUG: Using cached execution-specific directory: " + executionSpecificDir.getAbsolutePath());
+            if (getDebug()) {
+                System.err.println("DEBUG: Using cached execution-specific directory: " + executionSpecificDir.getAbsolutePath());
+            }
             return executionSpecificDir.getAbsolutePath();
         }
 

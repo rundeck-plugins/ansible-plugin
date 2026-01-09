@@ -942,10 +942,7 @@ public class AnsibleRunner {
         String result = yamlContent.toString();
 
         if(debug){
-            System.err.println("DEBUG: Generated YAML content (" + result.length() + " bytes):");
-            System.err.println("DEBUG: ========== YAML START ==========");
-            System.err.println(result);
-            System.err.println("DEBUG: ========== YAML END ==========");
+            System.err.println("DEBUG: Generated YAML content (" + result.length() + " bytes)");
         }
 
         return result;
