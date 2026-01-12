@@ -183,6 +183,7 @@ class AnsibleResourceModelSourceSpec extends Specification {
         Properties config = new Properties()
         config.put('project', 'project_1')
         config.put(AnsibleDescribable.ANSIBLE_GATHER_FACTS, 'false')
+        config.put(AnsibleDescribable.ANSIBLE_IMPORT_INVENTORY_VARS, 'true')
         plugin.configure(config)
 
         Services services = Mock(Services) {
@@ -412,6 +413,127 @@ class AnsibleResourceModelSourceSpec extends Specification {
         notThrown(Exception)
         nodes.size() == 1
         nodes.getNodeNames().contains('valid-node')
+    }
+
+    void "ignore host vars with prefix should filter variables when gather facts is false"() {
+        given: "a plugin configured with importInventoryVars and ignoreInventoryVars"
+        def nodeName = 'testhost'
+        def certificate = """-----BEGIN CERTIFICATE-----
+fake-cert
+-----END CERTIFICATE-----"""
+
+        Framework framework = Mock(Framework) {
+            getPropertyLookup() >> Mock(IPropertyLookup){
+                getProperty("framework.tmp.dir") >> '/tmp'
+            }
+            getBaseDir() >> Mock(File) {
+                getAbsolutePath() >> '/tmp'
+            }
+        }
+        AnsibleResourceModelSource plugin = new AnsibleResourceModelSource(framework)
+        Properties config = new Properties()
+        config.put('project', 'project_1')
+        config.put(AnsibleDescribable.ANSIBLE_GATHER_FACTS, 'false')
+        config.put(AnsibleDescribable.ANSIBLE_IMPORT_INVENTORY_VARS, 'true')
+        config.put(AnsibleDescribable.ANSIBLE_IGNORE_INVENTORY_VARS, 'ccp_certificate_chain')
+        plugin.configure(config)
+
+        Services services = Mock(Services) {
+            getService(KeyStorageTree.class) >> Mock(KeyStorageTree)
+        }
+        plugin.setServices(services)
+
+        when: "inventory contains host vars including one that should be ignored"
+        Yaml yaml = new Yaml()
+        def host = [(nodeName): [
+                'ansible_connection': 'local',
+                'ccp_certificate_chain': certificate,
+                'host_visible_var': 'visible_value',
+                'normal_group_var': 'normal_value',
+                'vault_api_token': 'super_secret_token'
+        ]]
+        def hosts = ['hosts': host]
+        def groups = ['ungrouped': hosts]
+        def children = ['children': groups]
+        def all = ['all': children]
+        String result = yaml.dump(all)
+
+        AnsibleInventoryListBuilder inventoryListBuilder = Mock(AnsibleInventoryListBuilder) {
+            build() >> Mock(AnsibleInventoryList) {
+                getNodeList() >> result
+            }
+        }
+        plugin.ansibleInventoryListBuilder = inventoryListBuilder
+        INodeSet nodes = plugin.getNodes()
+        INodeEntry node = nodes.getNode(nodeName)
+
+        then: "ignored variable should not be present in node attributes"
+        node != null
+        !node.getAttributes().containsKey('ccp_certificate_chain')
+
+        and: "other variables should be imported when importInventoryVars is true"
+        node.getAttributes().containsKey('host_visible_var')
+        node.getAttributes().get('host_visible_var') == 'visible_value'
+        node.getAttributes().containsKey('normal_group_var')
+        node.getAttributes().get('normal_group_var') == 'normal_value'
+        node.getAttributes().containsKey('vault_api_token')
+        node.getAttributes().get('vault_api_token') == 'super_secret_token'
+
+        and: "ansible special vars should be filtered"
+        !node.getAttributes().containsKey('ansible_connection')
+    }
+
+    void "should not import inventory vars when importInventoryVars is false"() {
+        given: "a plugin configured with importInventoryVars disabled"
+        def nodeName = 'testhost'
+
+        Framework framework = Mock(Framework) {
+            getPropertyLookup() >> Mock(IPropertyLookup){
+                getProperty("framework.tmp.dir") >> '/tmp'
+            }
+            getBaseDir() >> Mock(File) {
+                getAbsolutePath() >> '/tmp'
+            }
+        }
+        AnsibleResourceModelSource plugin = new AnsibleResourceModelSource(framework)
+        Properties config = new Properties()
+        config.put('project', 'project_1')
+        config.put(AnsibleDescribable.ANSIBLE_GATHER_FACTS, 'false')
+        config.put(AnsibleDescribable.ANSIBLE_IMPORT_INVENTORY_VARS, 'false')
+        plugin.configure(config)
+
+        Services services = Mock(Services) {
+            getService(KeyStorageTree.class) >> Mock(KeyStorageTree)
+        }
+        plugin.setServices(services)
+
+        when: "inventory contains host vars"
+        Yaml yaml = new Yaml()
+        def host = [(nodeName): [
+                'ansible_connection': 'local',
+                'host_var_1': 'value1',
+                'host_var_2': 'value2'
+        ]]
+        def hosts = ['hosts': host]
+        def groups = ['ungrouped': hosts]
+        def children = ['children': groups]
+        def all = ['all': children]
+        String result = yaml.dump(all)
+
+        AnsibleInventoryListBuilder inventoryListBuilder = Mock(AnsibleInventoryListBuilder) {
+            build() >> Mock(AnsibleInventoryList) {
+                getNodeList() >> result
+            }
+        }
+        plugin.ansibleInventoryListBuilder = inventoryListBuilder
+        INodeSet nodes = plugin.getNodes()
+        INodeEntry node = nodes.getNode(nodeName)
+
+        then: "no host variables should be imported as node attributes"
+        node != null
+        !node.getAttributes().containsKey('ansible_connection')
+        !node.getAttributes().containsKey('host_var_1')
+        !node.getAttributes().containsKey('host_var_2')
     }
 
 }

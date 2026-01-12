@@ -830,15 +830,33 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
 
     applyNodeTags(node, nodeValues);
 
-    nodeValues.forEach((key, value) -> {
-      if (value != null) {
-        if (value instanceof Map || value instanceof List) {
-          node.setAttribute(key, gson.toJson(value));
-        } else {
-          node.setAttribute(key, value.toString());
+    if (importInventoryVars) {
+      // Build list of variables to ignore, similar to processWithGatherFacts
+      List<String> ignoreVarsList = new ArrayList<>();
+      ignoreVarsList.add("ansible_");  // most ansible vars prefix
+
+      if (ignoreInventoryVars != null && ignoreInventoryVars.length() > 0) {
+        String[] ignoreInventoryVarsStrings = ignoreInventoryVars.split(",");
+        for (String ignoreInventoryVarsString: ignoreInventoryVarsStrings) {
+          ignoreVarsList.add(ignoreInventoryVarsString.trim());
         }
       }
-    });
+
+      nodeValues.forEach((key, value) -> {
+        // Skip variables that match ignored prefixes
+        if (skipVar(key, ignoreVarsList)) {
+          return;
+        }
+
+        if (value != null) {
+          if (value instanceof Map || value instanceof List) {
+            node.setAttribute(key, gson.toJson(value));
+          } else {
+            node.setAttribute(key, value.toString());
+          }
+        }
+      });
+    }
 
     return node;
   }
