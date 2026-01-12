@@ -23,12 +23,14 @@ class YamlParsingSpec extends BaseTestConfiguration {
         result != null
         result.size() == 3
         result.get(NODE_1) != null
-        result.get(NODE_1).getAttributes().get("ansible_host") == "192.168.1.10"
-        result.get(NODE_1).getAttributes().get("ansible_user") == "user2"
+        // ansible_ prefixed variables should be filtered out, not in attributes
+        result.get(NODE_1).getAttributes().get("ansible_host") == null
+        result.get(NODE_1).getAttributes().get("ansible_user") == null
+        // custom variables should still be imported
         result.get(NODE_1).getAttributes().get("http_port") == "8080"
         result.get(NODE_2) != null
-        result.get(NODE_2).getAttributes().get("ansible_host") == "192.168.1.20"
-        result.get(NODE_2).getAttributes().get("ansible_user") == "user3"
+        result.get(NODE_2).getAttributes().get("ansible_host") == null
+        result.get(NODE_2).getAttributes().get("ansible_user") == null
         result.get(NODE_2).getAttributes().get("http_port") == "8080"
     }
 }
