@@ -101,12 +101,16 @@ public class AnsibleRunnerContextBuilder {
     }
 
     public String getPrivateKeyStoragePath() {
+        return getPrivateKeyStoragePath(getNode());
+    }
+
+    public String getPrivateKeyStoragePath(INodeEntry node) {
         String path = PropertyResolver.resolveProperty(
                 AnsibleDescribable.ANSIBLE_SSH_KEYPATH_STORAGE_PATH,
                 null,
                 getFrameworkProject(),
                 getFramework(),
-                getNode(),
+                node,
                 getJobConf()
         );
         //expand properties in path
@@ -139,9 +143,9 @@ public class AnsibleRunnerContextBuilder {
         return path;
     }
 
-    public String getSshPrivateKey() throws ConfigurationException {
+    public String getSshPrivateKey(node) throws ConfigurationException {
         //look for storage option
-        String storagePath = getPrivateKeyStoragePath();
+        String storagePath = getPrivateKeyStoragePath(node);
 
         if (null != storagePath) {
             Path path = PathUtil.asPath(storagePath);
@@ -266,12 +270,17 @@ public class AnsibleRunnerContextBuilder {
 
 
     public AuthenticationType getSshAuthenticationType() {
+        return getSshAuthenticationType(getNode());
+    }
+
+
+    public AuthenticationType getSshAuthenticationType(INodeEntry node) {
         String authType = PropertyResolver.resolveProperty(
                 AnsibleDescribable.ANSIBLE_SSH_AUTH_TYPE,
                 null,
                 getFrameworkProject(),
                 getFramework(),
-                getNode(),
+                node,
                 getJobConf()
         );
 
@@ -932,39 +941,46 @@ public class AnsibleRunnerContextBuilder {
         return options;
     }
 
+    /*
+    Returns a map of node names to their respective authentication details.
+    Each entry in the outer map corresponds to a node, with the key being the node name
+    and the value being another map containing authentication parameters such as
+
+    "ansible_ssh_private_key" or "ansible_password".
+    [ "node1": { "ansible_ssh_private_key": "...", "ansible_user": "..." },
+      "node2": { "ansible_password": "...", "ansible_user": "..." }
+      ]
+
+     */
     public Map<String, Map<String, String>> getNodesAuthenticationMap(){
 
         Map<String, Map<String, String>> authenticationNodesMap = new HashMap<>();
 
         this.context.getNodes().forEach((node) -> {
-            String keyPath = PropertyResolver.resolveProperty(
-                    AnsibleDescribable.ANSIBLE_SSH_PASSWORD_STORAGE_PATH,
-                    null,
-                    getFrameworkProject(),
-                    getFramework(),
-                    node,
-                    getJobConf()
-            );
-
             Map<String, String> auth = new HashMap<>();
-
-            if(null!=keyPath){
+            final AuthenticationType authType = getSshAuthenticationType(node);
+            if (AnsibleDescribable.AuthenticationType.privateKey == authType) {
+                final String privateKey;
                 try {
-                    String password = getPasswordFromPath(keyPath);
-                    auth.put("ansible_password", password);
+                    privateKey = getSshPrivateKey(node);
                 } catch (ConfigurationException e) {
-                    if (getDebug()) {
-                        System.err.println("DEBUG: Error retrieving password for " + node.getNodename() + ": " + e.getMessage());
-                    }
                     throw new RuntimeException(e);
-                } catch (Exception e2) {
-                    if (getDebug()) {
-                        System.err.println("DEBUG: Unexpected error: " + e2.getMessage());
-                    }
-                    throw new RuntimeException(e2);
                 }
-
+                if (privateKey != null) {
+                    auth.put("ansible_ssh_private_key", privateKey);
+                }
+            } else if (AnsibleDescribable.AuthenticationType.password == authType) {
+                try {
+                    String password = getSshPassword(node);
+                    if(null!=password){
+                        auth.put("ansible_password", password);
+                    }
+                } catch (ConfigurationException e) {
+                    System.err.println("DEBUG: Error retrieving password for " + node.getNodename() + ": " + e.getMessage());
+                    throw new RuntimeException(e);
+                }
             }
+
             String userName = getSshNodeUser(node);
 
             if(null!=userName){

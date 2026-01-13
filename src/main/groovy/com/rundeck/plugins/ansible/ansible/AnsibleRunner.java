@@ -411,11 +411,32 @@ public class AnsibleRunner {
 
                 if(addNodeAuthToInventory != null && addNodeAuthToInventory && nodesAuthentication != null && !nodesAuthentication.isEmpty()) {
 
+                    /*
+                    Group vars file structure:
+
+                    host_users:
+                      host1: user1
+                      host2: user2
+
+                    host_passwords:
+                        host1: enc(password1)
+                        host2: enc(password1)
+
+                    host_private_keys:
+                        host1: /path/to/private_key1
+                        host2: /path/to/private_key2
+                     */
+
                     Map<String, String> hostUsers = new LinkedHashMap<>();
                     Map<String, String> hostPasswords = new LinkedHashMap<>();
+                    Map<String, String> hostKeys = new LinkedHashMap<>();
+
                     nodesAuthentication.forEach((nodeName, authValues) -> {
                         String user = authValues.get("ansible_user");
                         String password = authValues.get("ansible_password");
+                        String privateKey = authValues.get("ansible_ssh_private_key");
+
+
                         if (user != null) {
                             hostUsers.put(nodeName, user);
                         }
@@ -429,6 +450,26 @@ public class AnsibleRunner {
                                 }
                             }
                             hostPasswords.put(nodeName, encryptedPassword);
+                        }
+
+                        if(privateKey != null){
+                            //create temporary file for private key
+                            File tempHostPkFile;
+                            try {
+                                tempHostPkFile = AnsibleUtil.createTemporaryFile("","id_rsa_node_"+nodeName, privateKey,customTmpDirPath);
+
+                                // Only the owner can read and write
+                                Set<PosixFilePermission> perms = new HashSet<PosixFilePermission>();
+                                perms.add(PosixFilePermission.OWNER_READ);
+                                perms.add(PosixFilePermission.OWNER_WRITE);
+                                Files.setPosixFilePermissions(tempHostPkFile.toPath(), perms);
+
+                                hostKeys.put(nodeName, tempHostPkFile.getAbsolutePath());
+
+                                tempHostPkFile.deleteOnExit();
+                            } catch (IOException e) {
+                                throw new RuntimeException(e);
+                            }
                         }
                     });
 
@@ -490,7 +531,10 @@ public class AnsibleRunner {
 
                         //set extra vars to resolve the host specific authentication
                         procArgs.add("-e ansible_user=\"{{ host_users[inventory_hostname] }}\"");
-                        procArgs.add("-e ansible_password=\"{{ host_passwords[inventory_hostname] }}\"");
+                        if(!hostPasswords.isEmpty()){
+                            procArgs.add("-e ansible_password=\"{{ host_passwords[inventory_hostname] }}\"");
+                        }
+                        procArgs.add("-e ansible_ssh_private_key_file=\"{{ host_private_keys[inventory_hostname] }}\"");
 
                     } catch (IOException e) {
                         System.err.println("ERROR: Failed to write all.yaml: " + e.getMessage());
