@@ -42,7 +42,7 @@ dependencies {
 
 tasks.register('functionalTest', Test) {
     useJUnitPlatform()
-    systemProperty('RUNDECK_TEST_IMAGE', "rundeck/rundeck:5.18.0")
+    systemProperty('RUNDECK_TEST_IMAGE', "rundeck/rundeck:5.1.1")
 
     // Docker configuration for Testcontainers
     // For Rancher Desktop on macOS: Use /Users/<username>/.rd/docker.sock

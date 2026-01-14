@@ -105,19 +105,10 @@ public class AnsibleRunnerContextBuilder {
     }
 
     public String getPrivateKeyStoragePath(INodeEntry node) {
-        String path = PropertyResolver.resolveProperty(
+        return resolveAndExpandStoragePath(
                 AnsibleDescribable.ANSIBLE_SSH_KEYPATH_STORAGE_PATH,
-                null,
-                getFrameworkProject(),
-                getFramework(),
-                node,
-                getJobConf()
+                node
         );
-        //expand properties in path
-        if (path != null && path.contains("${")) {
-            path = DataContextUtils.replaceDataReferencesInString(path, context.getDataContext());
-        }
-        return path;
     }
 
     public byte[] getPrivateKeyStorageDataBytes() throws IOException {
@@ -126,13 +117,27 @@ public class AnsibleRunnerContextBuilder {
     }
 
     public String getPasswordStoragePath() {
+        return getPasswordStoragePath(getNode());
+    }
 
-        String path = PropertyResolver.resolveProperty(
+    public String getPasswordStoragePath(INodeEntry node) {
+        return resolveAndExpandStoragePath(
                 AnsibleDescribable.ANSIBLE_SSH_PASSWORD_STORAGE_PATH,
+                node
+        );
+    }
+
+    /**
+     * Helper method to resolve a storage path property and expand any data references.
+     * Extracted to reduce duplication between password and private key storage path resolution.
+     */
+    private String resolveAndExpandStoragePath(String propertyName, INodeEntry node) {
+        String path = PropertyResolver.resolveProperty(
+                propertyName,
                 null,
                 getFrameworkProject(),
                 getFramework(),
-                getNode(),
+                node,
                 getJobConf()
         );
 
@@ -143,22 +148,16 @@ public class AnsibleRunnerContextBuilder {
         return path;
     }
 
-    public String getSshPrivateKey(node) throws ConfigurationException {
+    public String getSshPrivateKey() throws ConfigurationException {
+        return getSshPrivateKey(getNode());
+    }
+
+    public String getSshPrivateKey(INodeEntry node) throws ConfigurationException {
         //look for storage option
         String storagePath = getPrivateKeyStoragePath(node);
 
         if (null != storagePath) {
-            Path path = PathUtil.asPath(storagePath);
-            try {
-                ResourceMeta contents = context.getStorageTree().getResource(path)
-                        .getContents();
-                ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-                contents.writeContent(byteArrayOutputStream);
-                return byteArrayOutputStream.toString();
-            } catch (StorageException | IOException e) {
-                throw new ConfigurationException("Failed to read the ssh private key for " +
-                        "storage path: " + storagePath + ": " + e.getMessage());
-            }
+            return readFromStoragePath(storagePath, "ssh private key");
         } else {
             //else look up option value
             final String path = getPrivateKeyfilePath();
@@ -176,6 +175,10 @@ public class AnsibleRunnerContextBuilder {
     }
 
     public String getSshPassword() throws ConfigurationException {
+        return getSshPassword(getNode());
+    }
+
+    public String getSshPassword(INodeEntry node) throws ConfigurationException {
 
         //look for option values first
         //typically jobs use secure options to dynamically setup the ssh password
@@ -184,7 +187,7 @@ public class AnsibleRunnerContextBuilder {
                 AnsibleDescribable.DEFAULT_ANSIBLE_SSH_PASSWORD_OPTION,
                 getFrameworkProject(),
                 getFramework(),
-                getNode(),
+                node,
                 getJobConf()
         );
         String sshPassword = PropertyResolver.evaluateSecureOption(passwordOption, getContext());
@@ -194,7 +197,7 @@ public class AnsibleRunnerContextBuilder {
             return sshPassword;
         } else {
             //look for storage option
-            String storagePath = getPasswordStoragePath();
+            String storagePath = getPasswordStoragePath(node);
 
             if (null != storagePath) {
                 //look up storage value
@@ -207,7 +210,19 @@ public class AnsibleRunnerContextBuilder {
     }
 
     public String getPasswordFromPath(String storagePath) throws ConfigurationException {
-        //look up storage value
+        return readFromStoragePath(storagePath, "ssh password");
+    }
+
+    /**
+     * Helper method to read content from Rundeck storage path.
+     * Extracted to reduce duplication between password and private key reading.
+     *
+     * @param storagePath The storage path to read from
+     * @param resourceType Description of resource type for error messages (e.g., "ssh password", "ssh private key")
+     * @return The content as a UTF-8 string
+     * @throws ConfigurationException if reading fails
+     */
+    private String readFromStoragePath(String storagePath, String resourceType) throws ConfigurationException {
         Path path = PathUtil.asPath(storagePath);
         try {
             ResourceMeta contents = context.getStorageTree().getResource(path)
@@ -216,7 +231,7 @@ public class AnsibleRunnerContextBuilder {
             contents.writeContent(byteArrayOutputStream);
             return byteArrayOutputStream.toString("UTF-8");
         } catch (StorageException | IOException e) {
-            throw new ConfigurationException("Failed to read the ssh password for " +
+            throw new ConfigurationException("Failed to read the " + resourceType + " for " +
                     "storage path: " + storagePath + ": " + e.getMessage());
         }
     }

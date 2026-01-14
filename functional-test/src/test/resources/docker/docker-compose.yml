@@ -37,6 +37,18 @@ services:
     volumes:
       - ./keys:/configuration:rw
 
+  ssh-node-4:
+    build:
+      context: node
+    environment:
+      NODE_USER_PASSWORD: unused_password
+    networks:
+      - rundeck
+    ports:
+      - "2225:22"
+    volumes:
+      - ./keys:/configuration:rw
+
   rundeck:
     build:
       context: rundeck

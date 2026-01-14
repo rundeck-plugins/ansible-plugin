@@ -474,10 +474,10 @@ public class AnsibleRunner {
                     });
 
                     // Build YAML content using helper method
-                    String yamlContent = buildGroupVarsYaml(hostPasswords, hostUsers);
+                    String yamlContent = buildGroupVarsYaml(hostPasswords, hostUsers, hostKeys);
 
                     if(debug){
-                        System.err.println("DEBUG: Building group_vars YAML with " + hostPasswords.size() + " passwords and " + hostUsers.size() + " users");
+                        System.err.println("DEBUG: Building group_vars YAML with " + hostPasswords.size() + " passwords, " + hostUsers.size() + " users, and " + hostKeys.size() + " private keys");
                         System.err.println("DEBUG: YAML content built successfully, length: " + yamlContent.length());
                     }
 
@@ -928,20 +928,24 @@ public class AnsibleRunner {
 
 
     /**
-     * Builds YAML content for Ansible group_vars with vault-encrypted passwords and host users.
+     * Builds YAML content for Ansible group_vars with vault-encrypted passwords, host users, and private keys.
      * This method manually constructs the YAML because Jackson cannot properly handle Ansible's
      * custom !vault tag, which would result in an extra | character.
      *
      * @param hostPasswords Map of host names to vault-encrypted password strings
      * @param hostUsers Map of host names to usernames
+     * @param hostKeys Map of host names to private key file paths
      * @return YAML content string ready to be written to all.yaml
      */
-    String buildGroupVarsYaml(Map<String, String> hostPasswords, Map<String, String> hostUsers) {
+    String buildGroupVarsYaml(Map<String, String> hostPasswords, Map<String, String> hostUsers, Map<String, String> hostKeys) {
 
         StringBuilder yamlContent = new StringBuilder();
-        yamlContent.append("host_passwords:\n");
 
-        for (Map.Entry<String, String> entry : hostPasswords.entrySet()) {
+        // Only add host_passwords section if there are passwords
+        if (!hostPasswords.isEmpty()) {
+            yamlContent.append("host_passwords:\n");
+
+            for (Map.Entry<String, String> entry : hostPasswords.entrySet()) {
             String originalKey = entry.getKey();
             String escapedKey = escapeYamlKey(originalKey);
 
@@ -971,17 +975,15 @@ public class AnsibleRunner {
                 System.err.println("DEBUG: Single line vault value for host: " + originalKey);
                 yamlContent.append(vaultValue).append("\n");
             }
+            }
         }
 
-        yamlContent.append("\nhost_users:\n");
-        for (Map.Entry<String, String> entry : hostUsers.entrySet()) {
-            String originalKey = entry.getKey();
-            String originalValue = entry.getValue();
-            String escapedKey = escapeYamlKey(originalKey);
-            String escapedValue = escapeYamlValue(originalValue);
-            yamlContent.append("  ").append(escapedKey).append(": ")
-                       .append(escapedValue).append("\n");
+        // Add host_private_keys section if there are private keys
+        if (!hostKeys.isEmpty()) {
+            appendYamlMapSection(yamlContent, "host_private_keys", hostKeys, true);
         }
+
+        appendYamlMapSection(yamlContent, "host_users", hostUsers, true);
 
         String result = yamlContent.toString();
 
@@ -990,6 +992,32 @@ public class AnsibleRunner {
         }
 
         return result;
+    }
+
+    /**
+     * Helper method to append a simple YAML map section with key-value pairs.
+     * Extracted to reduce duplication between host_private_keys and host_users sections.
+     *
+     * @param yamlContent The StringBuilder to append to
+     * @param sectionName The name of the YAML section (e.g., "host_users", "host_private_keys")
+     * @param entries The map of key-value pairs to add to the section
+     * @param addLeadingNewline Whether to add a newline before the section name
+     */
+    private void appendYamlMapSection(StringBuilder yamlContent, String sectionName,
+                                     Map<String, String> entries, boolean addLeadingNewline) {
+        if (addLeadingNewline) {
+            yamlContent.append("\n");
+        }
+        yamlContent.append(sectionName).append(":\n");
+
+        for (Map.Entry<String, String> entry : entries.entrySet()) {
+            String originalKey = entry.getKey();
+            String originalValue = entry.getValue();
+            String escapedKey = escapeYamlKey(originalKey);
+            String escapedValue = escapeYamlValue(originalValue);
+            yamlContent.append("  ").append(escapedKey).append(": ")
+                       .append(escapedValue).append("\n");
+        }
     }
 
     /**

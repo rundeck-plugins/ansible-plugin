@@ -690,7 +690,7 @@ class AnsibleRunnerSpec extends Specification{
         ]
 
         when:
-        def yaml = runner.buildGroupVarsYaml(hostPasswords, hostUsers)
+        def yaml = runner.buildGroupVarsYaml(hostPasswords, hostUsers, [:])
 
         then:
         yaml.contains("host_passwords:")
@@ -717,7 +717,7 @@ class AnsibleRunnerSpec extends Specification{
         ]
 
         when:
-        def yaml = runner.buildGroupVarsYaml(hostPasswords, hostUsers)
+        def yaml = runner.buildGroupVarsYaml(hostPasswords, hostUsers, [:])
 
         then:
         yaml.contains('"web:server:1": !vault |')
@@ -738,7 +738,7 @@ class AnsibleRunnerSpec extends Specification{
         ]
 
         when:
-        runner.buildGroupVarsYaml(hostPasswords, hostUsers)
+        runner.buildGroupVarsYaml(hostPasswords, hostUsers, [:])
 
         then:
         def e = thrown(RuntimeException)
@@ -755,10 +755,10 @@ class AnsibleRunnerSpec extends Specification{
         def hostUsers = [:]
 
         when:
-        def yaml = runner.buildGroupVarsYaml(hostPasswords, hostUsers)
+        def yaml = runner.buildGroupVarsYaml(hostPasswords, hostUsers, [:])
 
         then:
-        yaml.contains("host_passwords:")
+        !yaml.contains("host_passwords:")  // Should not appear when empty
         yaml.contains("host_users:")
     }
 

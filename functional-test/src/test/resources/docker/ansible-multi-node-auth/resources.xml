@@ -38,4 +38,17 @@
         ansible-ssh-auth-type="password"
         ansible-ssh-password-storage-path="keys/project/ansible-multi-node-auth/ssh-node-3.pass"
         ansible-ssh-user="rundeck"/>
+
+  <node name="ssh-node-4"
+        description="Test node 4 with private key authentication"
+        tags="test,multi-node,privatekey"
+        hostname="ssh-node-4"
+        osArch="amd64"
+        osFamily="unix"
+        osName="Linux"
+        osVersion="5.0"
+        username="rundeck"
+        ansible-ssh-auth-type="privateKey"
+        ansible-ssh-key-storage-path="keys/project/ansible-multi-node-auth/ssh-node-4.key"
+        ansible-ssh-user="rundeck"/>
 </project>
