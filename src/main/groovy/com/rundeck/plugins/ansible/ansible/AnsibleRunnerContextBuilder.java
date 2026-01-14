@@ -974,12 +974,27 @@ public class AnsibleRunnerContextBuilder {
         this.context.getNodes().forEach((node) -> {
             Map<String, String> auth = new HashMap<>();
             final AuthenticationType authType = getSshAuthenticationType(node);
+
+            if (getDebug()) {
+                System.err.println("DEBUG: Processing authentication for node '" + node.getNodename() +
+                        "' with auth type: " + authType);
+            }
+
             if (AnsibleDescribable.AuthenticationType.privateKey == authType) {
                 final String privateKey;
                 try {
                     privateKey = getSshPrivateKey(node);
+                    if (getDebug()) {
+                        System.err.println("DEBUG: Successfully retrieved private key for node '" +
+                                node.getNodename() + "'");
+                    }
                 } catch (ConfigurationException e) {
-                    throw new RuntimeException(e);
+                    if (getDebug()) {
+                        System.err.println("DEBUG: Error retrieving private key for node '" +
+                                node.getNodename() + "': " + e.getMessage());
+                    }
+                    throw new RuntimeException("Failed to retrieve private key for node '" +
+                            node.getNodename() + "': " + e.getMessage(), e);
                 }
                 if (privateKey != null) {
                     auth.put("ansible_ssh_private_key", privateKey);
@@ -989,10 +1004,18 @@ public class AnsibleRunnerContextBuilder {
                     String password = getSshPassword(node);
                     if(null!=password){
                         auth.put("ansible_password", password);
+                        if (getDebug()) {
+                            System.err.println("DEBUG: Successfully retrieved password for node '" +
+                                    node.getNodename() + "'");
+                        }
                     }
                 } catch (ConfigurationException e) {
-                    System.err.println("DEBUG: Error retrieving password for " + node.getNodename() + ": " + e.getMessage());
-                    throw new RuntimeException(e);
+                    if (getDebug()) {
+                        System.err.println("DEBUG: Error retrieving password for node '" +
+                                node.getNodename() + "': " + e.getMessage());
+                    }
+                    throw new RuntimeException("Failed to retrieve password for node '" +
+                            node.getNodename() + "': " + e.getMessage(), e);
                 }
             }
 
@@ -1000,6 +1023,19 @@ public class AnsibleRunnerContextBuilder {
 
             if(null!=userName){
                 auth.put("ansible_user",userName );
+            }
+
+            // Validate that node has at least one authentication method configured
+            boolean hasPassword = auth.containsKey("ansible_password");
+            boolean hasPrivateKey = auth.containsKey("ansible_ssh_private_key");
+
+            if (!hasPassword && !hasPrivateKey) {
+                context.getExecutionLogger().log(2, "WARNING: Node '" + node.getNodename() +
+                        "' has no password or private key configured. Authentication may fail.");
+                if (getDebug()) {
+                    System.err.println("DEBUG: Node '" + node.getNodename() +
+                            "' has no credentials configured (only username: " + (auth.containsKey("ansible_user") ? "yes" : "no") + ")");
+                }
             }
 
             authenticationNodesMap.put(node.getNodename(), auth);

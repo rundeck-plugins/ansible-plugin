@@ -446,7 +446,8 @@ public class AnsibleRunner {
                                 try {
                                     encryptedPassword = ansibleVault.encryptVariable("ansible_password", password);
                                 } catch (Exception e) {
-                                    throw new RuntimeException(e);
+                                    throw new RuntimeException("Failed to encrypt password for node '" +
+                                            nodeName + "' using Ansible Vault: " + e.getMessage(), e);
                                 }
                             }
                             hostPasswords.put(nodeName, encryptedPassword);
@@ -468,7 +469,8 @@ public class AnsibleRunner {
 
                                 tempHostPkFile.deleteOnExit();
                             } catch (IOException e) {
-                                throw new RuntimeException(e);
+                                throw new RuntimeException("Failed to create temporary private key file for node '" +
+                                        nodeName + "': " + e.getMessage(), e);
                             }
                         }
                     });
