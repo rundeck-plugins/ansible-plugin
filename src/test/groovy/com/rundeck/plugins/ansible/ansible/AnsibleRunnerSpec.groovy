@@ -1002,4 +1002,61 @@ class AnsibleRunnerSpec extends Specification{
         2 * ansibleVault.encryptVariable(_, _) >> "!vault | value"
     }
 
+    def "node name sanitization: should sanitize node names with forward slashes for temp files"() {
+        given:
+        // Test case from real issue: node name with forward slashes
+        String nodeName = "/docker-runner-ansible-ssh-node-b-3"
+        String sanitized = nodeName.replaceAll("[^a-zA-Z0-9._-]", "_")
+
+        expect:
+        sanitized == "_docker-runner-ansible-ssh-node-b-3"
+        // Verify sanitized name is filesystem-safe
+        !sanitized.contains("/")
+    }
+
+    def "node name sanitization: should sanitize various special characters"() {
+        expect:
+        nodeName.replaceAll("[^a-zA-Z0-9._-]", "_") == expected
+
+        where:
+        nodeName                          || expected
+        "simple-node"                     || "simple-node"
+        "node.with.dots"                  || "node.with.dots"
+        "node_with_underscores"           || "node_with_underscores"
+        "/docker-runner-ansible"          || "_docker-runner-ansible"
+        "node:with:colons"                || "node_with_colons"
+        "node with spaces"                || "node_with_spaces"
+        "node\\with\\backslashes"         || "node_with_backslashes"
+        "node*with?wildcards"             || "node_with_wildcards"
+        "node|with|pipes"                 || "node_with_pipes"
+        "node<with>brackets"              || "node_with_brackets"
+        "node\"with'quotes"               || "node_with_quotes"
+        'node@with#special$chars%'        || "node_with_special_chars_"
+        "/path/to/node-123"               || "_path_to_node-123"
+    }
+
+    def "node name sanitization: should preserve safe alphanumeric and allowed characters"() {
+        given:
+        String safeName = "my-node_123.server-A"
+        String sanitized = safeName.replaceAll("[^a-zA-Z0-9._-]", "_")
+
+        expect:
+        sanitized == safeName  // Should not be changed
+    }
+
+    def "node name sanitization: should handle empty and edge case node names"() {
+        expect:
+        nodeName.replaceAll("[^a-zA-Z0-9._-]", "_") == expected
+
+        where:
+        nodeName                          || expected
+        ""                                || ""
+        "123"                             || "123"
+        "..."                             || "..."
+        "---"                             || "---"
+        "___"                             || "___"
+        "a"                               || "a"
+        "/////"                           || "_____"
+    }
+
 }

@@ -457,7 +457,12 @@ public class AnsibleRunner {
                             //create temporary file for private key
                             File tempHostPkFile;
                             try {
-                                tempHostPkFile = AnsibleUtil.createTemporaryFile("","id_rsa_node_"+nodeName, privateKey,customTmpDirPath);
+                                // Sanitize node name for filesystem use (replace unsafe characters with underscores)
+                                String safeNodeName = nodeName.replaceAll("[^a-zA-Z0-9._-]", "_");
+                                if(debug && !nodeName.equals(safeNodeName)) {
+                                    System.err.println("DEBUG: Sanitized node name '" + nodeName + "' to '" + safeNodeName + "' for temp file");
+                                }
+                                tempHostPkFile = AnsibleUtil.createTemporaryFile("","id_rsa_node_"+safeNodeName, privateKey,customTmpDirPath);
 
                                 // Only the owner can read and write
                                 Set<PosixFilePermission> perms = new HashSet<PosixFilePermission>();
