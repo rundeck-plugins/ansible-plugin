@@ -541,7 +541,10 @@ public class AnsibleRunner {
                         if(!hostPasswords.isEmpty()){
                             procArgs.add("-e ansible_password=\"{{ host_passwords[inventory_hostname] }}\"");
                         }
-                        procArgs.add("-e ansible_ssh_private_key_file=\"{{ host_private_keys[inventory_hostname] }}\"");
+
+                        if(!hostKeys.isEmpty()){
+                            procArgs.add("-e ansible_ssh_private_key_file=\"{{ host_private_keys[inventory_hostname] }}\"");
+                        }
 
                     } catch (IOException e) {
                         System.err.println("ERROR: Failed to write all.yaml: " + e.getMessage());

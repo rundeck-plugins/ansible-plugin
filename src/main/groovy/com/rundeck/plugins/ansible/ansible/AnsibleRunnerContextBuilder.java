@@ -1047,6 +1047,10 @@ public class AnsibleRunnerContextBuilder {
 
     public List<String> getListNodesKeyPath(){
 
+        if(!generateInventoryNodesAuth()) {
+            return new ArrayList<>();
+        }
+
         List<String> secretPaths = new ArrayList<>();
 
         this.context.getNodes().forEach((node) -> {
@@ -1062,6 +1066,21 @@ public class AnsibleRunnerContextBuilder {
             if(null!=keyPath){
                 if(!secretPaths.contains(keyPath)){
                     secretPaths.add(keyPath);
+                }
+            }
+
+            String privateKeyPath = PropertyResolver.resolveProperty(
+                    AnsibleDescribable.ANSIBLE_SSH_KEYPATH_STORAGE_PATH,
+                    null,
+                    getFrameworkProject(),
+                    getFramework(),
+                    node,
+                    getJobConf()
+            );
+
+            if(null!=privateKeyPath){
+                if(!secretPaths.contains(privateKeyPath)){
+                    secretPaths.add(privateKeyPath);
                 }
             }
         });
