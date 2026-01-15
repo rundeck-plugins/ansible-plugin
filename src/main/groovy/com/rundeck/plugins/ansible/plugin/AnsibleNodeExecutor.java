@@ -200,7 +200,13 @@ public class AnsibleNodeExecutor implements NodeExecutor, AnsibleDescribable, Pr
         jobConf.put(AnsibleDescribable.ANSIBLE_LIMIT,node.getNodename());
         AnsibleRunnerContextBuilder builder = new AnsibleRunnerContextBuilder(node, context, context.getFramework(), jobConf);
 
-        return AnsibleUtil.getSecretsPath(builder);
+        List<String> secretPaths = AnsibleUtil.getSecretsPath(builder);
+        List<String> secretPathsNodes = builder.getListNodesKeyPath();
+
+        if(secretPathsNodes != null && !secretPathsNodes.isEmpty()){
+            secretPaths.addAll(secretPathsNodes);
+        }
+        return secretPaths;
     }
 }
 
