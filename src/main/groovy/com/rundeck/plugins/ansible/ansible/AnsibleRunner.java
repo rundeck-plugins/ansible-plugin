@@ -9,6 +9,7 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
 import lombok.Builder;
 import lombok.Data;
+import lombok.extern.slf4j.Slf4j;
 
 
 import java.io.*;
@@ -17,6 +18,7 @@ import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
 
+@Slf4j
 @Builder
 @Data
 public class AnsibleRunner {
@@ -831,7 +833,13 @@ public class AnsibleRunner {
             }
 
             if (groupVarsDir != null && groupVarsDir.exists()) {
-                if (!groupVarsDir.delete()) {
+                log.debug("Attempting to delete group_vars directory: {}", groupVarsDir.getAbsolutePath());
+                try {
+                    deleteTempDirectory(groupVarsDir.toPath());
+                    log.debug("Successfully deleted group_vars directory: {}", groupVarsDir.getAbsolutePath());
+                } catch (IOException e) {
+                    log.warn("Failed to delete group_vars directory: {}. Marking for deletion on JVM exit. Error: {}",
+                            groupVarsDir.getAbsolutePath(), e.getMessage());
                     groupVarsDir.deleteOnExit();
                 }
             }
@@ -956,35 +964,35 @@ public class AnsibleRunner {
             yamlContent.append("host_passwords:\n");
 
             for (Map.Entry<String, String> entry : hostPasswords.entrySet()) {
-            String originalKey = entry.getKey();
-            String escapedKey = escapeYamlKey(originalKey);
+                String originalKey = entry.getKey();
+                String escapedKey = escapeYamlKey(originalKey);
 
-            yamlContent.append("  ").append(escapedKey).append(": ");
-            String vaultValue = entry.getValue();
+                yamlContent.append("  ").append(escapedKey).append(": ");
+                String vaultValue = entry.getValue();
 
-            // Validate vault format
-            if (!isValidVaultFormat(vaultValue)) {
-                System.err.println("ERROR: Invalid vault format for host: " + originalKey);
-                throw new RuntimeException("Invalid vault format for host: " + originalKey);
-            }
-            // The vault value already contains "!vault |\n" followed by the encrypted content
-            // We just need to split and indent properly (4 spaces for vault content lines)
-            if (vaultValue.contains("\n")) {
-                String[] lines = vaultValue.split("\n", -1);
-                for (int i = 0; i < lines.length; i++) {
-                    if (i == 0) {
-                        // First line: "!vault |"
-                        yamlContent.append(lines[i]).append("\n");
-                    } else if (i < lines.length - 1 || !lines[i].isEmpty()) {
-                        // Vault content: indent with 4 spaces
-                        yamlContent.append("    ").append(lines[i]).append("\n");
-                    }
+                // Validate vault format
+                if (!isValidVaultFormat(vaultValue)) {
+                    System.err.println("ERROR: Invalid vault format for host: " + originalKey);
+                    throw new RuntimeException("Invalid vault format for host: " + originalKey);
                 }
-            } else {
-                // Single line value (shouldn't happen with vault, but handle it)
-                System.err.println("DEBUG: Single line vault value for host: " + originalKey);
-                yamlContent.append(vaultValue).append("\n");
-            }
+                // The vault value already contains "!vault |\n" followed by the encrypted content
+                // We just need to split and indent properly (4 spaces for vault content lines)
+                if (vaultValue.contains("\n")) {
+                    String[] lines = vaultValue.split("\n", -1);
+                    for (int i = 0; i < lines.length; i++) {
+                        if (i == 0) {
+                            // First line: "!vault |"
+                            yamlContent.append(lines[i]).append("\n");
+                        } else if (i < lines.length - 1 || !lines[i].isEmpty()) {
+                            // Vault content: indent with 4 spaces
+                            yamlContent.append("    ").append(lines[i]).append("\n");
+                        }
+                    }
+                } else {
+                    // Single line value (shouldn't happen with vault, but handle it)
+                    System.err.println("DEBUG: Single line vault value for host: " + originalKey);
+                    yamlContent.append(vaultValue).append("\n");
+                }
             }
         }
 
@@ -993,7 +1001,10 @@ public class AnsibleRunner {
             appendYamlMapSection(yamlContent, "host_private_keys", hostKeys, true);
         }
 
-        appendYamlMapSection(yamlContent, "host_users", hostUsers, true);
+        // Add host_users section if there are users
+        if (!hostUsers.isEmpty()) {
+            appendYamlMapSection(yamlContent, "host_users", hostUsers, true);
+        }
 
         String result = yamlContent.toString();
 
@@ -1043,7 +1054,10 @@ public class AnsibleRunner {
             key.startsWith("-") ||
             key.startsWith("?") ||
             key.matches("^[0-9].*")) {
-            // Escape any existing backslashes and quotes, then wrap in quotes
+            // IMPORTANT: Order of replacements matters! Must escape backslashes FIRST, then quotes.
+            // If we escaped quotes first, the backslash replacement would double-escape them.
+            // Example: value="a\"b" -> replace quotes: "a\\"b" -> replace backslash: "a\\\\"b" (WRONG!)
+            // Correct:  value="a\"b" -> replace backslash: "a\\"b" -> replace quotes: "a\\\"b" (RIGHT)
             return "\"" + key.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
         }
         return key;
@@ -1062,7 +1076,10 @@ public class AnsibleRunner {
             value.startsWith("-") ||
             value.startsWith("?") ||
             value.trim().isEmpty()) {
-            // Escape any existing backslashes and quotes, then wrap in quotes
+            // IMPORTANT: Order of replacements matters! Must escape backslashes FIRST, then quotes.
+            // If we escaped quotes first, the backslash replacement would double-escape them.
+            // Example: value="a\"b" -> replace quotes: "a\\"b" -> replace backslash: "a\\\\"b" (WRONG!)
+            // Correct:  value="a\"b" -> replace backslash: "a\\"b" -> replace quotes: "a\\\"b" (RIGHT)
             return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
         }
         return value;
@@ -1088,8 +1105,12 @@ public class AnsibleRunner {
      * Validates that a string is in proper Ansible vault format.
      * Expected format: "!vault |\n" followed by vault-encrypted content
      *
+     * Real Ansible Vault values are ALWAYS multiline with encrypted content.
+     * This validation rejects single-line vault values and vault values without content
+     * to prevent authentication failures.
+     *
      * @param vaultValue The vault value to validate
-     * @return true if valid vault format, false otherwise
+     * @return true if valid vault format with content, false otherwise
      */
     boolean isValidVaultFormat(String vaultValue) {
         if (vaultValue == null || vaultValue.trim().isEmpty()) {
@@ -1102,25 +1123,40 @@ public class AnsibleRunner {
             return false;
         }
 
-        // For multiline vault values, should contain the pipe character and newline
-        if (vaultValue.contains("\n")) {
-            // Check if it follows the "!vault |" format
-            String firstLine = vaultValue.split("\n", 2)[0];
-            if (!firstLine.trim().matches("!vault\\s*\\|?")) {
-                return false;
-            }
+        // Ansible Vault values must be multiline - reject single-line values
+        if (!vaultValue.contains("\n")) {
+            return false;
+        }
 
-            // Should have encrypted content after the first line
-            String[] lines = vaultValue.split("\n");
-            if (lines.length < 2) {
-                return false;
-            }
+        // Check if it follows the "!vault |" or "!vault" format
+        String firstLine = vaultValue.split("\n", 2)[0];
+        if (!firstLine.trim().matches("!vault\\s*\\|?")) {
+            return false;
+        }
 
-            // Vault content lines should not be empty (except maybe the last one)
-            for (int i = 1; i < lines.length - 1; i++) {
-                if (lines[i].trim().isEmpty()) {
-                    return false;
-                }
+        // Must have encrypted content after the first line
+        String[] lines = vaultValue.split("\n");
+        if (lines.length < 2) {
+            return false;
+        }
+
+        // At least one content line must be non-empty (excluding the last line which may be empty)
+        boolean hasContent = false;
+        for (int i = 1; i < lines.length; i++) {
+            if (!lines[i].trim().isEmpty()) {
+                hasContent = true;
+                break;
+            }
+        }
+
+        if (!hasContent) {
+            return false;
+        }
+
+        // Vault content lines should not be empty (except the last one)
+        for (int i = 1; i < lines.length - 1; i++) {
+            if (lines[i].trim().isEmpty()) {
+                return false;
             }
         }
 

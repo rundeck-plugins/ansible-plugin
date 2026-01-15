@@ -237,8 +237,8 @@ public interface AnsibleDescribable extends Describable {
     static final Property GENERATE_INVENTORY_NODES_AUTH = PropertyBuilder.builder()
             .booleanType(ANSIBLE_GENERATE_INVENTORY_NODES_AUTH)
             .required(false)
-            .title("Generate inventory, pass node authentication from rundeck nodes")
-            .description("Pass authentication from rundeck nodes.")
+            .title("Workflow Step: Generate inventory, pass node authentication from rundeck nodes")
+            .description("Pass authentication from rundeck nodes. Only applies to workflow steps.")
             .build();
 
     public static Property EXECUTABLE_PROP = PropertyUtil.freeSelect(

@@ -24,6 +24,7 @@ import java.nio.file.Paths;
 import com.rundeck.plugins.ansible.plugin.AnsiblePluginGroup;
 import com.rundeck.plugins.ansible.util.AnsibleUtil;
 import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
 import org.rundeck.storage.api.Path;
 
 import java.util.*;
@@ -31,6 +32,7 @@ import java.util.*;
 import org.rundeck.storage.api.PathUtil;
 import org.rundeck.storage.api.StorageException;
 
+@Slf4j
 @Getter
 public class AnsibleRunnerContextBuilder {
 
@@ -219,10 +221,14 @@ public class AnsibleRunnerContextBuilder {
      *
      * @param storagePath The storage path to read from
      * @param resourceType Description of resource type for error messages (e.g., "ssh password", "ssh private key")
-     * @return The content as a UTF-8 string
+     * @return The content as a UTF-8 string, or null if storagePath is null
      * @throws ConfigurationException if reading fails
      */
     private String readFromStoragePath(String storagePath, String resourceType) throws ConfigurationException {
+        if (storagePath == null) {
+            return null;
+        }
+
         Path path = PathUtil.asPath(storagePath);
         try {
             ResourceMeta contents = context.getStorageTree().getResource(path)
@@ -799,19 +805,25 @@ public class AnsibleRunnerContextBuilder {
     public void cleanupTempFiles() {
         // Clean up individual temp files
         for (File temp : tempFiles) {
-            if (getDebug()) {
-                System.err.println("DEBUG: Deleting temp file: " + temp.getAbsolutePath());
+            log.debug("Attempting to delete temp file: {}", temp.getAbsolutePath());
+            if (!temp.delete()) {
+                log.warn("Failed to delete temp file: {}. Marking for deletion on JVM exit.", temp.getAbsolutePath());
+                // Fallback: schedule for deletion on JVM exit
+                temp.deleteOnExit();
+            } else {
+                log.debug("Successfully deleted temp file: {}", temp.getAbsolutePath());
             }
-            temp.delete();
         }
         tempFiles.clear();
 
         // Clean up execution-specific directory (including group_vars)
         if (executionSpecificDir != null && executionSpecificDir.exists()) {
-            if (getDebug()) {
-                System.err.println("DEBUG: Execution-specific directory exists: " + executionSpecificDir.getAbsolutePath());
+            log.debug("Cleaning up execution-specific directory: {}", executionSpecificDir.getAbsolutePath());
+            if (!deleteDirectoryRecursively(executionSpecificDir)) {
+                log.warn("Failed to completely delete execution-specific directory: {}", executionSpecificDir.getAbsolutePath());
+            } else {
+                log.debug("Successfully deleted execution-specific directory: {}", executionSpecificDir.getAbsolutePath());
             }
-            deleteDirectoryRecursively(executionSpecificDir);
         }
     }
 
@@ -819,23 +831,37 @@ public class AnsibleRunnerContextBuilder {
      * Recursively deletes a directory and all its contents.
      *
      * @param directory The directory to delete
+     * @return true if the directory and all its contents were successfully deleted, false otherwise
      */
-    private void deleteDirectoryRecursively(File directory) {
+    private boolean deleteDirectoryRecursively(File directory) {
         if (directory == null || !directory.exists()) {
-            return;
+            return true;
         }
 
+        boolean success = true;
         File[] files = directory.listFiles();
         if (files != null) {
             for (File file : files) {
                 if (file.isDirectory()) {
-                    deleteDirectoryRecursively(file);
+                    if (!deleteDirectoryRecursively(file)) {
+                        success = false;
+                        log.warn("Failed to delete subdirectory: {}", file.getAbsolutePath());
+                    }
                 } else {
-                    file.delete();
+                    if (!file.delete()) {
+                        success = false;
+                        log.warn("Failed to delete file: {}", file.getAbsolutePath());
+                    }
                 }
             }
         }
-        directory.delete();
+
+        if (!directory.delete()) {
+            success = false;
+            log.warn("Failed to delete directory: {}", directory.getAbsolutePath());
+        }
+
+        return success;
     }
 
     public Boolean getUseSshAgent() {
@@ -1159,14 +1185,18 @@ public class AnsibleRunnerContextBuilder {
         if (executionId != null && !executionId.isEmpty()) {
             executionSpecificDir = new File(baseTmpDir, "ansible-exec-" + executionId);
             if (!executionSpecificDir.exists()) {
-                if (getDebug()) {
-                    System.err.println("DEBUG: Creating execution-specific directory: " + executionSpecificDir.getAbsolutePath());
+                log.debug("Creating execution-specific directory: {}", executionSpecificDir.getAbsolutePath());
+                // Check return value to handle race conditions and creation failures
+                boolean created = executionSpecificDir.mkdirs();
+                if (!created && !executionSpecificDir.exists()) {
+                    // Failed to create and directory still doesn't exist - this is an error
+                    String errorMsg = "Failed to create execution-specific directory: " + executionSpecificDir.getAbsolutePath();
+                    log.error(errorMsg);
+                    throw new IllegalStateException(errorMsg);
                 }
-                executionSpecificDir.mkdirs();
+                log.debug("Successfully created execution-specific directory: {}", executionSpecificDir.getAbsolutePath());
             } else {
-                if (getDebug()) {
-                    System.err.println("DEBUG: Execution-specific directory already exists: " + executionSpecificDir.getAbsolutePath());
-                }
+                log.debug("Execution-specific directory already exists: {}", executionSpecificDir.getAbsolutePath());
             }
             return executionSpecificDir.getAbsolutePath();
         }

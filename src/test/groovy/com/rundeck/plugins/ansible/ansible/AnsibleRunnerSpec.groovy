@@ -670,7 +670,7 @@ class AnsibleRunnerSpec extends Specification{
         "not a vault"                                 || false
         null                                          || false
         ""                                            || false
-        "!vault"                                      || true  // minimal valid
+        "!vault"                                      || false // single-line without content - invalid
         "!vault |\n"                                  || false // no content
     }
 
@@ -759,7 +759,9 @@ class AnsibleRunnerSpec extends Specification{
 
         then:
         !yaml.contains("host_passwords:")  // Should not appear when empty
-        yaml.contains("host_users:")
+        !yaml.contains("host_users:")  // Should not appear when empty
+        !yaml.contains("host_private_keys:")  // Should not appear when empty
+        yaml.isEmpty() || yaml.trim().isEmpty()  // Should produce empty or whitespace-only output
     }
 
     def "escapePasswordForYaml: should escape special characters"() {
