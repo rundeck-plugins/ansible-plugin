@@ -105,7 +105,6 @@ public class AnsiblePlaybookInlineWorkflowStep implements StepPlugin, AnsibleDes
                 configuration,
                 pluginGroup);
 
-
         try {
             runner = AnsibleRunner.buildAnsibleRunner(contextBuilder);
 
@@ -162,7 +161,7 @@ public class AnsiblePlaybookInlineWorkflowStep implements StepPlugin, AnsibleDes
 
     @Override
     public List<String> listSecretsPathWorkflowStep(ExecutionContext context, Map<String, Object> configuration) {
-        AnsibleRunnerContextBuilder builder = new AnsibleRunnerContextBuilder(context, context.getFramework(), context.getNodes(), configuration);
+        AnsibleRunnerContextBuilder builder = new AnsibleRunnerContextBuilder(context, context.getFramework(), context.getNodes(), configuration, pluginGroup);
         return AnsibleUtil.getSecretsPathWorkflowSteps(builder);
     }
 

@@ -216,8 +216,13 @@ public class AnsibleRunnerContextBuilder {
     }
 
     /**
-     * Helper method to read content from Rundeck storage path.
+     * Helper method to read text-based content from Rundeck storage path.
      * Extracted to reduce duplication between password and private key reading.
+     *
+     * IMPORTANT: This method converts storage content to UTF-8 string and is intended
+     * ONLY for text-based secrets (passwords, SSH private keys in PEM format, etc.).
+     * Do NOT use this method for binary data as UTF-8 conversion will cause data corruption.
+     * For binary data, use loadStoragePathData() which returns byte[] instead.
      *
      * @param storagePath The storage path to read from
      * @param resourceType Description of resource type for error messages (e.g., "ssh password", "ssh private key")
@@ -818,7 +823,8 @@ public class AnsibleRunnerContextBuilder {
         }
         tempFiles.clear();
 
-        // Clean up execution-specific directory (including group_vars)
+        // Clean up execution-specific directory (including group_vars when inventory was generated/inline)
+        // Note: group_vars created alongside user-provided inventory files is cleaned up by AnsibleRunner
         if (!getDebug() && executionSpecificDir != null && executionSpecificDir.exists()) {
             log.debug("Cleaning up execution-specific directory: {}", executionSpecificDir.getAbsolutePath());
             if (!deleteDirectoryRecursively(executionSpecificDir)) {
@@ -984,16 +990,19 @@ public class AnsibleRunnerContextBuilder {
         return options;
     }
 
-    /*
-    Returns a map of node names to their respective authentication details.
-    Each entry in the outer map corresponds to a node, with the key being the node name
-    and the value being another map containing authentication parameters such as
-
-    "ansible_ssh_private_key" or "ansible_password".
-    [ "node1": { "ansible_ssh_private_key": "...", "ansible_user": "..." },
-      "node2": { "ansible_password": "...", "ansible_user": "..." }
-      ]
-
+    /**
+     * Returns a map of node names to their respective authentication details.
+     * Each entry in the outer map corresponds to a node, with the key being the node name
+     * and the value being another map containing authentication parameters such as
+     * "ansible_ssh_private_key" or "ansible_password".
+     *
+     * @return Map of node names to authentication details. Example:
+     * <pre>
+     * {
+     *   "node1": { "ansible_ssh_private_key": "...", "ansible_user": "..." },
+     *   "node2": { "ansible_password": "...", "ansible_user": "..." }
+     * }
+     * </pre>
      */
     public Map<String, Map<String, String>> getNodesAuthenticationMap(){
 
@@ -1195,7 +1204,11 @@ public class AnsibleRunnerContextBuilder {
             executionSpecificDir = new File(baseTmpDir, "ansible-exec-" + executionId);
             if (!executionSpecificDir.exists()) {
                 log.debug("Creating execution-specific directory: {}", executionSpecificDir.getAbsolutePath());
-                // Check return value to handle race conditions and creation failures
+                // Race condition handling: mkdirs() returns false if the directory already exists
+                // or if creation failed. If another thread/process created the directory between
+                // our exists() check and mkdirs() call, mkdirs() returns false but the directory
+                // now exists. We use double-check pattern: only throw if mkdirs() failed AND
+                // directory still doesn't exist (true creation failure).
                 boolean created = executionSpecificDir.mkdirs();
                 if (!created && !executionSpecificDir.exists()) {
                     // Failed to create and directory still doesn't exist - this is an error

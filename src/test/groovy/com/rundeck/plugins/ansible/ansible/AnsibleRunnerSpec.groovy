@@ -666,7 +666,7 @@ class AnsibleRunnerSpec extends Specification{
         vaultValue                                    || expectedResult
         "!vault |\n  encryptedcontent"                || true
         "!vault |\n  line1\n  line2"                  || true
-        "!vault\n  content"                           || true  // without pipe
+        "!vault\n  content"                           || false // missing pipe - Ansible Vault always requires "|" for literal block style
         "not a vault"                                 || false
         null                                          || false
         ""                                            || false

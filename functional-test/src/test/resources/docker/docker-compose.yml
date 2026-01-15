@@ -29,7 +29,7 @@ services:
     build:
       context: node
     environment:
-      NODE_USER_PASSWORD: password3"quote'test
+      NODE_USER_PASSWORD: 'password3"quote''test'
     networks:
       - rundeck
     ports:

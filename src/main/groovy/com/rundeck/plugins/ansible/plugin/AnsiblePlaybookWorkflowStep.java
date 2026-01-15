@@ -66,7 +66,6 @@ public class AnsiblePlaybookWorkflowStep implements StepPlugin, AnsibleDescribab
         builder.property(BECOME_PASSWORD_STORAGE_PROP);
         builder.property(DISABLE_LIMIT_PROP);
 
-
         DESC = builder.build();
     }
 
@@ -156,7 +155,7 @@ public class AnsiblePlaybookWorkflowStep implements StepPlugin, AnsibleDescribab
 
     @Override
     public List<String> listSecretsPathWorkflowStep(ExecutionContext context, Map<String, Object> configuration) {
-        AnsibleRunnerContextBuilder builder = new AnsibleRunnerContextBuilder(context, context.getFramework(), context.getNodes(), configuration);
+        AnsibleRunnerContextBuilder builder = new AnsibleRunnerContextBuilder(context, context.getFramework(), context.getNodes(), configuration, pluginGroup);
         return AnsibleUtil.getSecretsPathWorkflowSteps(builder);
     }
     @Override

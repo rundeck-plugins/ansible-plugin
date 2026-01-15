@@ -466,10 +466,9 @@ public class AnsibleRunner {
                                 }
                                 tempHostPkFile = AnsibleUtil.createTemporaryFile("","id_rsa_node_"+safeNodeName, privateKey,customTmpDirPath);
 
-                                // Only the owner can read and write
+                                // Only the owner can read (SSH private key best practice: 0400)
                                 Set<PosixFilePermission> perms = new HashSet<PosixFilePermission>();
                                 perms.add(PosixFilePermission.OWNER_READ);
-                                perms.add(PosixFilePermission.OWNER_WRITE);
                                 Files.setPosixFilePermissions(tempHostPkFile.toPath(), perms);
 
                                 hostKeys.put(nodeName, tempHostPkFile.getAbsolutePath());
@@ -544,7 +543,7 @@ public class AnsibleRunner {
 
                         //set extra vars to resolve the host specific authentication
                         if (!hostUsers.isEmpty()) {
-                            procArgs.add("-e ansible_user=\"{{ host_users[inventory_hostname] }}\"");
+                            procArgs.add("-e ansible_user=\"{{ host_users[inventory_hostname] | default(omit) }}\"");
                         }
                         if(!hostPasswords.isEmpty()){
                             procArgs.add("-e ansible_password=\"{{ host_passwords[inventory_hostname] | default(omit) }}\"");
@@ -597,10 +596,9 @@ public class AnsibleRunner {
                 String privateKeyData = sshPrivateKey.replaceAll("\r\n", "\n");
                 tempPkFile = AnsibleUtil.createTemporaryFile("","id_rsa", privateKeyData,customTmpDirPath);
 
-                // Only the owner can read and write
+                // Only the owner can read (SSH private key best practice: 0400)
                 Set<PosixFilePermission> perms = new HashSet<PosixFilePermission>();
                 perms.add(PosixFilePermission.OWNER_READ);
-                perms.add(PosixFilePermission.OWNER_WRITE);
                 Files.setPosixFilePermissions(tempPkFile.toPath(), perms);
 
                 if (sshUseAgent) {
@@ -838,6 +836,9 @@ public class AnsibleRunner {
                 tempNodeAuthFile.deleteOnExit();
             }
 
+            // Clean up group_vars directory if it was created alongside user-provided inventory
+            // Note: When inventory is generated/inline, group_vars is inside executionSpecificDir
+            // and is cleaned up by AnsibleRunnerContextBuilder.cleanupTempFiles()
             if (groupVarsDir != null && groupVarsDir.exists()) {
                 log.debug("Attempting to delete group_vars directory: {}", groupVarsDir.getAbsolutePath());
                 try {
@@ -1134,9 +1135,9 @@ public class AnsibleRunner {
             return false;
         }
 
-        // Check if it follows the "!vault |" or "!vault" format
+        // Check if it follows the "!vault |" format (pipe is required by Ansible)
         String firstLine = vaultValue.split("\n", 2)[0];
-        if (!firstLine.trim().matches("!vault\\s*\\|?")) {
+        if (!firstLine.trim().matches("!vault\\s*\\|")) {
             return false;
         }
 

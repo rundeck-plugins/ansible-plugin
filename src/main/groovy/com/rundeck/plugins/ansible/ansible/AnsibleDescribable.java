@@ -237,8 +237,8 @@ public interface AnsibleDescribable extends Describable {
     static final Property GENERATE_INVENTORY_NODES_AUTH = PropertyBuilder.builder()
             .booleanType(ANSIBLE_GENERATE_INVENTORY_NODES_AUTH)
             .required(false)
-            .title("Workflow Step: Generate inventory, pass node authentication from rundeck nodes")
-            .description("Pass authentication from rundeck nodes. Only applies to workflow steps.")
+            .title("Workflow Step: Generate Inventory and Pass Node Authentication from Rundeck Nodes")
+            .description("Pass authentication credentials from Rundeck nodes. IMPORTANT: Only applies to Ansible Playbook Workflow Steps. This feature does NOT work with Node Steps because they run independently per node and do not share the global inventory context.")
             .build();
 
     public static Property EXECUTABLE_PROP = PropertyUtil.freeSelect(
