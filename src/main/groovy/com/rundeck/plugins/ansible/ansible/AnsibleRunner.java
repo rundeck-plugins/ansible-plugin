@@ -516,7 +516,11 @@ public class AnsibleRunner {
 
                             // Create all.yaml in group_vars directory
                             tempNodeAuthFile = new File(groupVarsDir, "all.yaml");
-                            java.nio.file.Files.writeString(tempNodeAuthFile.toPath(), yamlContent);
+                            java.nio.file.Files.writeString(
+                                    tempNodeAuthFile.toPath(),
+                                    yamlContent,
+                                    java.nio.charset.StandardCharsets.UTF_8
+                            );
 
                             if(debug) {
                                 System.err.println("DEBUG: Writing all.yaml to: " + tempNodeAuthFile.getAbsolutePath());
@@ -539,13 +543,15 @@ public class AnsibleRunner {
                         }
 
                         //set extra vars to resolve the host specific authentication
-                        procArgs.add("-e ansible_user=\"{{ host_users[inventory_hostname] }}\"");
+                        if (!hostUsers.isEmpty()) {
+                            procArgs.add("-e ansible_user=\"{{ host_users[inventory_hostname] }}\"");
+                        }
                         if(!hostPasswords.isEmpty()){
-                            procArgs.add("-e ansible_password=\"{{ host_passwords[inventory_hostname] }}\"");
+                            procArgs.add("-e ansible_password=\"{{ host_passwords[inventory_hostname] | default(omit) }}\"");
                         }
 
                         if(!hostKeys.isEmpty()){
-                            procArgs.add("-e ansible_ssh_private_key_file=\"{{ host_private_keys[inventory_hostname] }}\"");
+                            procArgs.add("-e ansible_ssh_private_key_file=\"{{ host_private_keys[inventory_hostname] | default(omit) }}\"");
                         }
 
                     } catch (IOException e) {
@@ -990,7 +996,7 @@ public class AnsibleRunner {
                     }
                 } else {
                     // Single line value (shouldn't happen with vault, but handle it)
-                    System.err.println("DEBUG: Single line vault value for host: " + originalKey);
+                    log.debug("Single line vault value for host: {}", originalKey);
                     yamlContent.append(vaultValue).append("\n");
                 }
             }

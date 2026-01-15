@@ -235,7 +235,7 @@ public class AnsibleRunnerContextBuilder {
                     .getContents();
             ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
             contents.writeContent(byteArrayOutputStream);
-            return byteArrayOutputStream.toString("UTF-8");
+            return byteArrayOutputStream.toString(java.nio.charset.StandardCharsets.UTF_8);
         } catch (StorageException | IOException e) {
             throw new ConfigurationException("Failed to read the " + resourceType + " for " +
                     "storage path: " + storagePath + ": " + e.getMessage());
@@ -805,19 +805,21 @@ public class AnsibleRunnerContextBuilder {
     public void cleanupTempFiles() {
         // Clean up individual temp files
         for (File temp : tempFiles) {
-            log.debug("Attempting to delete temp file: {}", temp.getAbsolutePath());
-            if (!temp.delete()) {
-                log.warn("Failed to delete temp file: {}. Marking for deletion on JVM exit.", temp.getAbsolutePath());
-                // Fallback: schedule for deletion on JVM exit
-                temp.deleteOnExit();
-            } else {
-                log.debug("Successfully deleted temp file: {}", temp.getAbsolutePath());
+            if (!getDebug()) {
+                log.debug("Attempting to delete temp file: {}", temp.getAbsolutePath());
+                if (!temp.delete()) {
+                    log.warn("Failed to delete temp file: {}. Marking for deletion on JVM exit.", temp.getAbsolutePath());
+                    // Fallback: schedule for deletion on JVM exit
+                    temp.deleteOnExit();
+                } else {
+                    log.debug("Successfully deleted temp file: {}", temp.getAbsolutePath());
+                }
             }
         }
         tempFiles.clear();
 
         // Clean up execution-specific directory (including group_vars)
-        if (executionSpecificDir != null && executionSpecificDir.exists()) {
+        if (!getDebug() && executionSpecificDir != null && executionSpecificDir.exists()) {
             log.debug("Cleaning up execution-specific directory: {}", executionSpecificDir.getAbsolutePath());
             if (!deleteDirectoryRecursively(executionSpecificDir)) {
                 log.warn("Failed to completely delete execution-specific directory: {}", executionSpecificDir.getAbsolutePath());
@@ -1011,8 +1013,8 @@ public class AnsibleRunnerContextBuilder {
                 try {
                     privateKey = getSshPrivateKey(node);
                     if (getDebug()) {
-                        System.err.println("DEBUG: Successfully retrieved private key for node '" +
-                                node.getNodename() + "'");
+                        System.err.println("DEBUG: Retrieved private key for node '" +
+                                node.getNodename() + "': " + (privateKey != null ? ("yes, length=" + privateKey.length()) : "null"));
                     }
                 } catch (ConfigurationException e) {
                     if (getDebug()) {
@@ -1024,6 +1026,13 @@ public class AnsibleRunnerContextBuilder {
                 }
                 if (privateKey != null) {
                     auth.put("ansible_ssh_private_key", privateKey);
+                    if (getDebug()) {
+                        System.err.println("DEBUG: Added private key to auth map for node '" + node.getNodename() + "'");
+                    }
+                } else {
+                    if (getDebug()) {
+                        System.err.println("DEBUG: Private key is null for node '" + node.getNodename() + "', not adding to auth map");
+                    }
                 }
             } else if (AnsibleDescribable.AuthenticationType.password == authType) {
                 try {

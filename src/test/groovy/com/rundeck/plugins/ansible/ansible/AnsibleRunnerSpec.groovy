@@ -620,7 +620,7 @@ class AnsibleRunnerSpec extends Specification{
         "-starts-with-dash"  || "\"-starts-with-dash\""
         "?starts-with-q"     || "\"?starts-with-q\""
         "123numeric"         || "\"123numeric\""
-        "key with spaces"    || "key with spaces"  // spaces are handled differently
+        "key with spaces"    || "key with spaces"  // spaces are valid in unquoted YAML keys, so we intentionally do not quote them
     }
 
     def "escapeYamlValue: should quote values with special characters"() {

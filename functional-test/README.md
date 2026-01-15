@@ -173,7 +173,7 @@ The multi-node authentication feature allows running Ansible playbooks across mu
 4. Ansible uses host-specific credentials from group_vars
 
 **Requirements:**
-- Must use Ansible Playbook **Workflow Steps** (not Node Steps)
+- Must use Ansible Playbook **Workflow Steps** (not Node Steps); the multi-node authentication logic and inventory generation are only implemented for the Workflow Step variant of the plugin and are not executed for Node Steps, so enabling `project.ansible-generate-inventory-nodes-auth` while using Node Steps will not apply per-node credentials. This limitation exists because Node Steps run independently on each target node and do not share the global inventory context that the multi-node authentication feature relies on.
 - Node attributes must include `ansible-ssh-password-storage-path` for each node
 - Passwords are automatically encrypted using Ansible Vault
 - Supports special characters with proper YAML escaping
