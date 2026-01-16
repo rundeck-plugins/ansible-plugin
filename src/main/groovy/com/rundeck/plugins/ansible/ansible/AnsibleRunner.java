@@ -535,7 +535,7 @@ public class AnsibleRunner {
                             );
 
                             // Alert administrators that sensitive files are being created in their inventory directory
-                            log.warn("Writing vault-encrypted authentication data to user-provided inventory location: {}. " +
+                            log.info("Writing vault-encrypted authentication data to user-provided inventory location: {}. " +
                                     "Administrators should ensure this directory has appropriate filesystem permissions. " +
                                     "This file will be cleaned up after execution, but may persist if cleanup fails.",
                                     tempNodeAuthFile.getAbsolutePath());
