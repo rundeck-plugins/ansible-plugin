@@ -845,7 +845,8 @@ public class AnsibleRunnerContextBuilder {
     }
 
     /**
-     * Recursively deletes a directory and all its contents.
+     * Recursively deletes a directory and all its contents using Java NIO.
+     * Uses Files.walk() for robust directory traversal and handles errors gracefully.
      *
      * @param directory The directory to delete
      * @return true if the directory and all its contents were successfully deleted, false otherwise
@@ -855,30 +856,22 @@ public class AnsibleRunnerContextBuilder {
             return true;
         }
 
-        boolean success = true;
-        File[] files = directory.listFiles();
-        if (files != null) {
-            for (File file : files) {
-                if (file.isDirectory()) {
-                    if (!deleteDirectoryRecursively(file)) {
-                        success = false;
-                        log.warn("Failed to delete subdirectory: {}", file.getAbsolutePath());
-                    }
-                } else {
-                    if (!file.delete()) {
-                        success = false;
-                        log.warn("Failed to delete file: {}", file.getAbsolutePath());
-                    }
-                }
-            }
+        try {
+            // Walk the file tree in depth-first order (reverse) to delete files before their parent directories
+            Files.walk(directory.toPath())
+                    .sorted(java.util.Comparator.reverseOrder())
+                    .forEach(path -> {
+                        try {
+                            Files.delete(path);
+                        } catch (java.io.IOException e) {
+                            log.warn("Failed to delete: {}", path.toAbsolutePath(), e);
+                        }
+                    });
+            return true;
+        } catch (java.io.IOException e) {
+            log.warn("Failed to walk directory tree for deletion: {}", directory.getAbsolutePath(), e);
+            return false;
         }
-
-        if (!directory.delete()) {
-            success = false;
-            log.warn("Failed to delete directory: {}", directory.getAbsolutePath());
-        }
-
-        return success;
     }
 
     public Boolean getUseSshAgent() {
@@ -1021,52 +1014,34 @@ public class AnsibleRunnerContextBuilder {
             Map<String, String> auth = new HashMap<>();
             final AuthenticationType authType = getSshAuthenticationType(node);
 
-            if (getDebug()) {
-                System.err.println("DEBUG: Processing authentication for node '" + node.getNodename() +
-                        "' with auth type: " + authType);
-            }
+            log.debug("Processing authentication for node '{}' with auth type: {}", node.getNodename(), authType);
 
             if (AnsibleDescribable.AuthenticationType.privateKey == authType) {
                 final String privateKey;
                 try {
                     privateKey = getSshPrivateKey(node);
-                    if (getDebug()) {
-                        System.err.println("DEBUG: Retrieved private key for node '" +
-                                node.getNodename() + "': " + (privateKey != null ? ("yes, length=" + privateKey.length()) : "null"));
-                    }
+                    log.debug("Retrieved private key for node '{}': {}", node.getNodename(),
+                            (privateKey != null ? ("yes, length=" + privateKey.length()) : "null"));
                 } catch (ConfigurationException e) {
-                    if (getDebug()) {
-                        System.err.println("DEBUG: Error retrieving private key for node '" +
-                                node.getNodename() + "': " + e.getMessage());
-                    }
+                    log.debug("Error retrieving private key for node '{}': {}", node.getNodename(), e.getMessage());
                     throw new RuntimeException("Failed to retrieve private key for node '" +
                             node.getNodename() + "': " + e.getMessage(), e);
                 }
                 if (privateKey != null) {
                     auth.put("ansible_ssh_private_key", privateKey);
-                    if (getDebug()) {
-                        System.err.println("DEBUG: Added private key to auth map for node '" + node.getNodename() + "'");
-                    }
+                    log.debug("Added private key to auth map for node '{}'", node.getNodename());
                 } else {
-                    if (getDebug()) {
-                        System.err.println("DEBUG: Private key is null for node '" + node.getNodename() + "', not adding to auth map");
-                    }
+                    log.debug("Private key is null for node '{}', not adding to auth map", node.getNodename());
                 }
             } else if (AnsibleDescribable.AuthenticationType.password == authType) {
                 try {
                     String password = getSshPassword(node);
                     if(null!=password){
                         auth.put("ansible_password", password);
-                        if (getDebug()) {
-                            System.err.println("DEBUG: Successfully retrieved password for node '" +
-                                    node.getNodename() + "'");
-                        }
+                        log.debug("Successfully retrieved password for node '{}'", node.getNodename());
                     }
                 } catch (ConfigurationException e) {
-                    if (getDebug()) {
-                        System.err.println("DEBUG: Error retrieving password for node '" +
-                                node.getNodename() + "': " + e.getMessage());
-                    }
+                    log.debug("Error retrieving password for node '{}': {}", node.getNodename(), e.getMessage());
                     throw new RuntimeException("Failed to retrieve password for node '" +
                             node.getNodename() + "': " + e.getMessage(), e);
                 }
@@ -1085,10 +1060,8 @@ public class AnsibleRunnerContextBuilder {
             if (!hasPassword && !hasPrivateKey) {
                 context.getExecutionLogger().log(2, "WARNING: Node '" + node.getNodename() +
                         "' has no password or private key configured. Authentication may fail.");
-                if (getDebug()) {
-                    System.err.println("DEBUG: Node '" + node.getNodename() +
-                            "' has no credentials configured (only username: " + (auth.containsKey("ansible_user") ? "yes" : "no") + ")");
-                }
+                log.debug("Node '{}' has no credentials configured (only username: {})",
+                        node.getNodename(), (auth.containsKey("ansible_user") ? "yes" : "no"));
             }
 
             authenticationNodesMap.put(node.getNodename(), auth);
@@ -1145,11 +1118,9 @@ public class AnsibleRunnerContextBuilder {
     public Boolean generateInventoryNodesAuth() {
         Boolean generateInventoryNodesAuth = null;
 
-        if(getDebug()) {
-            System.err.println("DEBUG: Resolving property ANSIBLE_GENERATE_INVENTORY_NODES_AUTH");
-            System.err.println("DEBUG: Property key: " + AnsibleDescribable.ANSIBLE_GENERATE_INVENTORY_NODES_AUTH);
-            System.err.println("DEBUG: Framework project: " + getFrameworkProject());
-        }
+        log.debug("Resolving property ANSIBLE_GENERATE_INVENTORY_NODES_AUTH");
+        log.debug("Property key: {}", AnsibleDescribable.ANSIBLE_GENERATE_INVENTORY_NODES_AUTH);
+        log.debug("Framework project: {}", getFrameworkProject());
 
         String sgenerateInventoryNodesAuth = PropertyResolver.resolveProperty(
                 AnsibleDescribable.ANSIBLE_GENERATE_INVENTORY_NODES_AUTH,
@@ -1160,19 +1131,13 @@ public class AnsibleRunnerContextBuilder {
                 getJobConf()
         );
 
-        if(getDebug()) {
-            System.err.println("DEBUG: PropertyResolver returned: " + sgenerateInventoryNodesAuth);
-        }
+        log.debug("PropertyResolver returned: {}", sgenerateInventoryNodesAuth);
 
         if (null != sgenerateInventoryNodesAuth) {
             generateInventoryNodesAuth = Boolean.parseBoolean(sgenerateInventoryNodesAuth);
-            if(getDebug()) {
-                System.err.println("DEBUG: Parsed to boolean: " + generateInventoryNodesAuth);
-            }
+            log.debug("Parsed to boolean: {}", generateInventoryNodesAuth);
         } else {
-            if(getDebug()) {
-                System.err.println("DEBUG: Property not found, returning null");
-            }
+            log.debug("Property not found, returning null");
         }
 
         return generateInventoryNodesAuth;
@@ -1188,9 +1153,7 @@ public class AnsibleRunnerContextBuilder {
     String getExecutionSpecificTmpDir() {
         // Return cached directory if already created
         if (executionSpecificDir != null) {
-            if (getDebug()) {
-                System.err.println("DEBUG: Using cached execution-specific directory: " + executionSpecificDir.getAbsolutePath());
-            }
+            log.debug("Using cached execution-specific directory: {}", executionSpecificDir.getAbsolutePath());
             return executionSpecificDir.getAbsolutePath();
         }
 
@@ -1199,10 +1162,7 @@ public class AnsibleRunnerContextBuilder {
         // Get execution ID from data context
         if (context.getDataContext() != null && context.getDataContext().get("job") != null) {
             executionId = context.getDataContext().get("job").get("execid");
-
-            if (getDebug()) {
-                System.err.println("DEBUG: Execution ID from context: " + executionId);
-            }
+            log.debug("Execution ID from context: {}", executionId);
         }
 
         // Get base tmp directory

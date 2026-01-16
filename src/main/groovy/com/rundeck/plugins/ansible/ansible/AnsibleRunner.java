@@ -1082,7 +1082,24 @@ public class AnsibleRunner {
 
     /**
      * Pattern for detecting YAML special characters that require quoting.
-     * Includes: : [ ] { } # & * ! | > ' " % @ ` \
+     * Matches any string containing one or more of these characters:
+     * <ul>
+     *   <li><code>:</code> - colon (key-value separator)</li>
+     *   <li><code>[ ]</code> - square brackets (array notation)</li>
+     *   <li><code>{ }</code> - curly braces (object notation)</li>
+     *   <li><code>#</code> - hash (comment marker)</li>
+     *   <li><code>&</code> - ampersand (anchor reference)</li>
+     *   <li><code>*</code> - asterisk (alias reference)</li>
+     *   <li><code>!</code> - exclamation (tag indicator)</li>
+     *   <li><code>|</code> - pipe (literal block scalar)</li>
+     *   <li><code>&gt;</code> - greater-than (folded block scalar)</li>
+     *   <li><code>' "</code> - quotes (string delimiters)</li>
+     *   <li><code>%</code> - percent (directive indicator)</li>
+     *   <li><code>@</code> - at-sign (reserved for future use)</li>
+     *   <li><code>`</code> - backtick (reserved for future use)</li>
+     *   <li><code>\</code> - backslash (escape character)</li>
+     * </ul>
+     * Regex pattern: <code>.*[:\\[\\]{}#&amp;*!|&gt;'\"%@`\\\\].*</code>
      */
     private static final java.util.regex.Pattern YAML_SPECIAL_CHARS_PATTERN =
             java.util.regex.Pattern.compile(".*[:\\[\\]{}#&*!|>'\"%@`\\\\].*");
