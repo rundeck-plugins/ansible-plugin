@@ -226,8 +226,9 @@ public class AnsibleRunnerContextBuilder {
      *
      * @param storagePath The storage path to read from
      * @param resourceType Description of resource type for error messages (e.g., "ssh password", "ssh private key")
-     * @return The content as a UTF-8 string, or null if storagePath is null
-     * @throws ConfigurationException if reading fails
+     * @return The content as a UTF-8 string. Returns null ONLY if storagePath parameter is null (early return).
+     *         After attempting to read content, this method either returns a non-null string or throws an exception.
+     * @throws ConfigurationException if the storage path cannot be read or does not exist
      */
     private String readFromStoragePath(String storagePath, String resourceType) throws ConfigurationException {
         if (storagePath == null) {

@@ -1286,10 +1286,26 @@ public class AnsibleRunner {
 
     /**
      * Sanitizes a node name to be safe for use in filesystem paths.
-     * Replaces unsafe characters with underscores and prevents hidden files and problematic names.
+     * <p>
+     * This method performs the following transformations:
+     * <ul>
+     *   <li>Replaces all characters except alphanumeric, dot, underscore, and hyphen with underscores</li>
+     *   <li>Prevents hidden files by prepending underscore if name starts with dot</li>
+     *   <li>Handles empty strings by prepending underscore</li>
+     * </ul>
+     * </p>
+     * <p>
+     * Examples:
+     * <ul>
+     *   <li>{@code "node-1"} → {@code "node-1"} (no change)</li>
+     *   <li>{@code "node@host"} → {@code "node_host"} (@ replaced)</li>
+     *   <li>{@code ".hidden"} → {@code "_.hidden"} (prevents hidden file)</li>
+     *   <li>{@code ""} → {@code "_"} (handles empty)</li>
+     * </ul>
+     * </p>
      *
-     * @param nodeName The original node name
-     * @return A sanitized node name safe for use in file paths
+     * @param nodeName The original node name to sanitize
+     * @return A sanitized node name safe for use in file paths, never null
      */
     String sanitizeNodeNameForFilesystem(String nodeName) {
         // Replace unsafe characters with underscores

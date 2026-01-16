@@ -623,6 +623,24 @@ class AnsibleRunnerSpec extends Specification{
         "key with spaces"    || "key with spaces"  // internal spaces are valid in unquoted YAML keys; node names with leading/trailing spaces are not supported
     }
 
+    def "escapeYamlKey: node names with leading/trailing spaces are not modified"() {
+        given:
+        def builder = AnsibleRunner.playbookInline("test")
+        builder.customTmpDirPath("/tmp")
+        def runner = builder.build()
+
+        expect:
+        // This documents that escapeYamlKey does not normalize leading/trailing spaces.
+        // Node names with such spaces are considered unsupported at a higher level.
+        runner.escapeYamlKey(key) == expectedResult
+
+        where:
+        key                    || expectedResult
+        " leading-space"       || " leading-space"
+        "trailing-space "      || "trailing-space "
+        "  both-sides  "       || "  both-sides  "
+    }
+
     def "escapeYamlValue: should quote values with special characters"() {
         given:
         def builder = AnsibleRunner.playbookInline("test")
