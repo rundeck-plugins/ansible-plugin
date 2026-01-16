@@ -573,8 +573,7 @@ public class AnsibleRunner {
                         }
 
                     } catch (IOException e) {
-                        System.err.println("ERROR: Failed to write all.yaml: " + e.getMessage());
-                        e.printStackTrace();
+                        log.error("ERROR: Failed to write all.yaml for node auth", e);
                         throw new RuntimeException("Failed to write all.yaml for node auth", e);
                     }
                 }
