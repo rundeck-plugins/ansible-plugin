@@ -1293,8 +1293,8 @@ public class AnsibleRunner {
         // Replace unsafe characters with underscores
         String safeNodeName = nodeName.replaceAll("[^a-zA-Z0-9._-]", "_");
 
-        // Prevent hidden files (starting with .) and problematic names (empty or all dots)
-        if (safeNodeName.isEmpty() || safeNodeName.startsWith(".") || safeNodeName.matches("^\\.+$")) {
+        // Prevent hidden files (starting with .) and problematic names (empty)
+        if (safeNodeName.isEmpty() || safeNodeName.startsWith(".")) {
             safeNodeName = "_" + safeNodeName;
         }
 
