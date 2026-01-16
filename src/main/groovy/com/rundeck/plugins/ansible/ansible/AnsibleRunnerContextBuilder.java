@@ -1075,7 +1075,7 @@ public class AnsibleRunnerContextBuilder {
             String userName = getSshNodeUser(node);
 
             if(null!=userName){
-                auth.put("ansible_user",userName );
+                auth.put("ansible_user", userName);
             }
 
             // Validate that node has at least one authentication method configured

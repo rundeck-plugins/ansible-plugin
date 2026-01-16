@@ -1,6 +1,6 @@
 # Multi-Node Authentication Functional Test
 
-This test verifies the multi-node authentication feature where each node can have its own password stored in Rundeck's key storage.
+This test verifies the multi-node authentication feature where each node can have its own credentials (password or private key) stored in Rundeck's key storage.
 
 ## Test Setup
 
@@ -8,18 +8,20 @@ This test verifies the multi-node authentication feature where each node can hav
 - **ssh-node**: Standard password (`testpassword123`)
 - **ssh-node-2**: Password with special characters (`password2_special!@#`)
 - **ssh-node-3**: Password with quotes (`password3"quote'test`)
+- **ssh-node-4**: Private key authentication (uses SSH key from key storage)
 
 ### Files
-- `resources.xml`: Defines three nodes with node-specific password storage paths
+- `resources.xml`: Defines four nodes with node-specific authentication (three with password storage paths, one with private key storage path)
 - `inventory.ini`: Ansible inventory file for the test nodes
 - `ansible.cfg`: Ansible configuration
 - `test-playbook.yml`: Test playbook for verification
 
 ## What's Being Tested
 
-1. **Multi-node authentication with different passwords per node**
-   - Each node has a different password stored in Rundeck key storage
-   - The plugin generates `group_vars/all.yaml` with vault-encrypted passwords
+1. **Multi-node authentication with different credentials per node**
+   - Three nodes have different passwords stored in Rundeck key storage
+   - One node uses private key authentication stored in Rundeck key storage
+   - The plugin generates `group_vars/all.yaml` with vault-encrypted passwords and private key paths
    - Each node authenticates with its specific credentials
 
 2. **Password escaping for special characters**
@@ -52,6 +54,9 @@ This test verifies the multi-node authentication feature where each node can hav
      ssh-node: rundeck
      ssh-node-2: rundeck
      ssh-node-3: rundeck
+     ssh-node-4: rundeck
+   host_private_keys:
+     ssh-node-4: /path/to/temporary/key
    ```
 6. Ansible uses host-specific credentials from group_vars
-7. Each node authenticates successfully with its own password
+7. Each node authenticates successfully with its own credentials (password or private key)
