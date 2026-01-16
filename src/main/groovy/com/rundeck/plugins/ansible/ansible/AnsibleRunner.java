@@ -619,8 +619,8 @@ public class AnsibleRunner {
                 // This is a security best practice: private keys should never be writable after creation.
                 // SSH itself will warn or refuse to use keys with overly permissive permissions (e.g., 0600).
                 // Write permission is unnecessary since this temporary file is created once, read by SSH,
-                // and never modified. The file will be deleted after use. This matches the permissions
-                // used for node-specific private keys (lines 474-476).
+                // and never modified. The file will be deleted after use.
+                // Node-specific private keys created elsewhere in this class should use the same 0400 permissions for consistency.
                 Set<PosixFilePermission> perms = new HashSet<PosixFilePermission>();
                 perms.add(PosixFilePermission.OWNER_READ);
                 Files.setPosixFilePermissions(tempPkFile.toPath(), perms);
