@@ -614,14 +614,14 @@ public class AnsibleRunner {
                 String privateKeyData = sshPrivateKey.replaceAll("\r\n", "\n");
                 tempPkFile = AnsibleUtil.createTemporaryFile("","id_rsa", privateKeyData,customTmpDirPath);
 
-                // Set SSH private key permissions to 0400 (owner read-only).
-                // This is a security best practice: private keys should never be writable after creation.
-                // SSH itself will warn or refuse to use keys with overly permissive permissions (e.g., 0600).
-                // Write permission is unnecessary since this temporary file is created once, read by SSH,
-                // and never modified. The file will be deleted after use.
-                // Node-specific private keys created elsewhere in this class should use the same 0400 permissions for consistency.
+                // Set SSH private key permissions to 0600 (owner read/write).
+                // This keeps the key private (not accessible by group/world) while preserving backward
+                // compatibility for workflows that may need to modify or reuse this temporary file.
+                // SSH itself will warn or refuse to use keys with overly permissive permissions, so we
+                // restrict access to the file owner only.
                 Set<PosixFilePermission> perms = new HashSet<PosixFilePermission>();
                 perms.add(PosixFilePermission.OWNER_READ);
+                perms.add(PosixFilePermission.OWNER_WRITE);
                 Files.setPosixFilePermissions(tempPkFile.toPath(), perms);
 
                 if (sshUseAgent) {
