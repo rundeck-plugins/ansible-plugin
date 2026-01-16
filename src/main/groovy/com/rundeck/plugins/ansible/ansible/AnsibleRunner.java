@@ -1082,6 +1082,29 @@ public class AnsibleRunner {
     }
 
     /**
+     * Pattern for detecting YAML special characters that require quoting.
+     * Includes: : [ ] { } # & * ! | > ' " % @ ` \
+     */
+    private static final java.util.regex.Pattern YAML_SPECIAL_CHARS_PATTERN =
+            java.util.regex.Pattern.compile(".*[:\\[\\]{}#&*!|>'\"%@`\\\\].*");
+
+    /**
+     * Checks if a string needs YAML quoting based on special characters and prefixes.
+     *
+     * @param value The string to check
+     * @param checkNumericPrefix If true, requires quoting if value starts with a digit
+     * @param checkEmpty If true, requires quoting if value is empty after trimming
+     * @return true if the string needs to be wrapped in quotes
+     */
+    private boolean needsYamlQuoting(String value, boolean checkNumericPrefix, boolean checkEmpty) {
+        return YAML_SPECIAL_CHARS_PATTERN.matcher(value).matches() ||
+               value.startsWith("-") ||
+               value.startsWith("?") ||
+               (checkNumericPrefix && value.matches("^[0-9].*")) ||
+               (checkEmpty && value.trim().isEmpty());
+    }
+
+    /**
      * Escapes YAML special characters in keys.
      * If the key contains special characters, wraps it in quotes.
      *
@@ -1089,11 +1112,7 @@ public class AnsibleRunner {
      * @return Escaped key safe for YAML
      */
     String escapeYamlKey(String key) {
-        // YAML special characters that require quoting (including backslash)
-        if (key.matches(".*[:\\[\\]{}#&*!|>'\"%@`\\\\].*") ||
-            key.startsWith("-") ||
-            key.startsWith("?") ||
-            key.matches("^[0-9].*")) {
+        if (needsYamlQuoting(key, true, false)) {
             // IMPORTANT: Order of replacements matters! Must escape backslashes FIRST, then quotes.
             // If we escaped quotes first, the backslash replacement would double-escape them.
             // Example: value="a\"b" -> replace quotes: "a\\"b" -> replace backslash: "a\\\\"b" (WRONG!)
@@ -1111,11 +1130,7 @@ public class AnsibleRunner {
      * @return Escaped value safe for YAML
      */
     String escapeYamlValue(String value) {
-        // Check if value needs quoting (including backslash)
-        if (value.matches(".*[:\\[\\]{}#&*!|>'\"%@`\\\\].*") ||
-            value.startsWith("-") ||
-            value.startsWith("?") ||
-            value.trim().isEmpty()) {
+        if (needsYamlQuoting(value, false, true)) {
             // IMPORTANT: Order of replacements matters! Must escape backslashes FIRST, then quotes.
             // If we escaped quotes first, the backslash replacement would double-escape them.
             // Example: value="a\"b" -> replace quotes: "a\\"b" -> replace backslash: "a\\\\"b" (WRONG!)
