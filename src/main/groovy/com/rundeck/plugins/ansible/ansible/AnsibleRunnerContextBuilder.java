@@ -165,7 +165,7 @@ public class AnsibleRunnerContextBuilder {
             final String path = getPrivateKeyfilePath();
             if (path != null) {
                 try {
-                    return new String(Files.readAllBytes(Paths.get(path)));
+                    return new String(Files.readAllBytes(Paths.get(path)), java.nio.charset.StandardCharsets.UTF_8);
                 } catch (IOException e) {
                     throw new ConfigurationException("Failed to read the ssh private key from path " +
                             path + ": " + e.getMessage());

@@ -76,11 +76,7 @@ public class AnsiblePlaybookWorflowNodeStep implements NodeStepPlugin, AnsibleDe
 
         configuration.put(AnsibleDescribable.ANSIBLE_LIMIT,entry.getNodename());
         // set log level
-        String loglevel = null;
-        if (context.getDataContext() != null &&
-            context.getDataContext().get("job") != null) {
-            loglevel = context.getDataContext().get("job").get("loglevel");
-        }
+        String loglevel = AnsibleUtil.getJobLogLevel(context);
 
         if ("DEBUG".equals(loglevel)) {
             configuration.put(AnsibleDescribable.ANSIBLE_DEBUG,"True");

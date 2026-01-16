@@ -85,11 +85,7 @@ public class AnsiblePlaybookWorkflowStep implements StepPlugin, AnsibleDescribab
             configuration.put(AnsibleDescribable.ANSIBLE_LIMIT, limit);
         }
         // set log level
-        String loglevel = null;
-        if (context.getDataContext() != null &&
-            context.getDataContext().get("job") != null) {
-            loglevel = context.getDataContext().get("job").get("loglevel");
-        }
+        String loglevel = AnsibleUtil.getJobLogLevel(context);
 
         if ("DEBUG".equals(loglevel)) {
             configuration.put(AnsibleDescribable.ANSIBLE_DEBUG, "True");

@@ -1007,12 +1007,9 @@ class AnsibleRunnerSpec extends Specification{
     def "node name sanitization: should sanitize node names with forward slashes for temp files"() {
         given:
         // Test case from real issue: node name with forward slashes
+        def runner = AnsibleRunner.playbookInline("test").build()
         String nodeName = "/docker-runner-ansible-ssh-node-b-3"
-        String sanitized = nodeName.replaceAll("[^a-zA-Z0-9._-]", "_")
-        // Prevent hidden files (starting with .) and problematic names (empty or all dots)
-        if (sanitized.isEmpty() || sanitized.startsWith(".") || sanitized.matches(/^\.\+$/)) {
-            sanitized = "_" + sanitized
-        }
+        String sanitized = runner.sanitizeNodeNameForFilesystem(nodeName)
 
         expect:
         sanitized == "_docker-runner-ansible-ssh-node-b-3"
@@ -1022,11 +1019,8 @@ class AnsibleRunnerSpec extends Specification{
 
     def "node name sanitization: should sanitize various special characters"() {
         given:
-        String sanitized = nodeName.replaceAll("[^a-zA-Z0-9._-]", "_")
-        // Prevent hidden files (starting with .) and problematic names (empty or all dots)
-        if (sanitized.isEmpty() || sanitized.startsWith(".") || sanitized.matches(/^\.\+$/)) {
-            sanitized = "_" + sanitized
-        }
+        def runner = AnsibleRunner.playbookInline("test").build()
+        String sanitized = runner.sanitizeNodeNameForFilesystem(nodeName)
 
         expect:
         sanitized == expected
@@ -1050,12 +1044,9 @@ class AnsibleRunnerSpec extends Specification{
 
     def "node name sanitization: should preserve safe alphanumeric and allowed characters"() {
         given:
+        def runner = AnsibleRunner.playbookInline("test").build()
         String safeName = "my-node_123.server-A"
-        String sanitized = safeName.replaceAll("[^a-zA-Z0-9._-]", "_")
-        // Prevent hidden files (starting with .) and problematic names (empty or all dots)
-        if (sanitized.isEmpty() || sanitized.startsWith(".") || sanitized.matches(/^\.\+$/)) {
-            sanitized = "_" + sanitized
-        }
+        String sanitized = runner.sanitizeNodeNameForFilesystem(safeName)
 
         expect:
         sanitized == safeName  // Should not be changed
@@ -1063,11 +1054,8 @@ class AnsibleRunnerSpec extends Specification{
 
     def "node name sanitization: should handle empty and edge case node names"() {
         given:
-        String sanitized = nodeName.replaceAll("[^a-zA-Z0-9._-]", "_")
-        // Prevent hidden files (starting with .) and problematic names (empty or all dots)
-        if (sanitized.isEmpty() || sanitized.startsWith(".") || sanitized.matches(/^\.\+$/)) {
-            sanitized = "_" + sanitized
-        }
+        def runner = AnsibleRunner.playbookInline("test").build()
+        String sanitized = runner.sanitizeNodeNameForFilesystem(nodeName)
 
         expect:
         sanitized == expected

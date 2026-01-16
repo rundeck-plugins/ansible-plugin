@@ -301,6 +301,7 @@ public class AnsibleRunner {
     File vaultPromptFile;
     File tempNodeAuthFile;
     File groupVarsDir;
+    List<File> tempNodePrivateKeyFiles;
 
     String customTmpDirPath;
 
@@ -433,6 +434,9 @@ public class AnsibleRunner {
                     Map<String, String> hostPasswords = new LinkedHashMap<>();
                     Map<String, String> hostKeys = new LinkedHashMap<>();
 
+                    // Track node-specific private key files for explicit cleanup
+                    tempNodePrivateKeyFiles = new ArrayList<>();
+
                     nodesAuthentication.forEach((nodeName, authValues) -> {
                         String user = authValues.get("ansible_user");
                         String password = authValues.get("ansible_password");
@@ -459,12 +463,8 @@ public class AnsibleRunner {
                             //create temporary file for private key
                             File tempHostPkFile;
                             try {
-                                // Sanitize node name for filesystem use (replace unsafe characters with underscores)
-                                String safeNodeName = nodeName.replaceAll("[^a-zA-Z0-9._-]", "_");
-                                // Prevent hidden files (starting with .) and problematic names (empty or all dots)
-                                if (safeNodeName.isEmpty() || safeNodeName.startsWith(".") || safeNodeName.matches("^\\.+$")) {
-                                    safeNodeName = "_" + safeNodeName;
-                                }
+                                // Sanitize node name for filesystem use
+                                String safeNodeName = sanitizeNodeNameForFilesystem(nodeName);
                                 if(debug && !nodeName.equals(safeNodeName)) {
                                     System.err.println("DEBUG: Sanitized node name '" + nodeName + "' to '" + safeNodeName + "' for temp file");
                                 }
@@ -477,7 +477,8 @@ public class AnsibleRunner {
 
                                 hostKeys.put(nodeName, tempHostPkFile.getAbsolutePath());
 
-                                tempHostPkFile.deleteOnExit();
+                                // Track for explicit cleanup to minimize exposure time of sensitive credentials
+                                tempNodePrivateKeyFiles.add(tempHostPkFile);
                             } catch (IOException e) {
                                 throw new RuntimeException("Failed to create temporary private key file for node '" +
                                         nodeName + "': " + e.getMessage(), e);
@@ -517,6 +518,9 @@ public class AnsibleRunner {
                             }
 
                             try {
+                                // Use Files.createDirectories() which is idempotent (safe to call if directory exists)
+                                // and handles race conditions properly. Unlike mkdirs(), it doesn't return false
+                                // when the directory already exists - it only throws IOException on actual failure.
                                 Files.createDirectories(groupVarsDir.toPath());
                             } catch (IOException e) {
                                 throw new RuntimeException("Failed to create group_vars directory at: " + groupVarsDir.getAbsolutePath(), e);
@@ -529,6 +533,12 @@ public class AnsibleRunner {
                                     yamlContent,
                                     java.nio.charset.StandardCharsets.UTF_8
                             );
+
+                            // Alert administrators that sensitive files are being created in their inventory directory
+                            log.warn("Writing vault-encrypted authentication data to user-provided inventory location: {}. " +
+                                    "Administrators should ensure this directory has appropriate filesystem permissions. " +
+                                    "This file will be cleaned up after execution, but may persist if cleanup fails.",
+                                    tempNodeAuthFile.getAbsolutePath());
 
                             if(debug) {
                                 System.err.println("DEBUG: Writing all.yaml to: " + tempNodeAuthFile.getAbsolutePath());
@@ -608,7 +618,9 @@ public class AnsibleRunner {
                 // Set SSH private key permissions to 0400 (owner read-only).
                 // This is a security best practice: private keys should never be writable after creation.
                 // SSH itself will warn or refuse to use keys with overly permissive permissions (e.g., 0600).
-                // This temporary file is immutable and will be deleted after use.
+                // Write permission is unnecessary since this temporary file is created once, read by SSH,
+                // and never modified. The file will be deleted after use. This matches the permissions
+                // used for node-specific private keys (lines 469-472).
                 Set<PosixFilePermission> perms = new HashSet<PosixFilePermission>();
                 perms.add(PosixFilePermission.OWNER_READ);
                 Files.setPosixFilePermissions(tempPkFile.toPath(), perms);
@@ -846,6 +858,15 @@ public class AnsibleRunner {
 
             if (tempNodeAuthFile != null && !tempNodeAuthFile.delete()) {
                 tempNodeAuthFile.deleteOnExit();
+            }
+
+            // Clean up node-specific private key files to minimize exposure time of sensitive credentials
+            if (tempNodePrivateKeyFiles != null) {
+                for (File nodeKeyFile : tempNodePrivateKeyFiles) {
+                    if (nodeKeyFile != null && !nodeKeyFile.delete()) {
+                        nodeKeyFile.deleteOnExit();
+                    }
+                }
             }
 
             // Clean up group_vars directory if it was created alongside user-provided inventory
@@ -1244,6 +1265,25 @@ public class AnsibleRunner {
         });
 
         return stringBuilder.toString();
+    }
+
+    /**
+     * Sanitizes a node name to be safe for use in filesystem paths.
+     * Replaces unsafe characters with underscores and prevents hidden files and problematic names.
+     *
+     * @param nodeName The original node name
+     * @return A sanitized node name safe for use in file paths
+     */
+    String sanitizeNodeNameForFilesystem(String nodeName) {
+        // Replace unsafe characters with underscores
+        String safeNodeName = nodeName.replaceAll("[^a-zA-Z0-9._-]", "_");
+
+        // Prevent hidden files (starting with .) and problematic names (empty or all dots)
+        if (safeNodeName.isEmpty() || safeNodeName.startsWith(".") || safeNodeName.matches("^\\.+$")) {
+            safeNodeName = "_" + safeNodeName;
+        }
+
+        return safeNodeName;
     }
 
 

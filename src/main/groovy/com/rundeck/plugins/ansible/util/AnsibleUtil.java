@@ -140,5 +140,31 @@ public class AnsibleUtil {
         return  customTmpDir;
     }
 
+    /**
+     * Safely retrieves the loglevel from the execution context's data context.
+     * Returns null if the loglevel cannot be retrieved (e.g., if data context or job is null).
+     *
+     * @param context The execution context
+     * @return The loglevel string, or null if not available
+     */
+    public static String getJobLogLevel(ExecutionContext context) {
+        if (context.getDataContext() != null &&
+            context.getDataContext().get("job") != null) {
+            return context.getDataContext().get("job").get("loglevel");
+        }
+        return null;
+    }
+
+    /**
+     * Safely retrieves the loglevel from the plugin step context's data context.
+     * Returns null if the loglevel cannot be retrieved (e.g., if data context or job is null).
+     *
+     * @param context The plugin step context
+     * @return The loglevel string, or null if not available
+     */
+    public static String getJobLogLevel(PluginStepContext context) {
+        return getJobLogLevel(context.getExecutionContext());
+    }
+
 
 }
