@@ -465,8 +465,8 @@ public class AnsibleRunner {
                             try {
                                 // Sanitize node name for filesystem use
                                 String safeNodeName = sanitizeNodeNameForFilesystem(nodeName);
-                                if(debug && !nodeName.equals(safeNodeName)) {
-                                    System.err.println("DEBUG: Sanitized node name '" + nodeName + "' to '" + safeNodeName + "' for temp file");
+                                if(!nodeName.equals(safeNodeName)) {
+                                    log.debug("Sanitized node name '{}' to '{}' for temp file", nodeName, safeNodeName);
                                 }
                                 tempHostPkFile = AnsibleUtil.createTemporaryFile("","id_rsa_node_"+safeNodeName, privateKey,customTmpDirPath);
 
@@ -489,10 +489,8 @@ public class AnsibleRunner {
                     // Build YAML content using helper method
                     String yamlContent = buildGroupVarsYaml(hostPasswords, hostUsers, hostKeys);
 
-                    if(debug){
-                        System.err.println("DEBUG: Building group_vars YAML with " + hostPasswords.size() + " passwords, " + hostUsers.size() + " users, and " + hostKeys.size() + " private keys");
-                        System.err.println("DEBUG: YAML content built successfully, length: " + yamlContent.length());
-                    }
+                    log.debug("Building group_vars YAML with {} passwords, {} users, and {} private keys", hostPasswords.size(), hostUsers.size(), hostKeys.size());
+                    log.debug("YAML content built successfully, length: {}", yamlContent.length());
 
                     try {
 
@@ -505,17 +503,13 @@ public class AnsibleRunner {
                         File inventoryFile = new File(inventory);
                         File inventoryParentDir = inventoryFile.getParentFile();
 
-                        if(debug) {
-                            System.err.println("DEBUG: inventoryFile: " + inventoryFile.getAbsolutePath());
-                            System.err.println("DEBUG: inventory file exists: " + inventoryFile.exists());
-                            System.err.println("DEBUG: inventoryParentDir: " + (inventoryParentDir != null ? inventoryParentDir.getAbsolutePath() : "null"));
-                        }
+                        log.debug("inventoryFile: {}", inventoryFile.getAbsolutePath());
+                        log.debug("inventory file exists: {}", inventoryFile.exists());
+                        log.debug("inventoryParentDir: {}", (inventoryParentDir != null ? inventoryParentDir.getAbsolutePath() : "null"));
 
                         if (inventoryParentDir != null) {
                             groupVarsDir = new File(inventoryParentDir, "group_vars");
-                            if(debug) {
-                                System.err.println("DEBUG: group_vars directory path: " + groupVarsDir.getAbsolutePath());
-                            }
+                            log.debug("group_vars directory path: {}", groupVarsDir.getAbsolutePath());
 
                             try {
                                 // Use Files.createDirectories() which is idempotent (safe to call if directory exists)
@@ -540,25 +534,19 @@ public class AnsibleRunner {
                                     "This file will be cleaned up after execution, but may persist if cleanup fails.",
                                     tempNodeAuthFile.getAbsolutePath());
 
-                            if(debug) {
-                                System.err.println("DEBUG: Writing all.yaml to: " + tempNodeAuthFile.getAbsolutePath());
-                                System.err.println("DEBUG: all.yaml written successfully, file size: " + tempNodeAuthFile.length() + " bytes");
-                            }
+                            log.debug("Writing all.yaml to: {}", tempNodeAuthFile.getAbsolutePath());
+                            log.debug("all.yaml written successfully, file size: {} bytes", tempNodeAuthFile.length());
                         } else {
                             // Fallback to temp file if inventory has no parent directory
                             tempNodeAuthFile = AnsibleUtil.createTemporaryFile("group_vars", "all.yaml", yamlContent, customTmpDirPath);
 
-                            if(debug) {
-                                System.err.println("DEBUG: No parent directory, using temporary file");
-                                System.err.println("DEBUG: Temporary all.yaml created at: " + tempNodeAuthFile.getAbsolutePath());
-                            }
+                            log.debug("No parent directory, using temporary file");
+                            log.debug("Temporary all.yaml created at: {}", tempNodeAuthFile.getAbsolutePath());
                         }
 
-                        if(debug) {
-                            System.err.println("DEBUG: tempNodeAuthFile: " + tempNodeAuthFile.getAbsolutePath());
-                            System.err.println("DEBUG: tempNodeAuthFile exists: " + tempNodeAuthFile.exists());
-                            System.err.println("DEBUG: tempNodeAuthFile readable: " + tempNodeAuthFile.canRead());
-                        }
+                        log.debug("tempNodeAuthFile: {}", tempNodeAuthFile.getAbsolutePath());
+                        log.debug("tempNodeAuthFile exists: {}", tempNodeAuthFile.exists());
+                        log.debug("tempNodeAuthFile readable: {}", tempNodeAuthFile.canRead());
 
                         //set extra vars to resolve the host specific authentication
                         if (!hostUsers.isEmpty()) {
@@ -1011,7 +999,7 @@ public class AnsibleRunner {
 
                 // Validate vault format
                 if (!isValidVaultFormat(vaultValue)) {
-                    System.err.println("ERROR: Invalid vault format for host: " + originalKey);
+                    log.error("Invalid vault format for host: {}", originalKey);
                     throw new RuntimeException("Invalid vault format for host: " + originalKey);
                 }
                 // The vault value already contains "!vault |\n" followed by the encrypted content
@@ -1047,9 +1035,7 @@ public class AnsibleRunner {
 
         String result = yamlContent.toString();
 
-        if(debug){
-            System.err.println("DEBUG: Generated YAML content (" + result.length() + " bytes)");
-        }
+        log.debug("Generated YAML content ({} bytes)", result.length());
 
         return result;
     }
