@@ -1030,7 +1030,7 @@ public class AnsibleRunner {
                     }
                 } else {
                     // Single line value (shouldn't happen with vault, but handle it)
-                    log.debug("Single line vault value for host: {}", originalKey);
+                    log.warn("Single line vault value for host: {}", originalKey);
                     yamlContent.append(vaultValue).append("\n");
                 }
             }
