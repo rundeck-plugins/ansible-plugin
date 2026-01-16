@@ -461,6 +461,10 @@ public class AnsibleRunner {
                             try {
                                 // Sanitize node name for filesystem use (replace unsafe characters with underscores)
                                 String safeNodeName = nodeName.replaceAll("[^a-zA-Z0-9._-]", "_");
+                                // Prevent hidden files (starting with .) and problematic names (empty or all dots)
+                                if (safeNodeName.isEmpty() || safeNodeName.startsWith(".") || safeNodeName.matches("^\\.+$")) {
+                                    safeNodeName = "_" + safeNodeName;
+                                }
                                 if(debug && !nodeName.equals(safeNodeName)) {
                                     System.err.println("DEBUG: Sanitized node name '" + nodeName + "' to '" + safeNodeName + "' for temp file");
                                 }
@@ -492,6 +496,11 @@ public class AnsibleRunner {
                     try {
 
                         // Create group_vars directory structure
+                        // IMPORTANT: Following Ansible convention, group_vars must be created in the same
+                        // directory as the inventory file for Ansible to find it. While this means writing
+                        // to user-specified locations, the passwords are vault-encrypted making them safe
+                        // for storage. Administrators should ensure inventory directories have appropriate
+                        // filesystem permissions to prevent unauthorized access.
                         File inventoryFile = new File(inventory);
                         File inventoryParentDir = inventoryFile.getParentFile();
 
@@ -507,10 +516,10 @@ public class AnsibleRunner {
                                 System.err.println("DEBUG: group_vars directory path: " + groupVarsDir.getAbsolutePath());
                             }
 
-                            if (!groupVarsDir.exists()) {
-                                if (!groupVarsDir.mkdirs()) {
-                                    throw new RuntimeException("Failed to create group_vars directory at: " + groupVarsDir.getAbsolutePath());
-                                }
+                            try {
+                                Files.createDirectories(groupVarsDir.toPath());
+                            } catch (IOException e) {
+                                throw new RuntimeException("Failed to create group_vars directory at: " + groupVarsDir.getAbsolutePath(), e);
                             }
 
                             // Create all.yaml in group_vars directory
@@ -596,7 +605,10 @@ public class AnsibleRunner {
                 String privateKeyData = sshPrivateKey.replaceAll("\r\n", "\n");
                 tempPkFile = AnsibleUtil.createTemporaryFile("","id_rsa", privateKeyData,customTmpDirPath);
 
-                // Only the owner can read (SSH private key best practice: 0400)
+                // Set SSH private key permissions to 0400 (owner read-only).
+                // This is a security best practice: private keys should never be writable after creation.
+                // SSH itself will warn or refuse to use keys with overly permissive permissions (e.g., 0600).
+                // This temporary file is immutable and will be deleted after use.
                 Set<PosixFilePermission> perms = new HashSet<PosixFilePermission>();
                 perms.add(PosixFilePermission.OWNER_READ);
                 Files.setPosixFilePermissions(tempPkFile.toPath(), perms);
@@ -1093,14 +1105,19 @@ public class AnsibleRunner {
     }
 
     /**
-     * Escapes a password value for safe use in YAML.
-     * Always wraps the password in quotes and escapes special characters to prevent YAML parsing errors.
+     * Escapes a password value for safe use inside double-quoted YAML strings.
+     * Note: This method does NOT add quotes - the caller must wrap the result in double quotes.
+     * This differs from escapeYamlKey() and escapeYamlValue() which conditionally add quotes based on content.
+     *
+     * Why the different approach:
+     * - Passwords are passed as Ansible extra vars (e.g., -e 'ansible_password: "..."') and are ALWAYS quoted
+     * - YAML keys/values in group_vars files should only be quoted when necessary for cleaner output
      *
      * @param password The password to escape
-     * @return Escaped and quoted password safe for YAML
+     * @return Escaped password safe for use inside double-quoted YAML strings (quotes not included)
      */
     String escapePasswordForYaml(String password) {
-        // Escape special characters in the password to prevent YAML parsing errors
+        // Escape special characters for use inside double-quoted strings
         return password
             .replace("\\", "\\\\")
             .replace("\"", "\\\"")

@@ -42,6 +42,13 @@ dependencies {
 
 tasks.register('functionalTest', Test) {
     useJUnitPlatform()
+
+    // Rundeck test image version
+    // NOTE: Using Rundeck 5.18.0 for functional testing. This version upgrade from the
+    // previously used 5.1.1 ensures compatibility with newer Rundeck releases and
+    // validates that the multi-node authentication feature works correctly with
+    // current Rundeck APIs and behavior. If the plugin's minimum supported Rundeck
+    // version changes, update both this test image and the plugin documentation.
     systemProperty('RUNDECK_TEST_IMAGE', "rundeck/rundeck:5.18.0")
 
     // Docker configuration for Testcontainers

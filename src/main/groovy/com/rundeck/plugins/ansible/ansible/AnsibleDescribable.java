@@ -100,6 +100,12 @@ public interface AnsibleDescribable extends Describable {
     public static final String ANSIBLE_INVENTORY_INLINE = "ansible-inventory-inline";
     public static final String ANSIBLE_INVENTORY = "ansible-inventory";
     public static final String ANSIBLE_GENERATE_INVENTORY = "ansible-generate-inventory";
+    /**
+     * Controls whether node authentication data is included when generating the inventory.
+     * This is an enhancement of {@link #ANSIBLE_GENERATE_INVENTORY} and only has effect
+     * when inventory generation is enabled. It is exposed as a separate top-level
+     * property for configuration/UI clarity.
+     */
     public static final String ANSIBLE_GENERATE_INVENTORY_NODES_AUTH = "ansible-generate-inventory-nodes-auth";
     public static final String ANSIBLE_MODULE = "ansible-module";
     public static final String ANSIBLE_MODULE_ARGS = "ansible-module-args";

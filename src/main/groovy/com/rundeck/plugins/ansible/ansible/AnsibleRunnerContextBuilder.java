@@ -819,18 +819,27 @@ public class AnsibleRunnerContextBuilder {
                 } else {
                     log.debug("Successfully deleted temp file: {}", temp.getAbsolutePath());
                 }
+            } else {
+                // In debug mode, temp files are intentionally preserved for inspection
+                log.debug("Debug mode enabled; not deleting temp file: {}", temp.getAbsolutePath());
             }
         }
         tempFiles.clear();
 
         // Clean up execution-specific directory (including group_vars when inventory was generated/inline)
         // Note: group_vars created alongside user-provided inventory files is cleaned up by AnsibleRunner
-        if (!getDebug() && executionSpecificDir != null && executionSpecificDir.exists()) {
-            log.debug("Cleaning up execution-specific directory: {}", executionSpecificDir.getAbsolutePath());
-            if (!deleteDirectoryRecursively(executionSpecificDir)) {
-                log.warn("Failed to completely delete execution-specific directory: {}", executionSpecificDir.getAbsolutePath());
+        if (executionSpecificDir != null && executionSpecificDir.exists()) {
+            if (!getDebug()) {
+                log.debug("Cleaning up execution-specific directory: {}", executionSpecificDir.getAbsolutePath());
+                if (!deleteDirectoryRecursively(executionSpecificDir)) {
+                    log.warn("Failed to completely delete execution-specific directory: {}", executionSpecificDir.getAbsolutePath());
+                } else {
+                    log.debug("Successfully deleted execution-specific directory: {}", executionSpecificDir.getAbsolutePath());
+                }
             } else {
-                log.debug("Successfully deleted execution-specific directory: {}", executionSpecificDir.getAbsolutePath());
+                // In debug mode, the execution-specific directory is intentionally preserved for troubleshooting.
+                // Note: These directories will accumulate over time and may require periodic manual cleanup.
+                log.debug("Debug mode enabled; not cleaning up execution-specific directory: {}", executionSpecificDir.getAbsolutePath());
             }
         }
     }
@@ -1202,23 +1211,17 @@ public class AnsibleRunnerContextBuilder {
         // Create execution-specific directory
         if (executionId != null && !executionId.isEmpty()) {
             executionSpecificDir = new File(baseTmpDir, "ansible-exec-" + executionId);
-            if (!executionSpecificDir.exists()) {
-                log.debug("Creating execution-specific directory: {}", executionSpecificDir.getAbsolutePath());
-                // Race condition handling: mkdirs() returns false if the directory already exists
-                // or if creation failed. If another thread/process created the directory between
-                // our exists() check and mkdirs() call, mkdirs() returns false but the directory
-                // now exists. We use double-check pattern: only throw if mkdirs() failed AND
-                // directory still doesn't exist (true creation failure).
-                boolean created = executionSpecificDir.mkdirs();
-                if (!created && !executionSpecificDir.exists()) {
-                    // Failed to create and directory still doesn't exist - this is an error
-                    String errorMsg = "Failed to create execution-specific directory: " + executionSpecificDir.getAbsolutePath();
-                    log.error(errorMsg);
-                    throw new IllegalStateException(errorMsg);
-                }
-                log.debug("Successfully created execution-specific directory: {}", executionSpecificDir.getAbsolutePath());
-            } else {
-                log.debug("Execution-specific directory already exists: {}", executionSpecificDir.getAbsolutePath());
+            log.debug("Creating execution-specific directory: {}", executionSpecificDir.getAbsolutePath());
+            try {
+                // Use Files.createDirectories() which is idempotent (safe to call if directory exists)
+                // and handles race conditions properly. Unlike mkdirs(), it doesn't return false
+                // when the directory already exists - it only throws IOException on actual failure.
+                Files.createDirectories(executionSpecificDir.toPath());
+                log.debug("Successfully ensured execution-specific directory exists: {}", executionSpecificDir.getAbsolutePath());
+            } catch (IOException e) {
+                String errorMsg = "Failed to create execution-specific directory: " + executionSpecificDir.getAbsolutePath();
+                log.error(errorMsg, e);
+                throw new IllegalStateException(errorMsg, e);
             }
             return executionSpecificDir.getAbsolutePath();
         }

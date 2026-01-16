@@ -620,7 +620,7 @@ class AnsibleRunnerSpec extends Specification{
         "-starts-with-dash"  || "\"-starts-with-dash\""
         "?starts-with-q"     || "\"?starts-with-q\""
         "123numeric"         || "\"123numeric\""
-        "key with spaces"    || "key with spaces"  // spaces are valid in unquoted YAML keys, so we intentionally do not quote them
+        "key with spaces"    || "key with spaces"  // internal spaces are valid in unquoted YAML keys; node names with leading/trailing spaces are not supported
     }
 
     def "escapeYamlValue: should quote values with special characters"() {
@@ -761,7 +761,7 @@ class AnsibleRunnerSpec extends Specification{
         !yaml.contains("host_passwords:")  // Should not appear when empty
         !yaml.contains("host_users:")  // Should not appear when empty
         !yaml.contains("host_private_keys:")  // Should not appear when empty
-        yaml.isEmpty() || yaml.trim().isEmpty()  // Should produce empty or whitespace-only output
+        yaml.isEmpty()  // Should produce empty output when all host lists are empty
     }
 
     def "escapePasswordForYaml: should escape special characters"() {
@@ -1009,6 +1009,10 @@ class AnsibleRunnerSpec extends Specification{
         // Test case from real issue: node name with forward slashes
         String nodeName = "/docker-runner-ansible-ssh-node-b-3"
         String sanitized = nodeName.replaceAll("[^a-zA-Z0-9._-]", "_")
+        // Prevent hidden files (starting with .) and problematic names (empty or all dots)
+        if (sanitized.isEmpty() || sanitized.startsWith(".") || sanitized.matches(/^\.\+$/)) {
+            sanitized = "_" + sanitized
+        }
 
         expect:
         sanitized == "_docker-runner-ansible-ssh-node-b-3"
@@ -1017,8 +1021,15 @@ class AnsibleRunnerSpec extends Specification{
     }
 
     def "node name sanitization: should sanitize various special characters"() {
+        given:
+        String sanitized = nodeName.replaceAll("[^a-zA-Z0-9._-]", "_")
+        // Prevent hidden files (starting with .) and problematic names (empty or all dots)
+        if (sanitized.isEmpty() || sanitized.startsWith(".") || sanitized.matches(/^\.\+$/)) {
+            sanitized = "_" + sanitized
+        }
+
         expect:
-        nodeName.replaceAll("[^a-zA-Z0-9._-]", "_") == expected
+        sanitized == expected
 
         where:
         nodeName                          || expected
@@ -1041,24 +1052,37 @@ class AnsibleRunnerSpec extends Specification{
         given:
         String safeName = "my-node_123.server-A"
         String sanitized = safeName.replaceAll("[^a-zA-Z0-9._-]", "_")
+        // Prevent hidden files (starting with .) and problematic names (empty or all dots)
+        if (sanitized.isEmpty() || sanitized.startsWith(".") || sanitized.matches(/^\.\+$/)) {
+            sanitized = "_" + sanitized
+        }
 
         expect:
         sanitized == safeName  // Should not be changed
     }
 
     def "node name sanitization: should handle empty and edge case node names"() {
+        given:
+        String sanitized = nodeName.replaceAll("[^a-zA-Z0-9._-]", "_")
+        // Prevent hidden files (starting with .) and problematic names (empty or all dots)
+        if (sanitized.isEmpty() || sanitized.startsWith(".") || sanitized.matches(/^\.\+$/)) {
+            sanitized = "_" + sanitized
+        }
+
         expect:
-        nodeName.replaceAll("[^a-zA-Z0-9._-]", "_") == expected
+        sanitized == expected
 
         where:
         nodeName                          || expected
-        ""                                || ""
+        ""                                || "_"         // empty -> prepend underscore
         "123"                             || "123"
-        "..."                             || "..."
+        "..."                             || "_..."      // all dots -> prepend underscore to avoid filesystem issues
         "---"                             || "---"
         "___"                             || "___"
         "a"                               || "a"
         "/////"                           || "_____"
+        ".hidden"                         || "_.hidden"  // starts with dot -> prepend underscore to prevent hidden files
+        ".config"                         || "_.config"  // starts with dot -> prepend underscore to prevent hidden files
     }
 
 }

@@ -17,7 +17,7 @@ class MultiNodeAuthSpec extends BaseTestConfiguration {
     // Test passwords for each node (matching docker-compose.yml)
     static String NODE1_PASSWORD = "testpassword123"
     static String NODE2_PASSWORD = "password2_special!@#"
-    static String NODE3_PASSWORD = 'password3"quote\'test'
+    static String NODE3_PASSWORD = 'password3"quote\'test' // Expected password value: password3"quote'test
 
     // Private key for node 4
     static String NODE4_PRIVATE_KEY_PATH = "src/test/resources/docker/keys/id_rsa"
