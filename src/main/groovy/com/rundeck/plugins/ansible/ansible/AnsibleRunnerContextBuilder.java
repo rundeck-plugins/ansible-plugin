@@ -1117,7 +1117,7 @@ public class AnsibleRunnerContextBuilder {
 
 
     public Boolean generateInventoryNodesAuth() {
-        Boolean generateInventoryNodesAuth = null;
+        boolean generateInventoryNodesAuth = false;
 
         log.debug("Resolving property ANSIBLE_GENERATE_INVENTORY_NODES_AUTH");
         log.debug("Property key: {}", AnsibleDescribable.ANSIBLE_GENERATE_INVENTORY_NODES_AUTH);
