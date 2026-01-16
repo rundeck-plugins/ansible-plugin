@@ -7,7 +7,7 @@ This test verifies the multi-node authentication feature where each node can hav
 ### Nodes
 - **ssh-node**: Standard password (`testpassword123`)
 - **ssh-node-2**: Password with special characters (`password2_special!@#`)
-- **ssh-node-3**: Password with quotes (`password3"quote'test`)
+- **ssh-node-3**: Password containing both a double quote (") and a single quote ('): password3"quote'test
 - **ssh-node-4**: Private key authentication (uses SSH key from key storage)
 
 ### Files
