@@ -824,6 +824,17 @@ public class AnsibleRunnerContextBuilder {
         return null;
 
     }
+    
+    public Map<String,String> getJobOptions(){
+        Map<String, String> options = new HashMap<>();
+        Map<String, String> jobOptions = context.getDataContext().get("job");
+        for (Map.Entry<String, String> entry : jobOptions.entrySet()) {
+            if(entry.getValue() != null) {
+                options.put("RD_JOB_" + entry.getKey().toUpperCase(), entry.getValue());
+            }
+        }
+        return options;
+    }
 
     public String getPassphraseStorageData(String storagePath) throws ConfigurationException {
         if (storagePath == null) {
