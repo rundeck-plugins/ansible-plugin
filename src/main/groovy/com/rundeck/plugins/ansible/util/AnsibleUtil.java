@@ -86,6 +86,16 @@ public class AnsibleUtil {
 
     }
 
+    public static List<String> getSecretsPathWorkflowSteps(AnsibleRunnerContextBuilder builder){
+        List<String> secretPaths = getSecretsPath(builder);
+        List<String> secretPathsNodes =builder.getListNodesKeyPath();
+
+        if(secretPathsNodes!=null && !secretPathsNodes.isEmpty()){
+            secretPaths.addAll(secretPathsNodes);
+        }
+        return secretPaths;
+    }
+
     public static Map<String, String> getRuntimeProperties(ExecutionContext context, String propertyPrefix) {
         Map<String, String> properties = null;
 
@@ -128,6 +138,32 @@ public class AnsibleUtil {
             customTmpDir = System.getProperty("java.io.tmpdir");
         }
         return  customTmpDir;
+    }
+
+    /**
+     * Safely retrieves the loglevel from the execution context's data context.
+     * Returns null if the loglevel cannot be retrieved (e.g., if data context or job is null).
+     *
+     * @param context The execution context
+     * @return The loglevel string, or null if not available
+     */
+    public static String getJobLogLevel(ExecutionContext context) {
+        if (context.getDataContext() != null &&
+            context.getDataContext().get("job") != null) {
+            return context.getDataContext().get("job").get("loglevel");
+        }
+        return null;
+    }
+
+    /**
+     * Safely retrieves the loglevel from the plugin step context's data context.
+     * Returns null if the loglevel cannot be retrieved (e.g., if data context or job is null).
+     *
+     * @param context The plugin step context
+     * @return The loglevel string, or null if not available
+     */
+    public static String getJobLogLevel(PluginStepContext context) {
+        return getJobLogLevel(context.getExecutionContext());
     }
 
 

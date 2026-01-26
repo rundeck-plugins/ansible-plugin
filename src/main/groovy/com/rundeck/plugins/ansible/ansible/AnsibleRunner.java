@@ -6,8 +6,10 @@ import com.rundeck.plugins.ansible.util.*;
 import com.dtolabs.rundeck.core.utils.SSHAgentProcess;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
 import lombok.Builder;
 import lombok.Data;
+import lombok.extern.slf4j.Slf4j;
 
 
 import java.io.*;
@@ -16,6 +18,7 @@ import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
 
+@Slf4j
 @Builder
 @Data
 public class AnsibleRunner {
@@ -275,7 +278,12 @@ public class AnsibleRunner {
     @Builder.Default
     private boolean useAnsibleVault = false;
 
-    static ObjectMapper mapperYaml = new ObjectMapper(new YAMLFactory());
+    static ObjectMapper mapperYaml = new ObjectMapper(
+        new YAMLFactory()
+            .enable(YAMLGenerator.Feature.LITERAL_BLOCK_STYLE)
+            .disable(YAMLGenerator.Feature.WRITE_DOC_START_MARKER)
+            .enable(YAMLGenerator.Feature.MINIMIZE_QUOTES)
+    );
     static ObjectMapper mapperJson = new ObjectMapper();
 
     private ProcessExecutor.ProcessExecutorBuilder processExecutorBuilder;
@@ -291,8 +299,15 @@ public class AnsibleRunner {
     File tempSshVarsFile ;
     File tempBecameVarsFile ;
     File vaultPromptFile;
+    File tempNodeAuthFile;
+    File groupVarsDir;
+    List<File> tempNodePrivateKeyFiles;
 
     String customTmpDirPath;
+
+    @Builder.Default
+    Boolean addNodeAuthToInventory = false;
+    Map<String, Map<String, String>> nodesAuthentication;
 
     public void deleteTempDirectory(Path tempDirectory) throws IOException {
         Files.walkFileTree(tempDirectory, new SimpleFileVisitor<Path>() {
@@ -384,8 +399,8 @@ public class AnsibleRunner {
             // 3) become-password is used for node authentication
             if (encryptExtraVars && extraVars != null && !extraVars.isEmpty() ||
                 sshUsePassword ||
-                (become && becomePassword != null && !becomePassword.isEmpty())) {
-
+                (become && becomePassword != null && !becomePassword.isEmpty()) ||
+                (addNodeAuthToInventory != null && addNodeAuthToInventory)){
                 useAnsibleVault = ansibleVault.checkAnsibleVault();
 
                 if(!useAnsibleVault) {
@@ -396,6 +411,161 @@ public class AnsibleRunner {
             if (inventory != null && !inventory.isEmpty()) {
                 procArgs.add("-i");
                 procArgs.add(inventory);
+
+                if(addNodeAuthToInventory != null && addNodeAuthToInventory && nodesAuthentication != null && !nodesAuthentication.isEmpty()) {
+
+                    /*
+                    Group vars file structure:
+
+                    host_users:
+                      host1: user1
+                      host2: user2
+
+                    host_passwords:
+                        host1: enc(password1)
+                        host2: enc(password2)
+
+                    host_private_keys:
+                        host1: /path/to/private_key1
+                        host2: /path/to/private_key2
+                     */
+
+                    Map<String, String> hostUsers = new LinkedHashMap<>();
+                    Map<String, String> hostPasswords = new LinkedHashMap<>();
+                    Map<String, String> hostKeys = new LinkedHashMap<>();
+
+                    // Track node-specific private key files for explicit cleanup
+                    tempNodePrivateKeyFiles = new ArrayList<>();
+
+                    nodesAuthentication.forEach((nodeName, authValues) -> {
+                        String user = authValues.get("ansible_user");
+                        String password = authValues.get("ansible_password");
+                        String privateKey = authValues.get("ansible_ssh_private_key");
+
+
+                        if (user != null) {
+                            hostUsers.put(nodeName, user);
+                        }
+                        if (password != null) {
+                            String encryptedPassword = password;
+                            if (useAnsibleVault) {
+                                try {
+                                    encryptedPassword = ansibleVault.encryptVariable("ansible_password", password);
+                                } catch (Exception e) {
+                                    throw new RuntimeException("Failed to encrypt password for node '" +
+                                            nodeName + "' using Ansible Vault: " + e.getMessage(), e);
+                                }
+                            }
+                            hostPasswords.put(nodeName, encryptedPassword);
+                        }
+
+                        if(privateKey != null){
+                            //create temporary file for private key
+                            File tempHostPkFile;
+                            try {
+                                // Sanitize node name for filesystem use
+                                String safeNodeName = sanitizeNodeNameForFilesystem(nodeName);
+                                if(!nodeName.equals(safeNodeName)) {
+                                    log.debug("Sanitized node name '{}' to '{}' for temp file", nodeName, safeNodeName);
+                                }
+                                tempHostPkFile = AnsibleUtil.createTemporaryFile("","id_rsa_node_"+safeNodeName, privateKey,customTmpDirPath);
+
+                                // Only the owner can read (SSH private key best practice: 0400)
+                                Set<PosixFilePermission> perms = new HashSet<PosixFilePermission>();
+                                perms.add(PosixFilePermission.OWNER_READ);
+                                Files.setPosixFilePermissions(tempHostPkFile.toPath(), perms);
+
+                                hostKeys.put(nodeName, tempHostPkFile.getAbsolutePath());
+
+                                // Track for explicit cleanup to minimize exposure time of sensitive credentials
+                                tempNodePrivateKeyFiles.add(tempHostPkFile);
+                            } catch (IOException e) {
+                                throw new RuntimeException("Failed to create temporary private key file for node '" +
+                                        nodeName + "': " + e.getMessage(), e);
+                            }
+                        }
+                    });
+
+                    // Build YAML content using helper method
+                    String yamlContent = buildGroupVarsYaml(hostPasswords, hostUsers, hostKeys);
+
+                    log.debug("Building group_vars YAML with {} passwords, {} users, and {} private keys", hostPasswords.size(), hostUsers.size(), hostKeys.size());
+                    log.debug("YAML content built successfully, length: {}", yamlContent.length());
+
+                    try {
+
+                        // Create group_vars directory structure
+                        // IMPORTANT: Following Ansible convention, group_vars must be created in the same
+                        // directory as the inventory file for Ansible to find it. While this means writing
+                        // to user-specified locations, the passwords are vault-encrypted making them safe
+                        // for storage. Administrators should ensure inventory directories have appropriate
+                        // filesystem permissions to prevent unauthorized access.
+                        File inventoryFile = new File(inventory);
+                        File inventoryParentDir = inventoryFile.getParentFile();
+
+                        log.debug("inventoryFile: {}", inventoryFile.getAbsolutePath());
+                        log.debug("inventory file exists: {}", inventoryFile.exists());
+                        log.debug("inventoryParentDir: {}", (inventoryParentDir != null ? inventoryParentDir.getAbsolutePath() : "null"));
+
+                        if (inventoryParentDir != null) {
+                            groupVarsDir = new File(inventoryParentDir, "group_vars");
+                            log.debug("group_vars directory path: {}", groupVarsDir.getAbsolutePath());
+
+                            try {
+                                // Use Files.createDirectories() which is idempotent (safe to call if directory exists)
+                                // and handles race conditions properly. Unlike mkdirs(), it doesn't return false
+                                // when the directory already exists - it only throws IOException on actual failure.
+                                Files.createDirectories(groupVarsDir.toPath());
+                            } catch (IOException e) {
+                                throw new RuntimeException("Failed to create group_vars directory at: " + groupVarsDir.getAbsolutePath(), e);
+                            }
+
+                            // Create all.yaml in group_vars directory
+                            tempNodeAuthFile = new File(groupVarsDir, "all.yaml");
+                            java.nio.file.Files.writeString(
+                                    tempNodeAuthFile.toPath(),
+                                    yamlContent,
+                                    java.nio.charset.StandardCharsets.UTF_8
+                            );
+
+                            // Alert administrators that sensitive files are being created in their inventory directory
+                            log.info("Writing vault-encrypted authentication data to user-provided inventory location: {}. " +
+                                    "Administrators should ensure this directory has appropriate filesystem permissions. " +
+                                    "This file will be cleaned up after execution, but may persist if cleanup fails.",
+                                    tempNodeAuthFile.getAbsolutePath());
+
+                            log.debug("Writing all.yaml to: {}", tempNodeAuthFile.getAbsolutePath());
+                            log.debug("all.yaml written successfully, file size: {} bytes", tempNodeAuthFile.length());
+                        } else {
+                            // Fallback to temp file if inventory has no parent directory
+                            tempNodeAuthFile = AnsibleUtil.createTemporaryFile("group_vars", "all.yaml", yamlContent, customTmpDirPath);
+
+                            log.debug("No parent directory, using temporary file");
+                            log.debug("Temporary all.yaml created at: {}", tempNodeAuthFile.getAbsolutePath());
+                        }
+
+                        log.debug("tempNodeAuthFile: {}", tempNodeAuthFile.getAbsolutePath());
+                        log.debug("tempNodeAuthFile exists: {}", tempNodeAuthFile.exists());
+                        log.debug("tempNodeAuthFile readable: {}", tempNodeAuthFile.canRead());
+
+                        //set extra vars to resolve the host specific authentication
+                        if (!hostUsers.isEmpty()) {
+                            procArgs.add("-e ansible_user=\"{{ host_users[inventory_hostname] | default(omit) }}\"");
+                        }
+                        if(!hostPasswords.isEmpty()){
+                            procArgs.add("-e ansible_password=\"{{ host_passwords[inventory_hostname] | default(omit) }}\"");
+                        }
+
+                        if(!hostKeys.isEmpty()){
+                            procArgs.add("-e ansible_ssh_private_key_file=\"{{ host_private_keys[inventory_hostname] | default(omit) }}\"");
+                        }
+
+                    } catch (IOException e) {
+                        log.error("ERROR: Failed to write all.yaml for node auth", e);
+                        throw new RuntimeException("Failed to write all.yaml for node auth", e);
+                    }
+                }
+
             }
 
             if (limits != null && limits.size() == 1) {
@@ -432,7 +602,11 @@ public class AnsibleRunner {
                 String privateKeyData = sshPrivateKey.replaceAll("\r\n", "\n");
                 tempPkFile = AnsibleUtil.createTemporaryFile("","id_rsa", privateKeyData,customTmpDirPath);
 
-                // Only the owner can read and write
+                // Set SSH private key permissions to 0600 (owner read/write).
+                // This keeps the key private (not accessible by group/world) while preserving backward
+                // compatibility for workflows that may need to modify or reuse this temporary file.
+                // SSH itself will warn or refuse to use keys with overly permissive permissions, so we
+                // restrict access to the file owner only.
                 Set<PosixFilePermission> perms = new HashSet<PosixFilePermission>();
                 perms.add(PosixFilePermission.OWNER_READ);
                 perms.add(PosixFilePermission.OWNER_WRITE);
@@ -449,7 +623,11 @@ public class AnsibleRunner {
             }
 
             if (sshUsePassword) {
-                String extraVarsPassword = "ansible_password: " + sshPass;
+                // Escape special characters in the password to prevent YAML parsing errors
+                String escapedPassword = escapePasswordForYaml(sshPass);
+
+                // Wrap in quotes to preserve special characters
+                String extraVarsPassword = "ansible_password: \"" + escapedPassword + "\"";
                 String finalextraVarsPassword = extraVarsPassword;
 
                 if(useAnsibleVault){
@@ -468,7 +646,11 @@ public class AnsibleRunner {
                 procArgs.add("--become");
 
                 if (becomePassword != null && !becomePassword.isEmpty()) {
-                    String extraVarsPassword = "ansible_become_password: " + becomePassword;
+                    // Escape special characters in the password to prevent YAML parsing errors
+                    String escapedPassword = escapePasswordForYaml(becomePassword);
+
+                    // Wrap in quotes to preserve special characters
+                    String extraVarsPassword = "ansible_become_password: \"" + escapedPassword + "\"";
                     String finalextraVarsPassword = extraVarsPassword;
 
                     if (useAnsibleVault) {
@@ -512,8 +694,6 @@ public class AnsibleRunner {
 
             //SET env variables
             Map<String, String> processEnvironment = new HashMap<>();
-
-
 
             if (configFile != null && !configFile.isEmpty()) {
                 if (debug) {
@@ -663,6 +843,34 @@ public class AnsibleRunner {
                 vaultPromptFile.deleteOnExit();
             }
 
+            if (tempNodeAuthFile != null && !tempNodeAuthFile.delete()) {
+                tempNodeAuthFile.deleteOnExit();
+            }
+
+            // Clean up node-specific private key files to minimize exposure time of sensitive credentials
+            if (tempNodePrivateKeyFiles != null) {
+                for (File nodeKeyFile : tempNodePrivateKeyFiles) {
+                    if (nodeKeyFile != null && !nodeKeyFile.delete()) {
+                        nodeKeyFile.deleteOnExit();
+                    }
+                }
+            }
+
+            // Clean up group_vars directory if it was created alongside user-provided inventory
+            // Note: When inventory is generated/inline, group_vars is inside executionSpecificDir
+            // and is cleaned up by AnsibleRunnerContextBuilder.cleanupTempFiles()
+            if (groupVarsDir != null && groupVarsDir.exists()) {
+                log.debug("Attempting to delete group_vars directory: {}", groupVarsDir.getAbsolutePath());
+                try {
+                    deleteTempDirectory(groupVarsDir.toPath());
+                    log.debug("Successfully deleted group_vars directory: {}", groupVarsDir.getAbsolutePath());
+                } catch (IOException e) {
+                    log.warn("Failed to delete group_vars directory: {}. Marking for deletion on JVM exit. Error: {}",
+                            groupVarsDir.getAbsolutePath(), e.getMessage());
+                    groupVarsDir.deleteOnExit();
+                }
+            }
+
             if (usingTempDirectory && !retainTempDirectory) {
                 deleteTempDirectory(baseDirectory);
             }
@@ -764,6 +972,259 @@ public class AnsibleRunner {
     }
 
 
+    /**
+     * Builds YAML content for Ansible group_vars with vault-encrypted passwords, host users, and private keys.
+     * This method manually constructs the YAML because Jackson cannot properly handle Ansible's
+     * custom !vault tag, which would result in an extra | character.
+     *
+     * @param hostPasswords Map of host names to vault-encrypted password strings
+     * @param hostUsers Map of host names to usernames
+     * @param hostKeys Map of host names to private key file paths
+     * @return YAML content string ready to be written to all.yaml
+     */
+    String buildGroupVarsYaml(Map<String, String> hostPasswords, Map<String, String> hostUsers, Map<String, String> hostKeys) {
+
+        StringBuilder yamlContent = new StringBuilder();
+
+        // Only add host_passwords section if there are passwords
+        if (!hostPasswords.isEmpty()) {
+            yamlContent.append("host_passwords:\n");
+
+            for (Map.Entry<String, String> entry : hostPasswords.entrySet()) {
+                String originalKey = entry.getKey();
+                String escapedKey = escapeYamlKey(originalKey);
+
+                yamlContent.append("  ").append(escapedKey).append(": ");
+                String vaultValue = entry.getValue();
+
+                // Validate vault format
+                if (!isValidVaultFormat(vaultValue)) {
+                    log.error("Invalid vault format for host: {}", originalKey);
+                    throw new RuntimeException("Invalid vault format for host: " + originalKey);
+                }
+                // The vault value already contains "!vault |\n" followed by the encrypted content
+                // We just need to split and indent properly (4 spaces for vault content lines)
+                if (vaultValue.contains("\n")) {
+                    String[] lines = vaultValue.split("\n", -1);
+                    for (int i = 0; i < lines.length; i++) {
+                        if (i == 0) {
+                            // First line: "!vault |"
+                            yamlContent.append(lines[i]).append("\n");
+                        } else if (i < lines.length - 1 || !lines[i].isEmpty()) {
+                            // Vault content: indent with 4 spaces
+                            yamlContent.append("    ").append(lines[i]).append("\n");
+                        }
+                    }
+                } else {
+                    // Single line value (shouldn't happen with vault, but handle it)
+                    log.warn("Single line vault value for host: {}", originalKey);
+                    yamlContent.append(vaultValue).append("\n");
+                }
+            }
+        }
+
+        // Add host_private_keys section if there are private keys
+        if (!hostKeys.isEmpty()) {
+            appendYamlMapSection(yamlContent, "host_private_keys", hostKeys, true);
+        }
+
+        // Add host_users section if there are users
+        if (!hostUsers.isEmpty()) {
+            appendYamlMapSection(yamlContent, "host_users", hostUsers, true);
+        }
+
+        String result = yamlContent.toString();
+
+        log.debug("Generated YAML content ({} bytes)", result.length());
+
+        return result;
+    }
+
+    /**
+     * Helper method to append a simple YAML map section with key-value pairs.
+     * Extracted to reduce duplication between host_private_keys and host_users sections.
+     *
+     * @param yamlContent The StringBuilder to append to
+     * @param sectionName The name of the YAML section (e.g., "host_users", "host_private_keys")
+     * @param entries The map of key-value pairs to add to the section
+     * @param addLeadingNewline Whether to add a newline before the section name
+     */
+    private void appendYamlMapSection(StringBuilder yamlContent, String sectionName,
+                                     Map<String, String> entries, boolean addLeadingNewline) {
+        if (addLeadingNewline) {
+            yamlContent.append("\n");
+        }
+        yamlContent.append(sectionName).append(":\n");
+
+        for (Map.Entry<String, String> entry : entries.entrySet()) {
+            String originalKey = entry.getKey();
+            String originalValue = entry.getValue();
+            String escapedKey = escapeYamlKey(originalKey);
+            String escapedValue = escapeYamlValue(originalValue);
+            yamlContent.append("  ").append(escapedKey).append(": ")
+                       .append(escapedValue).append("\n");
+        }
+    }
+
+    /**
+     * Pattern for detecting YAML special characters that require quoting.
+     * Matches any string containing one or more of these characters:
+     * <ul>
+     *   <li><code>:</code> - colon (key-value separator)</li>
+     *   <li><code>[ ]</code> - square brackets (array notation)</li>
+     *   <li><code>{ }</code> - curly braces (object notation)</li>
+     *   <li><code>#</code> - hash (comment marker)</li>
+     *   <li><code>&</code> - ampersand (anchor reference)</li>
+     *   <li><code>*</code> - asterisk (alias reference)</li>
+     *   <li><code>!</code> - exclamation (tag indicator)</li>
+     *   <li><code>|</code> - pipe (literal block scalar)</li>
+     *   <li><code>&gt;</code> - greater-than (folded block scalar)</li>
+     *   <li><code>' "</code> - quotes (string delimiters)</li>
+     *   <li><code>%</code> - percent (directive indicator)</li>
+     *   <li><code>@</code> - at-sign (reserved for future use)</li>
+     *   <li><code>`</code> - backtick (reserved for future use)</li>
+     *   <li><code>\</code> - backslash (escape character)</li>
+     * </ul>
+     * Regex pattern: <code>.*[:\\[\\]{}#&amp;*!|&gt;'\"%@`\\\\].*</code>
+     */
+    private static final java.util.regex.Pattern YAML_SPECIAL_CHARS_PATTERN =
+            java.util.regex.Pattern.compile(".*[:\\[\\]{}#&*!|>'\"%@`\\\\].*");
+
+    /**
+     * Checks if a string needs YAML quoting based on special characters and prefixes.
+     *
+     * @param value The string to check
+     * @param checkNumericPrefix If true, requires quoting if value starts with a digit
+     * @param checkEmpty If true, requires quoting if value is empty after trimming
+     * @return true if the string needs to be wrapped in quotes
+     */
+    private boolean needsYamlQuoting(String value, boolean checkNumericPrefix, boolean checkEmpty) {
+        return YAML_SPECIAL_CHARS_PATTERN.matcher(value).matches() ||
+               value.startsWith("-") ||
+               value.startsWith("?") ||
+               (checkNumericPrefix && value.matches("^[0-9].*")) ||
+               (checkEmpty && value.trim().isEmpty());
+    }
+
+    /**
+     * Escapes YAML special characters in keys.
+     * If the key contains special characters, wraps it in quotes.
+     *
+     * @param key The key to escape
+     * @return Escaped key safe for YAML
+     */
+    String escapeYamlKey(String key) {
+        if (needsYamlQuoting(key, true, false)) {
+            // IMPORTANT: Order of replacements matters! Must escape backslashes FIRST, then quotes.
+            // If we escaped quotes first, the backslash replacement would double-escape them.
+            // Example: value="a\"b" -> replace quotes: "a\\"b" -> replace backslash: "a\\\\"b" (WRONG!)
+            // Correct:  value="a\"b" -> replace backslash: "a\\"b" -> replace quotes: "a\\\"b" (RIGHT)
+            return "\"" + key.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
+        }
+        return key;
+    }
+
+    /**
+     * Escapes YAML special characters in values.
+     * If the value contains special characters, wraps it in quotes.
+     *
+     * @param value The value to escape
+     * @return Escaped value safe for YAML
+     */
+    String escapeYamlValue(String value) {
+        if (needsYamlQuoting(value, false, true)) {
+            // IMPORTANT: Order of replacements matters! Must escape backslashes FIRST, then quotes.
+            // If we escaped quotes first, the backslash replacement would double-escape them.
+            // Example: value="a\"b" -> replace quotes: "a\\"b" -> replace backslash: "a\\\\"b" (WRONG!)
+            // Correct:  value="a\"b" -> replace backslash: "a\\"b" -> replace quotes: "a\\\"b" (RIGHT)
+            return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
+        }
+        return value;
+    }
+
+    /**
+     * Escapes a password value for safe use inside double-quoted YAML strings.
+     * Note: This method does NOT add quotes - the caller must wrap the result in double quotes.
+     * This differs from escapeYamlKey() and escapeYamlValue() which conditionally add quotes based on content.
+     *
+     * Why the different approach:
+     * - Passwords are passed as Ansible extra vars (e.g., -e 'ansible_password: "..."') and are ALWAYS quoted
+     * - YAML keys/values in group_vars files should only be quoted when necessary for cleaner output
+     *
+     * @param password The password to escape
+     * @return Escaped password safe for use inside double-quoted YAML strings (quotes not included)
+     */
+    String escapePasswordForYaml(String password) {
+        // Escape special characters for use inside double-quoted strings
+        return password
+            .replace("\\", "\\\\")
+            .replace("\"", "\\\"")
+            .replace("\n", "\\n")
+            .replace("\r", "\\r");
+    }
+
+    /**
+     * Validates that a string is in proper Ansible vault format.
+     * Expected format: "!vault |\n" followed by vault-encrypted content
+     *
+     * Real Ansible Vault values are ALWAYS multiline with encrypted content.
+     * This validation rejects single-line vault values and vault values without content
+     * to prevent authentication failures.
+     *
+     * @param vaultValue The vault value to validate
+     * @return true if valid vault format with content, false otherwise
+     */
+    boolean isValidVaultFormat(String vaultValue) {
+        if (vaultValue == null || vaultValue.trim().isEmpty()) {
+            return false;
+        }
+
+        // Must start with "!vault" (case insensitive)
+        String trimmed = vaultValue.trim();
+        if (!trimmed.toLowerCase().startsWith("!vault")) {
+            return false;
+        }
+
+        // Ansible Vault values must be multiline - reject single-line values
+        if (!vaultValue.contains("\n")) {
+            return false;
+        }
+
+        // Check if it follows the "!vault |" format (pipe is required by Ansible)
+        String firstLine = vaultValue.split("\n", 2)[0];
+        if (!firstLine.trim().matches("!vault\\s*\\|")) {
+            return false;
+        }
+
+        // Must have encrypted content after the first line
+        String[] lines = vaultValue.split("\n");
+        if (lines.length < 2) {
+            return false;
+        }
+
+        // At least one content line must be non-empty (excluding the last line which may be empty)
+        boolean hasContent = false;
+        for (int i = 1; i < lines.length; i++) {
+            if (!lines[i].trim().isEmpty()) {
+                hasContent = true;
+                break;
+            }
+        }
+
+        if (!hasContent) {
+            return false;
+        }
+
+        // Vault content lines should not be empty (except the last one)
+        for (int i = 1; i < lines.length - 1; i++) {
+            if (lines[i].trim().isEmpty()) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     public String encryptExtraVarsKey(String extraVars) throws Exception {
         Map<String, String> extraVarsMap = new HashMap<>();
         Map<String, String> encryptedExtraVarsMap = new HashMap<>();
@@ -823,5 +1284,41 @@ public class AnsibleRunner {
         return stringBuilder.toString();
     }
 
+    /**
+     * Sanitizes a node name to be safe for use in filesystem paths.
+     * <p>
+     * This method performs the following transformations:
+     * <ul>
+     *   <li>Replaces all characters except alphanumeric, dot, underscore, and hyphen with underscores</li>
+     *   <li>Prevents hidden files by prepending underscore if name starts with dot</li>
+     *   <li>Handles empty strings by prepending underscore</li>
+     * </ul>
+     * </p>
+     * <p>
+     * Examples:
+     * <ul>
+     *   <li>{@code "node-1"} → {@code "node-1"} (no change)</li>
+     *   <li>{@code "node@host"} → {@code "node_host"} (@ replaced)</li>
+     *   <li>{@code ".hidden"} → {@code "_.hidden"} (prevents hidden file)</li>
+     *   <li>{@code ""} → {@code "_"} (handles empty)</li>
+     * </ul>
+     * </p>
+     *
+     * @param nodeName The original node name to sanitize
+     * @return A sanitized node name safe for use in file paths, never null
+     */
+    String sanitizeNodeNameForFilesystem(String nodeName) {
+        // Replace unsafe characters with underscores
+        String safeNodeName = nodeName.replaceAll("[^a-zA-Z0-9._-]", "_");
+
+        // Prevent hidden files (starting with .) and problematic names (empty)
+        if (safeNodeName.isEmpty() || safeNodeName.startsWith(".")) {
+            safeNodeName = "_" + safeNodeName;
+        }
+
+        return safeNodeName;
+    }
+
 
 }
+

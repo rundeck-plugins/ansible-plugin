@@ -100,6 +100,13 @@ public interface AnsibleDescribable extends Describable {
     public static final String ANSIBLE_INVENTORY_INLINE = "ansible-inventory-inline";
     public static final String ANSIBLE_INVENTORY = "ansible-inventory";
     public static final String ANSIBLE_GENERATE_INVENTORY = "ansible-generate-inventory";
+    /**
+     * Controls whether node authentication data is included when generating the inventory.
+     * This is an enhancement of {@link #ANSIBLE_GENERATE_INVENTORY} and only has effect
+     * when inventory generation is enabled. It is exposed as a separate top-level
+     * property for configuration/UI clarity.
+     */
+    public static final String ANSIBLE_GENERATE_INVENTORY_NODES_AUTH = "ansible-generate-inventory-nodes-auth";
     public static final String ANSIBLE_MODULE = "ansible-module";
     public static final String ANSIBLE_MODULE_ARGS = "ansible-module-args";
     public static final String ANSIBLE_DEBUG = "ansible-debug";
@@ -232,6 +239,13 @@ public interface AnsibleDescribable extends Describable {
     .title("Generate inventory")
     .description("Generate Ansible inventory from Rundeck nodes.")
     .build();
+
+    static final Property GENERATE_INVENTORY_NODES_AUTH = PropertyBuilder.builder()
+            .booleanType(ANSIBLE_GENERATE_INVENTORY_NODES_AUTH)
+            .required(false)
+            .title("Workflow Step: Generate Inventory and Pass Node Authentication from Rundeck Nodes")
+            .description("Pass authentication credentials from Rundeck nodes for Ansible Playbook Workflow Steps only (not supported for Node Steps). See the Ansible plugin documentation for details.")
+            .build();
 
     public static Property EXECUTABLE_PROP = PropertyUtil.freeSelect(
               ANSIBLE_EXECUTABLE,
