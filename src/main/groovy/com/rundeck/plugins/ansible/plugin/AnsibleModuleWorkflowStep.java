@@ -72,7 +72,9 @@ public class AnsibleModuleWorkflowStep implements StepPlugin, AnsibleDescribable
         }
 
         // set log level
-        if (context.getDataContext().get("job").get("loglevel").equals("DEBUG")) {
+        String loglevel = AnsibleUtil.getJobLogLevel(context);
+
+        if ("DEBUG".equals(loglevel)) {
             configuration.put(AnsibleDescribable.ANSIBLE_DEBUG, "True");
         } else {
             configuration.put(AnsibleDescribable.ANSIBLE_DEBUG, "False");

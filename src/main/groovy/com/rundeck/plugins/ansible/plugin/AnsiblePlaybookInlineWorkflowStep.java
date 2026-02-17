@@ -16,12 +16,14 @@ import com.dtolabs.rundeck.plugins.step.PluginStepContext;
 import com.dtolabs.rundeck.plugins.step.StepPlugin;
 import com.dtolabs.rundeck.plugins.util.DescriptionBuilder;
 import com.rundeck.plugins.ansible.util.AnsibleUtil;
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+@Slf4j
 @Plugin(name = AnsiblePlaybookInlineWorkflowStep.SERVICE_PROVIDER_NAME, service = ServiceNameConstants.WorkflowStep)
 public class AnsiblePlaybookInlineWorkflowStep implements StepPlugin, AnsibleDescribable, ProxyRunnerPlugin, ConfiguredBy<AnsiblePluginGroup> {
 
@@ -37,6 +39,10 @@ public class AnsiblePlaybookInlineWorkflowStep implements StepPlugin, AnsibleDes
         builder.name(SERVICE_PROVIDER_NAME);
         builder.title("Ansible Playbook Inline");
         builder.description("Runs an Inline Ansible Playbook.");
+        builder.metadata(
+                "automaticWorkflowStepRunnerAssociation",
+                "true"
+        );
 
         builder.property(BINARIES_DIR_PATH_PROP);
         builder.property(BASE_DIR_PROP);
@@ -81,7 +87,9 @@ public class AnsiblePlaybookInlineWorkflowStep implements StepPlugin, AnsibleDes
             configuration.put(AnsibleDescribable.ANSIBLE_LIMIT, limit);
         }
         // set log level
-        if (context.getDataContext().get("job").get("loglevel").equals("DEBUG")) {
+        String loglevel = AnsibleUtil.getJobLogLevel(context);
+
+        if ("DEBUG".equals(loglevel)) {
             configuration.put(AnsibleDescribable.ANSIBLE_DEBUG, "True");
         } else {
             configuration.put(AnsibleDescribable.ANSIBLE_DEBUG, "False");
@@ -95,6 +103,24 @@ public class AnsiblePlaybookInlineWorkflowStep implements StepPlugin, AnsibleDes
 
         try {
             runner = AnsibleRunner.buildAnsibleRunner(contextBuilder);
+
+            Boolean generateInventoryNodeAuth = contextBuilder.generateInventoryNodesAuth();
+
+            log.debug("generateInventoryNodesAuth returned: {}", generateInventoryNodeAuth);
+
+            if(generateInventoryNodeAuth != null && generateInventoryNodeAuth){
+                log.debug("Node auth is enabled, getting authentication map");
+                Map<String, Map<String, String>> nodesAuth = contextBuilder.getNodesAuthenticationMap();
+                log.debug("Retrieved {} node authentications", (nodesAuth != null ? nodesAuth.size() : 0));
+                if (nodesAuth != null && !nodesAuth.isEmpty()) {
+                    runner.setAddNodeAuthToInventory(true);
+                    runner.setNodesAuthentication(nodesAuth);
+                    log.debug("Set node authentication on runner");
+                }
+            } else {
+                log.debug("Node auth is NOT enabled");
+            }
+
             runner.setCustomTmpDirPath(AnsibleUtil.getCustomTmpPathDir(contextBuilder.getFramework()));
         } catch (ConfigurationException e) {
             throw new StepException("Error configuring Ansible runner: " + e.getMessage(), e, AnsibleException.AnsibleFailureReason.ParseArgumentsError);
@@ -131,8 +157,8 @@ public class AnsiblePlaybookInlineWorkflowStep implements StepPlugin, AnsibleDes
 
     @Override
     public List<String> listSecretsPathWorkflowStep(ExecutionContext context, Map<String, Object> configuration) {
-        AnsibleRunnerContextBuilder builder = new AnsibleRunnerContextBuilder(context, context.getFramework(), context.getNodes(), configuration);
-        return AnsibleUtil.getSecretsPath(builder);
+        AnsibleRunnerContextBuilder builder = new AnsibleRunnerContextBuilder(context, context.getFramework(), context.getNodes(), configuration, pluginGroup);
+        return AnsibleUtil.getSecretsPathWorkflowSteps(builder);
     }
 
     @Override
