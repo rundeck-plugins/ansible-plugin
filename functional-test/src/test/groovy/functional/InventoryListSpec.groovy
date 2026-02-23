@@ -22,12 +22,14 @@ class InventoryListSpec extends BaseTestConfiguration {
         result!=null
         result.size()==8000
         result.get("Node-0")!=null
-        result.get("Node-0").getAttributes().get("ansible_host") == "ssh-node"
-        result.get("Node-0").getAttributes().get("ansible_ssh_user") == "rundeck"
+        // ansible_ prefixed variables should be filtered out, not in attributes
+        result.get("Node-0").getAttributes().get("ansible_host") == null
+        result.get("Node-0").getAttributes().get("ansible_ssh_user") == null
+        // custom variables should still be imported
         result.get("Node-0").getAttributes().get("some-var") == "1234"
         result.get("Node-7999")!=null
-        result.get("Node-7999").getAttributes().get("ansible_host") == "ssh-node"
-        result.get("Node-7999").getAttributes().get("ansible_ssh_user") == "rundeck"
+        result.get("Node-7999").getAttributes().get("ansible_host") == null
+        result.get("Node-7999").getAttributes().get("ansible_ssh_user") == null
         result.get("Node-7999").getAttributes().get("some-var") == "1234"
     }
 
@@ -40,8 +42,9 @@ class InventoryListSpec extends BaseTestConfiguration {
         result!=null
         result.size()==35
         result.get("node1")!=null
-        result.get("node1").getAttributes().get("ansible_host") == "node1"
-        result.get("node1").getAttributes().get("ansible_user") == "agent"
-        result.get("node1").getAttributes().get("ansible_port") == "22"
+        // ansible_ prefixed variables should be filtered out, not in attributes
+        result.get("node1").getAttributes().get("ansible_host") == null
+        result.get("node1").getAttributes().get("ansible_user") == null
+        result.get("node1").getAttributes().get("ansible_port") == null
     }
 }
