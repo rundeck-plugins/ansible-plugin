@@ -6,7 +6,7 @@ kotlin-stdlib = "2.1.0"
 
 # Current dependency versions (maintained for compatibility)
 gson = "2.10.1"
-jackson = "2.16.1"
+jackson = "2.18.6"
 snakeyaml = "2.2"
 groovy = "3.0.15"
 lombok = "1.18.30"
