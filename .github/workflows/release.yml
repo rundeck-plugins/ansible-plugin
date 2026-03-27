@@ -19,7 +19,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           java-version: '17'
-          distribution: 'zulu'
+        distribution: 'zulu'
       - name: Build with Gradle
         run: ./gradlew build
       - name: Get Release Version
