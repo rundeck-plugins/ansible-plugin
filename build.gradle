@@ -94,7 +94,7 @@ dependencies {
   testAnnotationProcessor libs.lombok
 
   testImplementation libs.spock.core
-  testImplementation libs.cglib.nodep
+  testImplementation libs.bytebuddy
   testImplementation libs.objenesis
 
 }

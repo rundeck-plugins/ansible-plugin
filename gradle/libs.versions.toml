@@ -14,8 +14,8 @@ spock = "2.4-groovy-4.0"
 testcontainers = "1.19.0"
 rd-api-client = "2.0.8"
 jsch = "0.1.55"
-cglib = "3.3.0"
-objenesis = "1.4"
+bytebuddy = "1.14.11"
+objenesis = "3.4"
 
 # Rundeck version
 rundeck-core = "6.0.0-SNAPSHOT"
@@ -39,5 +39,5 @@ testcontainers-spock = { module = "org.testcontainers:spock", version.ref = "tes
 rd-api-client = { module = "org.rundeck.api:rd-api-client", version.ref = "rd-api-client" }
 jsch = { module = "com.jcraft:jsch", version.ref = "jsch" }
 rundeck-core = { module = "org.rundeck:rundeck-core", version.ref = "rundeck-core" }
-cglib-nodep = { module = "cglib:cglib-nodep", version.ref = "cglib" }
+bytebuddy = { module = "net.bytebuddy:byte-buddy", version.ref = "bytebuddy" }
 objenesis = { module = "org.objenesis:objenesis", version.ref = "objenesis" }
