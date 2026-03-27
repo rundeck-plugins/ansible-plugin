@@ -36,6 +36,7 @@ public class AnsibleNodeExecutor implements NodeExecutor, AnsibleDescribable, Pr
         builder.property(WINDOWS_EXECUTABLE_PROP);
         builder.property(CONFIG_FILE_PATH);
         builder.property(GENERATE_INVENTORY_PROP);
+        builder.property(GENERATE_INVENTORY_NODES_AUTH);
         builder.property(SSH_AUTH_TYPE_PROP);
         builder.property(SSH_USER_PROP);
         builder.property(SSH_PASSWORD_STORAGE_PROP);
@@ -63,6 +64,8 @@ public class AnsibleNodeExecutor implements NodeExecutor, AnsibleDescribable, Pr
         builder.frameworkMapping(ANSIBLE_CONFIG_FILE_PATH,FWK_PROP_PREFIX + ANSIBLE_CONFIG_FILE_PATH);
         builder.mapping(ANSIBLE_GENERATE_INVENTORY,PROJ_PROP_PREFIX + ANSIBLE_GENERATE_INVENTORY);
         builder.frameworkMapping(ANSIBLE_GENERATE_INVENTORY,FWK_PROP_PREFIX + ANSIBLE_GENERATE_INVENTORY);
+        builder.mapping(ANSIBLE_GENERATE_INVENTORY_NODES_AUTH,PROJ_PROP_PREFIX + ANSIBLE_GENERATE_INVENTORY_NODES_AUTH);
+        builder.frameworkMapping(ANSIBLE_GENERATE_INVENTORY_NODES_AUTH,FWK_PROP_PREFIX + ANSIBLE_GENERATE_INVENTORY_NODES_AUTH);
         builder.mapping(ANSIBLE_SSH_AUTH_TYPE,PROJ_PROP_PREFIX + ANSIBLE_SSH_AUTH_TYPE);
         builder.frameworkMapping(ANSIBLE_SSH_AUTH_TYPE,FWK_PROP_PREFIX + ANSIBLE_SSH_AUTH_TYPE);
         builder.mapping(ANSIBLE_SSH_USER,PROJ_PROP_PREFIX + ANSIBLE_SSH_USER);
@@ -197,7 +200,13 @@ public class AnsibleNodeExecutor implements NodeExecutor, AnsibleDescribable, Pr
         jobConf.put(AnsibleDescribable.ANSIBLE_LIMIT,node.getNodename());
         AnsibleRunnerContextBuilder builder = new AnsibleRunnerContextBuilder(node, context, context.getFramework(), jobConf);
 
-        return AnsibleUtil.getSecretsPath(builder);
+        List<String> secretPaths = AnsibleUtil.getSecretsPath(builder);
+        List<String> secretPathsNodes = builder.getListNodesKeyPath();
+
+        if(secretPathsNodes != null && !secretPathsNodes.isEmpty()){
+            secretPaths.addAll(secretPathsNodes);
+        }
+        return secretPaths;
     }
 }
 

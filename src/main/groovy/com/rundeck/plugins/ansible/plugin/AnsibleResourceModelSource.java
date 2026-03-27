@@ -73,6 +73,31 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
   private static final Logger logger = LoggerFactory.getLogger(AnsibleResourceModelSource.class);
   public static final String HOST_TPL_J2 = "host-tpl.j2";
   public static final String GATHER_HOSTS_YML = "gather-hosts.yml";
+
+  // Ansible Special variables as of Ansible 2.9
+  // https://docs.ansible.com/ansible/latest/reference_appendices/special_variables.html
+  private static final List<String> ANSIBLE_SPECIAL_VARS = List.of(
+    "ansible_",  // most ansible vars prefix
+    "discovered_interpreter_python",
+    "facts",   // rundeck used to gather host_vars
+    "gather_subset",
+    "group_names",
+    "groups",
+    "hostvars",
+    "inventory_dir",
+    "inventory_file",
+    "inventory_hostname",
+    "inventory_hostname_short",
+    "module_setup",
+    "omit",
+    "play_hosts",
+    "playbook_dir",
+    "role_name",
+    "role_names",
+    "role_path",
+    "tmpdir"  // rundeck used to gather host_vars
+  );
+
   private final Gson gson = new Gson();
 
   @Setter
@@ -630,33 +655,17 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
 
 
           if (importInventoryVars == true) {
-            // Add ALL vars as node attributes, except Ansible Special variables, as of Ansible 2.9
-            // https://docs.ansible.com/ansible/latest/reference_appendices/special_variables.html
-            List<String> specialVarsList = new ArrayList<>();
-            specialVarsList.add("ansible_");  // most ansible vars prefix
-            specialVarsList.add("discovered_interpreter_python");
-            specialVarsList.add("facts");   // rundeck used to gather host_vars
-            specialVarsList.add("gather_subset");
-            specialVarsList.add("group_names");
-            specialVarsList.add("groups");
-            specialVarsList.add("hostvars");
-            specialVarsList.add("inventory_dir");
-            specialVarsList.add("inventory_file");
-            specialVarsList.add("inventory_hostname");
-            specialVarsList.add("inventory_hostname_short");
-            specialVarsList.add("module_setup");
-            specialVarsList.add("omit");
-            specialVarsList.add("play_hosts");
-            specialVarsList.add("playbook_dir");
-            specialVarsList.add("role_name");
-            specialVarsList.add("role_names");
-            specialVarsList.add("role_path");
-            specialVarsList.add("tmpdir");  // rundeck used to gather host_vars
+            // Add ALL vars as node attributes, except Ansible Special variables
+            List<String> specialVarsList = new ArrayList<>(ANSIBLE_SPECIAL_VARS);
 
             if (ignoreInventoryVars != null && ignoreInventoryVars.length() > 0) {
               String[] ignoreInventoryVarsStrings = ignoreInventoryVars.split(",");
               for (String ignoreInventoryVarsString: ignoreInventoryVarsStrings) {
-                specialVarsList.add(ignoreInventoryVarsString.trim());
+                String trimmed = ignoreInventoryVarsString.trim();
+                // Only add non-empty strings to avoid matching everything
+                if (!trimmed.isEmpty()) {
+                  specialVarsList.add(trimmed);
+                }
               }
             }
 
@@ -830,15 +839,36 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
 
     applyNodeTags(node, nodeValues);
 
-    nodeValues.forEach((key, value) -> {
-      if (value != null) {
-        if (value instanceof Map || value instanceof List) {
-          node.setAttribute(key, gson.toJson(value));
-        } else {
-          node.setAttribute(key, value.toString());
+    if (importInventoryVars) {
+      // Build list of variables to ignore, matching processWithGatherFacts behavior
+      List<String> ignoreVarsList = new ArrayList<>(ANSIBLE_SPECIAL_VARS);
+
+      if (ignoreInventoryVars != null && ignoreInventoryVars.length() > 0) {
+        String[] ignoreInventoryVarsStrings = ignoreInventoryVars.split(",");
+        for (String ignoreInventoryVarsString: ignoreInventoryVarsStrings) {
+          String trimmed = ignoreInventoryVarsString.trim();
+          // Only add non-empty strings to avoid matching everything
+          if (!trimmed.isEmpty()) {
+            ignoreVarsList.add(trimmed);
+          }
         }
       }
-    });
+
+      nodeValues.forEach((key, value) -> {
+        // Skip variables that match ignored prefixes
+        if (skipVar(key, ignoreVarsList)) {
+          return;
+        }
+
+        if (value != null) {
+          if (value instanceof Map || value instanceof List) {
+            node.setAttribute(key, gson.toJson(value));
+          } else {
+            node.setAttribute(key, value.toString());
+          }
+        }
+      });
+    }
 
     return node;
   }

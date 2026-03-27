@@ -24,6 +24,7 @@ import java.nio.file.Paths;
 import com.rundeck.plugins.ansible.plugin.AnsiblePluginGroup;
 import com.rundeck.plugins.ansible.util.AnsibleUtil;
 import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
 import org.rundeck.storage.api.Path;
 
 import java.util.*;
@@ -31,6 +32,7 @@ import java.util.*;
 import org.rundeck.storage.api.PathUtil;
 import org.rundeck.storage.api.StorageException;
 
+@Slf4j
 @Getter
 public class AnsibleRunnerContextBuilder {
 
@@ -40,6 +42,7 @@ public class AnsibleRunnerContextBuilder {
     private final Map<String, Object> jobConf;
     private final Collection<INodeEntry> nodes;
     private final Collection<File> tempFiles;
+    private File executionSpecificDir;
 
     private AnsiblePluginGroup pluginGroup;
 
@@ -100,19 +103,14 @@ public class AnsibleRunnerContextBuilder {
     }
 
     public String getPrivateKeyStoragePath() {
-        String path = PropertyResolver.resolveProperty(
+        return getPrivateKeyStoragePath(getNode());
+    }
+
+    public String getPrivateKeyStoragePath(INodeEntry node) {
+        return resolveAndExpandStoragePath(
                 AnsibleDescribable.ANSIBLE_SSH_KEYPATH_STORAGE_PATH,
-                null,
-                getFrameworkProject(),
-                getFramework(),
-                getNode(),
-                getJobConf()
+                node
         );
-        //expand properties in path
-        if (path != null && path.contains("${")) {
-            path = DataContextUtils.replaceDataReferencesInString(path, context.getDataContext());
-        }
-        return path;
     }
 
     public byte[] getPrivateKeyStorageDataBytes() throws IOException {
@@ -121,13 +119,27 @@ public class AnsibleRunnerContextBuilder {
     }
 
     public String getPasswordStoragePath() {
+        return getPasswordStoragePath(getNode());
+    }
 
-        String path = PropertyResolver.resolveProperty(
+    public String getPasswordStoragePath(INodeEntry node) {
+        return resolveAndExpandStoragePath(
                 AnsibleDescribable.ANSIBLE_SSH_PASSWORD_STORAGE_PATH,
+                node
+        );
+    }
+
+    /**
+     * Helper method to resolve a storage path property and expand any data references.
+     * Extracted to reduce duplication between password and private key storage path resolution.
+     */
+    private String resolveAndExpandStoragePath(String propertyName, INodeEntry node) {
+        String path = PropertyResolver.resolveProperty(
+                propertyName,
                 null,
                 getFrameworkProject(),
                 getFramework(),
-                getNode(),
+                node,
                 getJobConf()
         );
 
@@ -139,27 +151,21 @@ public class AnsibleRunnerContextBuilder {
     }
 
     public String getSshPrivateKey() throws ConfigurationException {
+        return getSshPrivateKey(getNode());
+    }
+
+    public String getSshPrivateKey(INodeEntry node) throws ConfigurationException {
         //look for storage option
-        String storagePath = getPrivateKeyStoragePath();
+        String storagePath = getPrivateKeyStoragePath(node);
 
         if (null != storagePath) {
-            Path path = PathUtil.asPath(storagePath);
-            try {
-                ResourceMeta contents = context.getStorageTree().getResource(path)
-                        .getContents();
-                ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-                contents.writeContent(byteArrayOutputStream);
-                return byteArrayOutputStream.toString();
-            } catch (StorageException | IOException e) {
-                throw new ConfigurationException("Failed to read the ssh private key for " +
-                        "storage path: " + storagePath + ": " + e.getMessage());
-            }
+            return readFromStoragePath(storagePath, "ssh private key");
         } else {
             //else look up option value
             final String path = getPrivateKeyfilePath();
             if (path != null) {
                 try {
-                    return new String(Files.readAllBytes(Paths.get(path)));
+                    return new String(Files.readAllBytes(Paths.get(path)), java.nio.charset.StandardCharsets.UTF_8);
                 } catch (IOException e) {
                     throw new ConfigurationException("Failed to read the ssh private key from path " +
                             path + ": " + e.getMessage());
@@ -171,6 +177,10 @@ public class AnsibleRunnerContextBuilder {
     }
 
     public String getSshPassword() throws ConfigurationException {
+        return getSshPassword(getNode());
+    }
+
+    public String getSshPassword(INodeEntry node) throws ConfigurationException {
 
         //look for option values first
         //typically jobs use secure options to dynamically setup the ssh password
@@ -179,7 +189,7 @@ public class AnsibleRunnerContextBuilder {
                 AnsibleDescribable.DEFAULT_ANSIBLE_SSH_PASSWORD_OPTION,
                 getFrameworkProject(),
                 getFramework(),
-                getNode(),
+                node,
                 getJobConf()
         );
         String sshPassword = PropertyResolver.evaluateSecureOption(passwordOption, getContext());
@@ -189,25 +199,52 @@ public class AnsibleRunnerContextBuilder {
             return sshPassword;
         } else {
             //look for storage option
-            String storagePath = getPasswordStoragePath();
+            String storagePath = getPasswordStoragePath(node);
 
             if (null != storagePath) {
                 //look up storage value
-                Path path = PathUtil.asPath(storagePath);
-                try {
-                    ResourceMeta contents = context.getStorageTree().getResource(path)
-                            .getContents();
-                    ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-                    contents.writeContent(byteArrayOutputStream);
-                    return byteArrayOutputStream.toString();
-                } catch (StorageException | IOException e) {
-                    throw new ConfigurationException("Failed to read the ssh password for " +
-                            "storage path: " + storagePath + ": " + e.getMessage());
-                }
+                return getPasswordFromPath(storagePath);
 
             } else {
                 return null;
             }
+        }
+    }
+
+    public String getPasswordFromPath(String storagePath) throws ConfigurationException {
+        return readFromStoragePath(storagePath, "ssh password");
+    }
+
+    /**
+     * Helper method to read text-based content from Rundeck storage path.
+     * Extracted to reduce duplication between password and private key reading.
+     *
+     * IMPORTANT: This method converts storage content to UTF-8 string and is intended
+     * ONLY for text-based secrets (passwords, SSH private keys in PEM format, etc.).
+     * Do NOT use this method for binary data as UTF-8 conversion will cause data corruption.
+     * For binary data, use loadStoragePathData() which returns byte[] instead.
+     *
+     * @param storagePath The storage path to read from
+     * @param resourceType Description of resource type for error messages (e.g., "ssh password", "ssh private key")
+     * @return The content as a UTF-8 string. Returns null ONLY if storagePath parameter is null (early return).
+     *         After attempting to read content, this method either returns a non-null string or throws an exception.
+     * @throws ConfigurationException if the storage path cannot be read or does not exist
+     */
+    private String readFromStoragePath(String storagePath, String resourceType) throws ConfigurationException {
+        if (storagePath == null) {
+            return null;
+        }
+
+        Path path = PathUtil.asPath(storagePath);
+        try {
+            ResourceMeta contents = context.getStorageTree().getResource(path)
+                    .getContents();
+            ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+            contents.writeContent(byteArrayOutputStream);
+            return byteArrayOutputStream.toString(java.nio.charset.StandardCharsets.UTF_8);
+        } catch (StorageException | IOException e) {
+            throw new ConfigurationException("Failed to read the " + resourceType + " for " +
+                    "storage path: " + storagePath + ": " + e.getMessage());
         }
     }
 
@@ -249,14 +286,28 @@ public class AnsibleRunnerContextBuilder {
         return user;
     }
 
+    public String getSshNodeUser(INodeEntry node) {
+        final String user;
+        user = node.getUsername();
+        if (null != user && user.contains("${")) {
+            return DataContextUtils.replaceDataReferencesInString(user, getContext().getDataContext());
+        }
+        return user;
+    }
+
 
     public AuthenticationType getSshAuthenticationType() {
+        return getSshAuthenticationType(getNode());
+    }
+
+
+    public AuthenticationType getSshAuthenticationType(INodeEntry node) {
         String authType = PropertyResolver.resolveProperty(
                 AnsibleDescribable.ANSIBLE_SSH_AUTH_TYPE,
                 null,
                 getFrameworkProject(),
                 getFramework(),
-                getNode(),
+                node,
                 getJobConf()
         );
 
@@ -596,6 +647,7 @@ public class AnsibleRunnerContextBuilder {
         if (null != sgenerateInventory) {
             generateInventory = Boolean.parseBoolean(sgenerateInventory);
         }
+
         return generateInventory;
     }
 
@@ -606,7 +658,8 @@ public class AnsibleRunnerContextBuilder {
 
 
         if (isGenerated != null && isGenerated) {
-            File tempInventory = new AnsibleInventoryBuilder(this.nodes, AnsibleUtil.getCustomTmpPathDir(framework)).buildInventory();
+            String executionSpecificDir = getExecutionSpecificTmpDir();
+            File tempInventory = new AnsibleInventoryBuilder(this.nodes, executionSpecificDir).buildInventory();
             tempFiles.add(tempInventory);
             inventory = tempInventory.getAbsolutePath();
             return inventory;
@@ -626,7 +679,8 @@ public class AnsibleRunnerContextBuilder {
             the builder gets the nodes from rundeck in rundeck node format and converts to ansible inventory
             we don't want that, we simply want the list we provided in ansible format
              */
-            File tempInventory = new AnsibleInlineInventoryBuilder(inline_inventory,AnsibleUtil.getCustomTmpPathDir(framework)).buildInventory();
+            String executionSpecificDir = getExecutionSpecificTmpDir();
+            File tempInventory = new AnsibleInlineInventoryBuilder(inline_inventory, executionSpecificDir).buildInventory();
             tempFiles.add(tempInventory);
             inventory = tempInventory.getAbsolutePath();
             return inventory;
@@ -755,12 +809,70 @@ public class AnsibleRunnerContextBuilder {
 
 
     public void cleanupTempFiles() {
+        // Clean up individual temp files
         for (File temp : tempFiles) {
             if (!getDebug()) {
-                temp.delete();
+                log.debug("Attempting to delete temp file: {}", temp.getAbsolutePath());
+                if (!temp.delete()) {
+                    log.warn("Failed to delete temp file: {}. Marking for deletion on JVM exit.", temp.getAbsolutePath());
+                    // Fallback: schedule for deletion on JVM exit
+                    temp.deleteOnExit();
+                } else {
+                    log.debug("Successfully deleted temp file: {}", temp.getAbsolutePath());
+                }
+            } else {
+                // In debug mode, temp files are intentionally preserved for inspection
+                log.debug("Debug mode enabled; not deleting temp file: {}", temp.getAbsolutePath());
             }
         }
         tempFiles.clear();
+
+        // Clean up execution-specific directory (including group_vars when inventory was generated/inline)
+        // Note: group_vars created alongside user-provided inventory files is cleaned up by AnsibleRunner
+        if (executionSpecificDir != null && executionSpecificDir.exists()) {
+            if (!getDebug()) {
+                log.debug("Cleaning up execution-specific directory: {}", executionSpecificDir.getAbsolutePath());
+                if (!deleteDirectoryRecursively(executionSpecificDir)) {
+                    log.warn("Failed to completely delete execution-specific directory: {}", executionSpecificDir.getAbsolutePath());
+                } else {
+                    log.debug("Successfully deleted execution-specific directory: {}", executionSpecificDir.getAbsolutePath());
+                }
+            } else {
+                // In debug mode, the execution-specific directory is intentionally preserved for troubleshooting.
+                // Note: These directories will accumulate over time and may require periodic manual cleanup.
+                log.debug("Debug mode enabled; not cleaning up execution-specific directory: {}", executionSpecificDir.getAbsolutePath());
+            }
+        }
+    }
+
+    /**
+     * Recursively deletes a directory and all its contents using Java NIO.
+     * Uses Files.walk() for robust directory traversal and handles errors gracefully.
+     *
+     * @param directory The directory to delete
+     * @return true if the directory and all its contents were successfully deleted, false otherwise
+     */
+    private boolean deleteDirectoryRecursively(File directory) {
+        if (directory == null || !directory.exists()) {
+            return true;
+        }
+
+        try {
+            // Walk the file tree in depth-first order (reverse) to delete files before their parent directories
+            Files.walk(directory.toPath())
+                    .sorted(java.util.Comparator.reverseOrder())
+                    .forEach(path -> {
+                        try {
+                            Files.delete(path);
+                        } catch (java.io.IOException e) {
+                            log.warn("Failed to delete: {}", path.toAbsolutePath(), e);
+                        }
+                    });
+            return true;
+        } catch (java.io.IOException e) {
+            log.warn("Failed to walk directory tree for deletion: {}", directory.getAbsolutePath(), e);
+            return false;
+        }
     }
 
     public Boolean getUseSshAgent() {
@@ -879,5 +991,201 @@ public class AnsibleRunnerContextBuilder {
             options.putAll(optionsContext);
         }
         return options;
+    }
+
+    /**
+     * Returns a map of node names to their respective authentication details.
+     * Each entry in the outer map corresponds to a node, with the key being the node name
+     * and the value being another map containing authentication parameters such as
+     * "ansible_ssh_private_key" or "ansible_password".
+     *
+     * @return Map of node names to authentication details. Example:
+     * <pre>
+     * {
+     *   "node1": { "ansible_ssh_private_key": "...", "ansible_user": "..." },
+     *   "node2": { "ansible_password": "...", "ansible_user": "..." }
+     * }
+     * </pre>
+     */
+    public Map<String, Map<String, String>> getNodesAuthenticationMap(){
+
+        Map<String, Map<String, String>> authenticationNodesMap = new HashMap<>();
+
+        this.context.getNodes().forEach((node) -> {
+            Map<String, String> auth = new HashMap<>();
+            final AuthenticationType authType = getSshAuthenticationType(node);
+
+            log.debug("Processing authentication for node '{}' with auth type: {}", node.getNodename(), authType);
+
+            if (AnsibleDescribable.AuthenticationType.privateKey == authType) {
+                final String privateKey;
+                try {
+                    privateKey = getSshPrivateKey(node);
+                    log.debug("Retrieved private key for node '{}': {}", node.getNodename(),
+                            (privateKey != null ? ("yes, length=" + privateKey.length()) : "null"));
+                } catch (ConfigurationException e) {
+                    log.debug("Error retrieving private key for node '{}': {}", node.getNodename(), e.getMessage());
+                    throw new RuntimeException("Failed to retrieve private key for node '" +
+                            node.getNodename() + "': " + e.getMessage(), e);
+                }
+                if (privateKey != null) {
+                    auth.put("ansible_ssh_private_key", privateKey);
+                    log.debug("Added private key to auth map for node '{}'", node.getNodename());
+                } else {
+                    log.debug("Private key is null for node '{}', not adding to auth map", node.getNodename());
+                }
+            } else if (AnsibleDescribable.AuthenticationType.password == authType) {
+                try {
+                    String password = getSshPassword(node);
+                    if(null!=password){
+                        auth.put("ansible_password", password);
+                        log.debug("Successfully retrieved password for node '{}'", node.getNodename());
+                    }
+                } catch (ConfigurationException e) {
+                    log.debug("Error retrieving password for node '{}': {}", node.getNodename(), e.getMessage());
+                    throw new RuntimeException("Failed to retrieve password for node '" +
+                            node.getNodename() + "': " + e.getMessage(), e);
+                }
+            }
+
+            String userName = getSshNodeUser(node);
+
+            if(null!=userName){
+                auth.put("ansible_user", userName);
+            }
+
+            // Validate that node has at least one authentication method configured
+            boolean hasPassword = auth.containsKey("ansible_password");
+            boolean hasPrivateKey = auth.containsKey("ansible_ssh_private_key");
+
+            if (!hasPassword && !hasPrivateKey) {
+                context.getExecutionLogger().log(2, "WARNING: Node '" + node.getNodename() +
+                        "' has no password or private key configured. Authentication may fail.");
+                log.debug("Node '{}' has no credentials configured (only username: {})",
+                        node.getNodename(), (auth.containsKey("ansible_user") ? "yes" : "no"));
+            }
+
+            authenticationNodesMap.put(node.getNodename(), auth);
+        });
+
+        return authenticationNodesMap;
+    }
+
+
+    public List<String> getListNodesKeyPath(){
+
+        if(!generateInventoryNodesAuth()) {
+            return new ArrayList<>();
+        }
+
+        List<String> secretPaths = new ArrayList<>();
+
+        this.context.getNodes().forEach((node) -> {
+            String keyPath = PropertyResolver.resolveProperty(
+                    AnsibleDescribable.ANSIBLE_SSH_PASSWORD_STORAGE_PATH,
+                    null,
+                    getFrameworkProject(),
+                    getFramework(),
+                    node,
+                    getJobConf()
+            );
+
+            if(null!=keyPath){
+                if(!secretPaths.contains(keyPath)){
+                    secretPaths.add(keyPath);
+                }
+            }
+
+            String privateKeyPath = PropertyResolver.resolveProperty(
+                    AnsibleDescribable.ANSIBLE_SSH_KEYPATH_STORAGE_PATH,
+                    null,
+                    getFrameworkProject(),
+                    getFramework(),
+                    node,
+                    getJobConf()
+            );
+
+            if(null!=privateKeyPath){
+                if(!secretPaths.contains(privateKeyPath)){
+                    secretPaths.add(privateKeyPath);
+                }
+            }
+        });
+
+        return secretPaths;
+    }
+
+
+    public Boolean generateInventoryNodesAuth() {
+        boolean generateInventoryNodesAuth = false;
+
+        log.debug("Resolving property ANSIBLE_GENERATE_INVENTORY_NODES_AUTH");
+        log.debug("Property key: {}", AnsibleDescribable.ANSIBLE_GENERATE_INVENTORY_NODES_AUTH);
+        log.debug("Framework project: {}", getFrameworkProject());
+
+        String sgenerateInventoryNodesAuth = PropertyResolver.resolveProperty(
+                AnsibleDescribable.ANSIBLE_GENERATE_INVENTORY_NODES_AUTH,
+                null,
+                getFrameworkProject(),
+                getFramework(),
+                getNode(),
+                getJobConf()
+        );
+
+        log.debug("PropertyResolver returned: {}", sgenerateInventoryNodesAuth);
+
+        if (null != sgenerateInventoryNodesAuth) {
+            generateInventoryNodesAuth = Boolean.parseBoolean(sgenerateInventoryNodesAuth);
+            log.debug("Parsed to boolean: {}", generateInventoryNodesAuth);
+        } else {
+            log.debug("Property not found, returning null");
+        }
+
+        return generateInventoryNodesAuth;
+    }
+
+    /**
+     * Creates and returns an execution-specific temporary directory path.
+     * This ensures that each execution has its own isolated directory for inventory and group_vars,
+     * preventing conflicts when multiple workflow step executions run in parallel.
+     *
+     * @return The path to the execution-specific directory
+     */
+    String getExecutionSpecificTmpDir() {
+        // Return cached directory if already created
+        if (executionSpecificDir != null) {
+            log.debug("Using cached execution-specific directory: {}", executionSpecificDir.getAbsolutePath());
+            return executionSpecificDir.getAbsolutePath();
+        }
+
+        String executionId = null;
+
+        // Get execution ID from data context
+        if (context.getDataContext() != null && context.getDataContext().get("job") != null) {
+            executionId = context.getDataContext().get("job").get("execid");
+            log.debug("Execution ID from context: {}", executionId);
+        }
+
+        // Get base tmp directory
+        String baseTmpDir = AnsibleUtil.getCustomTmpPathDir(framework);
+
+        // Create execution-specific directory
+        if (executionId != null && !executionId.isEmpty()) {
+            executionSpecificDir = new File(baseTmpDir, "ansible-exec-" + executionId);
+            log.debug("Creating execution-specific directory: {}", executionSpecificDir.getAbsolutePath());
+            try {
+                // Use Files.createDirectories() which is idempotent (safe to call if directory exists)
+                // and handles race conditions properly. Unlike mkdirs(), it doesn't return false
+                // when the directory already exists - it only throws IOException on actual failure.
+                Files.createDirectories(executionSpecificDir.toPath());
+                log.debug("Successfully ensured execution-specific directory exists: {}", executionSpecificDir.getAbsolutePath());
+            } catch (IOException e) {
+                String errorMsg = "Failed to create execution-specific directory: " + executionSpecificDir.getAbsolutePath();
+                log.error(errorMsg, e);
+                throw new IllegalStateException(errorMsg, e);
+            }
+            return executionSpecificDir.getAbsolutePath();
+        }
+        return baseTmpDir;
     }
 }

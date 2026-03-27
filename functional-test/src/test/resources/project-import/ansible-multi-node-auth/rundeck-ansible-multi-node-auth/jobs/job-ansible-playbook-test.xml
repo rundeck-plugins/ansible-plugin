@@ -1,0 +1,35 @@
+<joblist>
+  <job>
+    <defaultTab>nodes</defaultTab>
+    <description>Test multi-node authentication using Ansible playbook</description>
+    <dispatch>
+      <excludePrecedence>true</excludePrecedence>
+      <keepgoing>false</keepgoing>
+      <rankOrder>ascending</rankOrder>
+      <successOnEmptyNodeFilter>false</successOnEmptyNodeFilter>
+      <threadcount>1</threadcount>
+    </dispatch>
+    <executionEnabled>true</executionEnabled>
+    <id>b2c3d4e5-f6a7-8901-bcde-f12345678901</id>
+    <loglevel>INFO</loglevel>
+    <name>ansible-playbook-multi-node-test</name>
+    <nodeFilterEditable>false</nodeFilterEditable>
+    <nodefilters>
+      <filter>.*</filter>
+    </nodefilters>
+    <nodesSelectedByDefault>true</nodesSelectedByDefault>
+    <plugins />
+    <scheduleEnabled>true</scheduleEnabled>
+    <sequence keepgoing='false' strategy='step-first'>
+      <command>
+        <step-plugin type='com.batix.rundeck.plugins.AnsiblePlaybookInlineWorkflowStep'>
+          <configuration>
+            <entry key='ansible-playbook-inline' value='- hosts: all&#10;  gather_facts: yes&#10;  tasks:&#10;    - name: Display hostname&#10;      debug:&#10;        msg: "Connected to {{ inventory_hostname }} successfully"&#10;&#10;    - name: Verify authentication&#10;      command: whoami&#10;      register: current_user&#10;&#10;    - name: Show current user&#10;      debug:&#10;        msg: "Authenticated as {{ current_user.stdout }}"&#10;&#10;    - name: Test file creation&#10;      file:&#10;        path: /tmp/multi_node_auth_test_{{ inventory_hostname }}&#10;        state: touch&#10;        mode: "0644"&#10;&#10;    - name: Verify file was created&#10;      stat:&#10;        path: /tmp/multi_node_auth_test_{{ inventory_hostname }}&#10;      register: test_file&#10;&#10;    - name: Assert file exists&#10;      assert:&#10;        that:&#10;          - test_file.stat.exists&#10;        success_msg: "Multi-node authentication test passed for {{ inventory_hostname }}"&#10;        fail_msg: "Multi-node authentication test failed for {{ inventory_hostname }}"' />
+            <entry key='ansible-inventory' value='/home/rundeck/ansible-multi-node-auth/inventory.ini' />
+          </configuration>
+        </step-plugin>
+      </command>
+    </sequence>
+    <uuid>b2c3d4e5-f6a7-8901-bcde-f12345678901</uuid>
+  </job>
+</joblist>
