@@ -61,7 +61,7 @@ configurations {
   // Security: Force resolution of vulnerable dependencies
   all {
     resolutionStrategy {
-      force 'org.apache.commons:commons-lang3:3.17.0'
+      force 'org.apache.commons:commons-lang3:3.20.0'
       force 'org.apache.commons:commons-compress:1.28.0'
       force 'org.jetbrains.kotlin:kotlin-stdlib:2.1.0'
       // Exclude old commons-lang to prevent conflicts
