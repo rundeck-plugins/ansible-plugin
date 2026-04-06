@@ -11,12 +11,6 @@ repositories {
 group = 'com.github.rundeck-plugins'
 
 configurations {
-    configurations {
-        instrumentedClasspath {
-            canBeConsumed = false
-        }
-    }
-    
     // Security: Force resolution of vulnerable dependencies
     all {
         resolutionStrategy {

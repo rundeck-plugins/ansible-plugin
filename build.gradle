@@ -3,7 +3,7 @@ plugins {
   id 'maven-publish'
 }
 
-group = 'com.github.rundeck-plugins'
+group = 'com.rundeck.plugins'
 
 ext.rundeckPluginVersion = '1.2'
 ext.pluginClassNames = [
@@ -21,21 +21,38 @@ ext.pluginClassNames = [
 
 apply plugin: 'java'
 apply plugin: 'groovy'
-sourceCompatibility = 1.11
+sourceCompatibility = 17
+targetCompatibility = 17
 
 scmVersion {
     ignoreUncommittedChanges = false
     tag {
-        prefix = 'v'
+        prefix = ''           // NO "v" prefix - see PLUGIN_TAGGING_ARCHITECTURE.md
         versionSeparator = ''
     }
 }
 
-version = scmVersion.version
+version = scmVersion.version  // Dynamic version from git tag
 
 repositories {
-  mavenCentral()
   mavenLocal()
+    maven {
+        name = 'Central Portal Snapshots'
+        url = 'https://central.sonatype.com/repository/maven-snapshots/'
+        content {
+            includeGroup('org.rundeck')
+        }
+    }  // Must be FIRST for Grails 7 development
+    maven {
+        name = 'Central Portal Snapshots'
+        url = 'https://central.sonatype.com/repository/maven-snapshots/'
+        
+        // Only search this repository for org.rundeck snapshots
+        content {
+            includeGroup('org.rundeck')
+        }
+    }
+  mavenCentral()
 }
 
 configurations {
@@ -44,7 +61,7 @@ configurations {
   // Security: Force resolution of vulnerable dependencies
   all {
     resolutionStrategy {
-      force 'org.apache.commons:commons-lang3:3.18.0'
+      force 'org.apache.commons:commons-lang3:3.20.0'
       force 'org.apache.commons:commons-compress:1.28.0'
       force 'org.jetbrains.kotlin:kotlin-stdlib:2.1.0'
       // Exclude old commons-lang to prevent conflicts
@@ -77,11 +94,22 @@ dependencies {
   testAnnotationProcessor libs.lombok
 
   testImplementation libs.spock.core
+  testImplementation libs.bytebuddy
+  testImplementation libs.objenesis
 
 }
 
 tasks.withType(Test).configureEach {
   useJUnitPlatform()
+  
+  // Java 17+ module access for cglib/Spock mocking
+  jvmArgs = [
+    '--add-opens=java.base/java.lang=ALL-UNNAMED',
+    '--add-opens=java.base/java.util=ALL-UNNAMED',
+    '--add-opens=java.base/java.lang.reflect=ALL-UNNAMED',
+    '--add-opens=java.base/java.io=ALL-UNNAMED',
+    '--add-opens=java.base/java.net=ALL-UNNAMED'
+  ]
 }
 
 task copyToLib(type: Copy) {
@@ -114,8 +142,24 @@ jar {
 publishing {
   publications {
     maven(MavenPublication) {
+      groupId = 'com.rundeck.plugins'
       artifactId = 'ansible-plugin'
+      version = project.version
       from components.java
+    }
+  }
+  
+  repositories {
+    maven {
+      name = "PackageCloudTest"
+      url = uri("https://packagecloud.io/pagerduty/rundeckpro-test/maven2")
+      authentication {
+        header(HttpHeaderAuthentication)
+      }
+      credentials(HttpHeaderCredentials) {
+        name = "Authorization"
+        value = "Bearer " + (System.getenv("PKGCLD_WRITE_TOKEN") ?: project.findProperty("pkgcldWriteToken"))
+      }
     }
   }
 }
