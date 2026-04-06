@@ -27,8 +27,20 @@ ext.pluginClassNames = [
 
 apply plugin: 'java'
 apply plugin: 'groovy'
-sourceCompatibility = 17
-targetCompatibility = 17
+
+// Maven Central (Sonatype) requires -sources.jar and -javadoc.jar on close; same as attribute-match java.gradle
+java {
+  sourceCompatibility = JavaVersion.VERSION_17
+  targetCompatibility = JavaVersion.VERSION_17
+  withSourcesJar()
+  withJavadocJar()
+}
+
+// Lombok @Builder inner types break strict javadoc; Central still requires a -javadoc.jar artifact
+tasks.withType(Javadoc).configureEach {
+  failOnError = false
+  options.encoding = 'UTF-8'
+}
 
 scmVersion {
     ignoreUncommittedChanges = false
