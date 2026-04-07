@@ -1,7 +1,6 @@
 package functional
 
 import functional.base.BaseTestConfiguration
-import functional.util.TestUtil
 import org.rundeck.client.api.model.JobRun
 import org.testcontainers.spock.Testcontainers
 
@@ -36,31 +35,8 @@ class MultiNodeAuthSpec extends BaseTestConfiguration {
         // Store private key for node 4 in Rundeck key storage
         storePrivateKeyInKeyStorage("ssh-node-4.key", NODE4_PRIVATE_KEY_PATH)
 
-        // Create project
-        def projList = client.apiCall { api -> api.listProjects() }
-        if (!projList*.name.contains(PROJ_NAME)) {
-            client.apiCall { api ->
-                api.createProject(new org.rundeck.client.api.model.ProjectItem(name: PROJ_NAME))
-            }
-        }
-
-        // Import project configuration
-        File projectFile = TestUtil.createArchiveJarFile(
-            PROJ_NAME,
-            new File("src/test/resources/project-import/$PROJ_NAME")
-        )
-        okhttp3.RequestBody body = okhttp3.RequestBody.create(
-            org.rundeck.client.util.Client.MEDIA_TYPE_ZIP,
-            projectFile
-        )
-        client.apiCall { api ->
-            api.importProjectArchive(
-                PROJ_NAME,
-                "preserve",
-                true, true, true, true, true, true, true, true,
-                body
-            )
-        }
+        createProjectGrails7IfMissing(PROJ_NAME)
+        importProjectArchiveFromTestResources(PROJ_NAME)
 
         // Wait for nodes to be available
         waitForNodeAvailability(PROJ_NAME, NODE1_NAME)

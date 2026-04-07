@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import functional.util.TestUtil
 import okhttp3.Request
 import okhttp3.RequestBody
+import org.rundeck.client.api.RequestFailed
 import org.rundeck.client.api.RundeckApi
 import org.rundeck.client.api.model.ExecLog
 import org.rundeck.client.api.model.ExecOutput
@@ -119,32 +120,65 @@ class BaseTestConfiguration extends Specification{
         requestBody = RequestBody.create(Client.MEDIA_TYPE_X_RUNDECK_PASSWORD, ENCRYPTED_INVENTORY_VAULT_PASSWORD.getBytes())
         keyResult = client.apiCall {api-> api.createKeyStorage("project/$projectName/vault-inventory.password", requestBody)}
 
-        // create project — Grails 7 expects top-level name plus config.project.name (see rundeck OSS BaseContainer.setupProjectArchiveFile)
-        def projList = client.apiCall { api -> api.listProjects() }
+        createProjectGrails7IfMissing(projectName)
+        importProjectArchiveFromTestResources(projectName)
 
+        waitForNodeAvailability(projectName, nodeName)
+
+    }
+
+    /**
+     * Grails 7: POST /projects expects top-level {@code name} and {@code config["project.name"]}
+     * (rundeck OSS {@code BaseContainer.setupProjectArchiveFile}).
+     */
+    protected void createProjectGrails7IfMissing(String projectName) {
+        def projList = client.apiCall { api -> api.listProjects() }
         if (!projList*.name.contains(projectName)) {
             def item = new ProjectItem()
             item.name = projectName
             item.config = [('project.name'): projectName]
             client.apiCall { api -> api.createProject(item) }
         }
+    }
 
-        // import project — rd-api-client: PUT project/{project}/import; jobUuidOption preserve; see RundeckApi.importProjectArchive
-        File projectFile = TestUtil.createArchiveJarFile(projectName, new File("src/test/resources/project-import/" + projectName))
+    /**
+     * Import {@code src/test/resources/project-import/{projectName}} and fail with stderr diagnostics if the server
+     * reports failure. HTTP errors still throw {@link org.rundeck.client.api.RequestFailed} from {@code apiCall}.
+     */
+    protected void importProjectArchiveFromTestResources(String projectName) {
+        File projectDir = new File("src/test/resources/project-import/${projectName}")
+        File projectFile = TestUtil.createArchiveJarFile(projectName, projectDir)
         RequestBody body = RequestBody.create(Client.MEDIA_TYPE_ZIP, projectFile)
-        ProjectImportStatus importStatus = client.apiCall { api ->
-            api.importProjectArchive(projectName, "preserve",
-                    true, true, true, true, true, true, true, true,
-                    body)
+        ProjectImportStatus importStatus
+        try {
+            importStatus = client.apiCall { api ->
+                api.importProjectArchive(projectName, "preserve",
+                        true, true, true, true, true, true, true, true,
+                        body)
+            }
+        } catch (RequestFailed rf) {
+            System.err.println(
+                    "Project import HTTP/API error for '${projectName}': HTTP ${rf.statusCode} ${rf.message} status=${rf.status}")
+            throw rf
         }
-        if (!importStatus.getResultSuccess()) {
-            throw new IllegalStateException(
-                    "Project import failed for '${projectName}': importStatus=${importStatus.importStatus}, successful=${importStatus.successful}, " +
-                            "errors=${importStatus.errors}, executionErrors=${importStatus.executionErrors}, aclErrors=${importStatus.aclErrors}")
+        assertProjectImportSucceeded(projectName, importStatus)
+    }
+
+    protected void assertProjectImportSucceeded(String projectName, ProjectImportStatus importStatus) {
+        if (importStatus != null && importStatus.getResultSuccess()) {
+            return
         }
-
-        waitForNodeAvailability(projectName, nodeName)
-
+        String parsedJson
+        try {
+            parsedJson = importStatus == null ? 'null'
+                    : JSON_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(importStatus)
+        } catch (Exception e) {
+            parsedJson = "Could not serialize ProjectImportStatus: ${e.message}; toString=${String.valueOf(importStatus)}"
+        }
+        String detail = "Project import did not succeed for '${projectName}'. " +
+                "Parsed ProjectImportStatus from API (rd-api-client model as JSON):\n${parsedJson}"
+        System.err.println(detail)
+        throw new IllegalStateException(detail)
     }
 
     /**
