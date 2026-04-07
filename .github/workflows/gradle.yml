@@ -26,7 +26,23 @@ jobs:
       - name: Copy Artifact for integration test
         run: ./gradlew :functional-test:copyPluginArtifact
       - name: Run integration Test
-        run: ./gradlew :functional-test:functionalTest
+        run: |
+          set -eo pipefail
+          mkdir -p .temp
+          LOG=".temp/functionalTest-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-$(date -u +%Y%m%dT%H%M%SZ).log"
+          echo "Full Gradle log: $LOG"
+          ./gradlew :functional-test:functionalTest --stacktrace 2>&1 | tee "$LOG"
+      - name: Upload functional test reports and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ansible-functional-test-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            .temp/*.log
+            functional-test/build/reports/tests/
+            functional-test/build/test-results/
+            build/reports/problems/
+          if-no-files-found: warn
       - name: Get Release Version
         id: get_version
         run: VERSION=$(./gradlew currentVersion -q -Prelease.quiet) && echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
