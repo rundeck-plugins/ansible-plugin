@@ -37,12 +37,8 @@ dependencies {
 tasks.register('functionalTest', Test) {
     useJUnitPlatform()
 
-    // Rundeck test image version
-    // Minimum supported Rundeck version for this plugin: 5.1.1 (see main README/changelog).
-    // Functional tests intentionally run against a newer version, Rundeck 5.18.0, to validate
-    // compatibility with current releases. When raising the minimum supported version, update
-    // this test image tag in tandem.
-    systemProperty('RUNDECK_TEST_IMAGE', "rundeck/rundeck:5.18.0")
+    // Rundeck Docker image tag must match `rundeck-core` in ../gradle/libs.versions.toml (single source of truth).
+    systemProperty('RUNDECK_TEST_IMAGE', "rundeck/rundeck:${libs.versions.rundeck.core.get()}")
 
     // Docker configuration for Testcontainers
     // For Rancher Desktop on macOS: Use /Users/<username>/.rd/docker.sock
