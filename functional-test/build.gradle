@@ -47,6 +47,16 @@ tasks.register('functionalTest', Test) {
     // You can also configure this via ~/.testcontainers.properties (see functional-test/README.md)
 
     description = "Run Ansible integration tests"
+
+    // CI / local: surface Spock stderr (e.g. ProjectImportStatus JSON) and full stack traces in console + tee logs
+    testLogging {
+        events 'failed', 'passed', 'skipped', 'standard_out', 'standard_error'
+        exceptionFormat 'full'
+        showExceptions true
+        showCauses true
+        showStackTraces true
+        showStandardStreams true
+    }
 }
 
 tasks.register('copyPluginArtifact', Copy) {
