@@ -50,8 +50,8 @@ class MultiNodeAuthSpec extends BaseTestConfiguration {
             new File("src/test/resources/project-import/$PROJ_NAME")
         )
         okhttp3.RequestBody body = okhttp3.RequestBody.create(
-            projectFile,
-            org.rundeck.client.util.Client.MEDIA_TYPE_ZIP
+            org.rundeck.client.util.Client.MEDIA_TYPE_ZIP,
+            projectFile
         )
         client.apiCall { api ->
             api.importProjectArchive(
@@ -73,8 +73,8 @@ class MultiNodeAuthSpec extends BaseTestConfiguration {
     // Helper method to store password in Rundeck key storage
     private void storePasswordInKeyStorage(String keyPath, String password) {
         okhttp3.RequestBody requestBody = okhttp3.RequestBody.create(
-            password.getBytes(),
-            org.rundeck.client.util.Client.MEDIA_TYPE_X_RUNDECK_PASSWORD
+            org.rundeck.client.util.Client.MEDIA_TYPE_X_RUNDECK_PASSWORD,
+            password.getBytes()
         )
         client.apiCall { api ->
             api.createKeyStorage("project/$PROJ_NAME/$keyPath", requestBody)
@@ -85,8 +85,8 @@ class MultiNodeAuthSpec extends BaseTestConfiguration {
     private void storePrivateKeyInKeyStorage(String keyPath, String privateKeyFilePath) {
         File privateKeyFile = new File(privateKeyFilePath)
         okhttp3.RequestBody requestBody = okhttp3.RequestBody.create(
-            privateKeyFile,
-            org.rundeck.client.util.Client.MEDIA_TYPE_OCTET_STREAM
+            org.rundeck.client.util.Client.MEDIA_TYPE_OCTET_STREAM,
+            privateKeyFile
         )
         client.apiCall { api ->
             api.createKeyStorage("project/$PROJ_NAME/$keyPath", requestBody)

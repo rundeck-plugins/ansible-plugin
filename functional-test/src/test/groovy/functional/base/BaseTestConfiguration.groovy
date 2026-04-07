@@ -88,27 +88,28 @@ class BaseTestConfiguration extends Specification{
     def configureRundeck(String projectName, String nodeName){
 
         //add private key
-        RequestBody requestBody = RequestBody.create(new File("src/test/resources/docker/keys/id_rsa"), Client.MEDIA_TYPE_OCTET_STREAM)
+        // OkHttp 4+: MediaType first (classpath resolves okhttp 4.12 from rd-api-client / retrofit)
+        RequestBody requestBody = RequestBody.create(Client.MEDIA_TYPE_OCTET_STREAM, new File("src/test/resources/docker/keys/id_rsa"))
         def keyResult = client.apiCall {api-> api.createKeyStorage("project/$projectName/ssh-node.key", requestBody)}
 
         //add private key with passphrase
-        requestBody = RequestBody.create(new File("src/test/resources/docker/keys/id_rsa_passphrase"), Client.MEDIA_TYPE_OCTET_STREAM)
+        requestBody = RequestBody.create(Client.MEDIA_TYPE_OCTET_STREAM, new File("src/test/resources/docker/keys/id_rsa_passphrase"))
         keyResult = client.apiCall {api-> api.createKeyStorage("project/$projectName/ssh-node-passphrase.key", requestBody)}
 
         //add passphrase
-        requestBody = RequestBody.create(NODE_KEY_PASSPHRASE.getBytes(), Client.MEDIA_TYPE_X_RUNDECK_PASSWORD)
+        requestBody = RequestBody.create(Client.MEDIA_TYPE_X_RUNDECK_PASSWORD, NODE_KEY_PASSPHRASE.getBytes())
         keyResult = client.apiCall {api-> api.createKeyStorage("project/$projectName/ssh-node-passphrase.pass", requestBody)}
 
         //add node user ssh-password
-        requestBody = RequestBody.create(NODE_USER_PASSWORD.getBytes(), Client.MEDIA_TYPE_X_RUNDECK_PASSWORD)
+        requestBody = RequestBody.create(Client.MEDIA_TYPE_X_RUNDECK_PASSWORD, NODE_USER_PASSWORD.getBytes())
         keyResult = client.apiCall {api-> api.createKeyStorage("project/$projectName/ssh-node.pass", requestBody)}
 
         //user vault password
-        requestBody = RequestBody.create(USER_VAULT_PASSWORD.getBytes(), Client.MEDIA_TYPE_X_RUNDECK_PASSWORD)
+        requestBody = RequestBody.create(Client.MEDIA_TYPE_X_RUNDECK_PASSWORD, USER_VAULT_PASSWORD.getBytes())
         keyResult = client.apiCall {api-> api.createKeyStorage("project/$projectName/vault-user.pass", requestBody)}
 
         //add encrypted inventory password
-        requestBody = RequestBody.create(ENCRYPTED_INVENTORY_VAULT_PASSWORD.getBytes(), Client.MEDIA_TYPE_X_RUNDECK_PASSWORD)
+        requestBody = RequestBody.create(Client.MEDIA_TYPE_X_RUNDECK_PASSWORD, ENCRYPTED_INVENTORY_VAULT_PASSWORD.getBytes())
         keyResult = client.apiCall {api-> api.createKeyStorage("project/$projectName/vault-inventory.password", requestBody)}
 
         //create project
@@ -120,7 +121,7 @@ class BaseTestConfiguration extends Specification{
 
         //import project
         File projectFile = TestUtil.createArchiveJarFile(projectName, new File("src/test/resources/project-import/" + projectName))
-        RequestBody body = RequestBody.create(projectFile, Client.MEDIA_TYPE_ZIP)
+        RequestBody body = RequestBody.create(Client.MEDIA_TYPE_ZIP, projectFile)
         client.apiCall(api ->
                 api.importProjectArchive(projectName,  "preserve", true, true, true, true, true, true, true, [:], body)
         )
