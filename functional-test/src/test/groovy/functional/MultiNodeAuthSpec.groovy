@@ -57,8 +57,7 @@ class MultiNodeAuthSpec extends BaseTestConfiguration {
             api.importProjectArchive(
                 PROJ_NAME,
                 "preserve",
-                true, true, true, true, true, true, true,
-                [:],
+                true, true, true, true, true, true, true, true,
                 body
             )
         }

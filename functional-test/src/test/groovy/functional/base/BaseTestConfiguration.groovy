@@ -113,18 +113,20 @@ class BaseTestConfiguration extends Specification{
         keyResult = client.apiCall {api-> api.createKeyStorage("project/$projectName/vault-inventory.password", requestBody)}
 
         //create project
-        def projList = client.apiCall(api -> api.listProjects())
+        def projList = client.apiCall { api -> api.listProjects() }
 
         if (!projList*.name.contains(projectName)) {
-            def project = client.apiCall(api -> api.createProject(new ProjectItem(name: projectName)))
+            client.apiCall { api -> api.createProject(new ProjectItem(name: projectName)) }
         }
 
-        //import project
+        //import project — rd-api-client: 8 boolean flags then RequestBody (no Map); see RundeckApi.importProjectArchive
         File projectFile = TestUtil.createArchiveJarFile(projectName, new File("src/test/resources/project-import/" + projectName))
         RequestBody body = RequestBody.create(Client.MEDIA_TYPE_ZIP, projectFile)
-        client.apiCall(api ->
-                api.importProjectArchive(projectName,  "preserve", true, true, true, true, true, true, true, [:], body)
-        )
+        client.apiCall { api ->
+            api.importProjectArchive(projectName, "preserve",
+                    true, true, true, true, true, true, true, true,
+                    body)
+        }
 
         waitForNodeAvailability(projectName, nodeName)
 
