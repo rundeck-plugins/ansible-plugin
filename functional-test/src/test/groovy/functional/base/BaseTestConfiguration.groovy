@@ -159,6 +159,7 @@ class BaseTestConfiguration extends Specification{
         } catch (RequestFailed rf) {
             System.err.println(
                     "Project import HTTP/API error for '${projectName}': HTTP ${rf.statusCode} ${rf.message} status=${rf.status}")
+            dumpRundeckLogsAfterImportFailure(projectName)
             throw rf
         }
         assertProjectImportSucceeded(projectName, importStatus)
@@ -178,7 +179,16 @@ class BaseTestConfiguration extends Specification{
         String detail = "Project import did not succeed for '${projectName}'. " +
                 "Parsed ProjectImportStatus from API (rd-api-client model as JSON):\n${parsedJson}"
         System.err.println(detail)
+        dumpRundeckLogsAfterImportFailure(projectName)
         throw new IllegalStateException(detail)
+    }
+
+    private void dumpRundeckLogsAfterImportFailure(String projectName) {
+        if (rundeckEnvironment == null) {
+            return
+        }
+        rundeckEnvironment.appendRundeckContainerLogsToStdErr(
+                "--- Rundeck container logs (project '${projectName}' import failure) ---")
     }
 
     /**

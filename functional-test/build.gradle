@@ -39,6 +39,8 @@ tasks.register('functionalTest', Test) {
 
     // Rundeck Docker image tag must match `rundeck-core` in ../gradle/libs.versions.toml (single source of truth).
     systemProperty('RUNDECK_TEST_IMAGE', "rundeck/rundeck:${libs.versions.rundeck.core.get()}")
+    // Project archive manifest must match server generation; see TestUtil.createArchiveJarFile
+    systemProperty('RUNDECK_ARCHIVE_APP_VERSION', libs.versions.rundeck.core.get())
 
     // Docker configuration for Testcontainers
     // For Rancher Desktop on macOS: Use /Users/<username>/.rd/docker.sock

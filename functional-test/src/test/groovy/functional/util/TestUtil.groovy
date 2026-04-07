@@ -26,7 +26,10 @@ class TestUtil {
         manifest.mainAttributes.putValue("Manifest-Version", "1.0")
         manifest.mainAttributes.putValue("Rundeck-Archive-Project-Name", name)
         manifest.mainAttributes.putValue("Rundeck-Archive-Format-Version", "1.0")
-        manifest.mainAttributes.putValue("Rundeck-Application-Version", "5.0.0")
+        // Must align with the Rundeck server under test; Rundeck 6 can reject archives stamped as 5.x (functionalTest sets RUNDECK_ARCHIVE_APP_VERSION).
+        manifest.mainAttributes.putValue(
+                "Rundeck-Application-Version",
+                System.getProperty("RUNDECK_ARCHIVE_APP_VERSION", "6.0.0"))
         manifest.mainAttributes.putValue(
                 "Rundeck-Archive-Export-Date",
                 new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssX").format(new Date())
