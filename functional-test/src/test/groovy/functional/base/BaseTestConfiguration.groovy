@@ -1,17 +1,24 @@
 package functional.base
 
+import com.fasterxml.jackson.databind.ObjectMapper
 import functional.util.TestUtil
+import okhttp3.Request
 import okhttp3.RequestBody
 import org.rundeck.client.api.RundeckApi
 import org.rundeck.client.api.model.ExecLog
 import org.rundeck.client.api.model.ExecOutput
 import org.rundeck.client.api.model.ExecutionStateResponse
+import org.rundeck.client.api.model.ProjectImportStatus
 import org.rundeck.client.api.model.ProjectItem
 import org.rundeck.client.util.Client
 import spock.lang.Shared
 import spock.lang.Specification
 
+import java.util.concurrent.TimeUnit
+
 class BaseTestConfiguration extends Specification{
+
+    private static final ObjectMapper JSON_MAPPER = new ObjectMapper()
 
     @Shared
     Client<RundeckApi> client
@@ -112,34 +119,70 @@ class BaseTestConfiguration extends Specification{
         requestBody = RequestBody.create(Client.MEDIA_TYPE_X_RUNDECK_PASSWORD, ENCRYPTED_INVENTORY_VAULT_PASSWORD.getBytes())
         keyResult = client.apiCall {api-> api.createKeyStorage("project/$projectName/vault-inventory.password", requestBody)}
 
-        //create project
+        // create project — Grails 7 expects top-level name plus config.project.name (see rundeck OSS BaseContainer.setupProjectArchiveFile)
         def projList = client.apiCall { api -> api.listProjects() }
 
         if (!projList*.name.contains(projectName)) {
-            client.apiCall { api -> api.createProject(new ProjectItem(name: projectName)) }
+            def item = new ProjectItem()
+            item.name = projectName
+            item.config = [('project.name'): projectName]
+            client.apiCall { api -> api.createProject(item) }
         }
 
-        //import project — rd-api-client: 8 boolean flags then RequestBody (no Map); see RundeckApi.importProjectArchive
+        // import project — rd-api-client: PUT project/{project}/import; jobUuidOption preserve; see RundeckApi.importProjectArchive
         File projectFile = TestUtil.createArchiveJarFile(projectName, new File("src/test/resources/project-import/" + projectName))
         RequestBody body = RequestBody.create(Client.MEDIA_TYPE_ZIP, projectFile)
-        client.apiCall { api ->
+        ProjectImportStatus importStatus = client.apiCall { api ->
             api.importProjectArchive(projectName, "preserve",
                     true, true, true, true, true, true, true, true,
                     body)
+        }
+        if (!importStatus.getResultSuccess()) {
+            throw new IllegalStateException(
+                    "Project import failed for '${projectName}': importStatus=${importStatus.importStatus}, successful=${importStatus.successful}, " +
+                            "errors=${importStatus.errors}, executionErrors=${importStatus.executionErrors}, aclErrors=${importStatus.aclErrors}")
         }
 
         waitForNodeAvailability(projectName, nodeName)
 
     }
 
-    def waitForNodeAvailability(String projectName, String nodeName){
-        def result = client.apiCall {api-> api.listNodes(projectName,".*")}
-        def count =0
+    /**
+     * Nudge resource providers (Ansible inventory, etc.) like OSS {@code BaseContainer.waitingResourceEnabled}:
+     * PUT project/{project}/config/time then poll until the expected node appears.
+     */
+    def waitForNodeAvailability(String projectName, String nodeName) {
+        touchProjectConfigTime(projectName)
+        final long deadlineNanos = System.nanoTime() + TimeUnit.MINUTES.toNanos(3)
+        def result = client.apiCall { api -> api.listNodes(projectName, ".*") }
 
-        while(result.get(nodeName)==null && count<5){
-            sleep(2000)
-            result = client.apiCall {api-> api.listNodes(projectName,".*")}
-            count++
+        while (result.get(nodeName) == null && System.nanoTime() < deadlineNanos) {
+            touchProjectConfigTime(projectName)
+            sleep(3000)
+            result = client.apiCall { api -> api.listNodes(projectName, ".*") }
+        }
+    }
+
+    private void touchProjectConfigTime(String projectName) {
+        String base = client.getApiBaseUrl()
+        String url = (base.endsWith('/') ? base : base + '/') + "project/${projectName}/config/time"
+        String json = JSON_MAPPER.writeValueAsString([value: String.valueOf(System.currentTimeMillis())])
+        RequestBody jsonBody = RequestBody.create(Client.MEDIA_TYPE_JSON, json)
+        Request httpReq = new Request.Builder()
+                .url(url)
+                .put(jsonBody)
+                .header('Accept', 'application/json')
+                .header('Content-Type', 'application/json')
+                .build()
+        def call = client.getRetrofit().callFactory().newCall(httpReq)
+        def resp = call.execute()
+        try {
+            if (!resp.successful) {
+                String err = resp.body()?.string() ?: ''
+                throw new IllegalStateException("PUT project config/time failed: HTTP ${resp.code} ${err}")
+            }
+        } finally {
+            resp.close()
         }
     }
 
