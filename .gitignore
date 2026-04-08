@@ -50,6 +50,9 @@ crashlytics-build.properties
 .gradle
 build/
 
+# CI / local full Gradle transcripts (GitHub Actions writes here; avoids hidden .temp upload issues)
+ci-logs/
+
 # Ignore Gradle GUI config
 gradle-app.setting
 
