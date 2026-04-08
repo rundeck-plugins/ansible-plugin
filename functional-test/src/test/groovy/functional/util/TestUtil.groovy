@@ -4,7 +4,10 @@ import com.jcraft.jsch.JSch
 import com.jcraft.jsch.KeyPair
 import org.rundeck.client.api.model.ExecLog
 
+import groovy.io.FileType
+
 import java.nio.file.Files
+import java.nio.file.Path
 import java.nio.file.attribute.PosixFilePermission
 import java.text.SimpleDateFormat
 import java.util.jar.JarEntry
@@ -35,19 +38,39 @@ class TestUtil {
                 new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssX").format(new Date())
         )
 
+        Path base = projectArchiveDirectory.toPath()
+        List<File> filesOnly = []
+        projectArchiveDirectory.eachFileRecurse(FileType.FILES) { f -> filesOnly.add(f) }
+
+        // Rundeck 6 async import expects directory entries with trailing /. Otherwise "jobs" can extract as a
+        // zero-byte file and AsyncImportService fails with "Not a directory".
+        Set<String> directoryEntries = new LinkedHashSet<>()
+        for (File f : filesOnly) {
+            String rel = base.relativize(f.toPath()).toString().replace('\\', '/')
+            String[] parts = rel.split('/')
+            for (int i = 0; i < parts.length - 1; i++) {
+                directoryEntries.add((parts[0..i].join('/') + '/') as String)
+            }
+        }
+        List<String> dirsOrdered = new ArrayList<>(directoryEntries)
+        dirsOrdered.sort { a, b ->
+            int da = a.count('/')
+            int db = b.count('/')
+            da != db ? da <=> db : a <=> b
+        }
+
         tempFile.withOutputStream { os ->
-            def jos = new JarOutputStream(os, manifest)
-
-            jos.withCloseable { jarOutputStream ->
-
-                projectArchiveDirectory.eachFileRecurse { file ->
-                    def entry = new JarEntry(projectArchiveDirectory.toPath().relativize(file.toPath()).toString())
-                    jarOutputStream.putNextEntry(entry)
-                    if (file.isFile()) {
-                        file.withInputStream { is ->
-                            jarOutputStream << is
-                        }
-                    }
+            JarOutputStream jos = new JarOutputStream(os, manifest)
+            jos.withCloseable { JarOutputStream jarOutputStream ->
+                for (String dir : dirsOrdered) {
+                    jarOutputStream.putNextEntry(new JarEntry(dir))
+                    jarOutputStream.closeEntry()
+                }
+                for (File file : filesOnly) {
+                    String entryName = base.relativize(file.toPath()).toString().replace('\\', '/')
+                    jarOutputStream.putNextEntry(new JarEntry(entryName))
+                    file.withInputStream { is -> jarOutputStream << is }
+                    jarOutputStream.closeEntry()
                 }
             }
         }
