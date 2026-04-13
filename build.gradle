@@ -76,12 +76,12 @@ repositories {
 configurations {
   pluginLibs
   
-  // Security: Force resolution of vulnerable dependencies
+  // Security: Force resolution of vulnerable dependencies (versions: gradle/libs.versions.toml)
   all {
     resolutionStrategy {
-      force 'org.apache.commons:commons-lang3:3.20.0'
-      force 'org.apache.commons:commons-compress:1.28.0'
-      force 'org.jetbrains.kotlin:kotlin-stdlib:2.1.0'
+      force libs.commons.lang3.get()
+      force libs.commons.compress.get()
+      force libs.kotlin.stdlib.get()
       // Exclude old commons-lang to prevent conflicts
       exclude group: 'commons-lang', module: 'commons-lang'
     }
@@ -143,7 +143,7 @@ jar {
     def libList = configurations.pluginLibs.collect{'lib/' + it.name}.join(' ')
     attributes 'Rundeck-Plugin-Name' : 'Ansible Integration'
     attributes 'Rundeck-Plugin-Description' : 'This plugin brings basic Ansible support to Rundeck. It imports hosts from Ansible\'s inventory, including a bunch of facts, and can run modules and playbooks. There is also a node executor and file copier for your project.'
-    attributes 'Rundeck-Plugin-Rundeck-Compatibility-Version': '3.0.1+'
+    attributes 'Rundeck-Plugin-Rundeck-Compatibility-Version': '6.0.0+'
     attributes 'Rundeck-Plugin-Tags': 'java,node executor,resource model,workflow step,ansible'
     attributes 'Rundeck-Plugin-License': 'MIT'
     attributes 'Rundeck-Plugin-Source-Link': 'https://github.com/rundeck-plugins/ansible-plugin'
