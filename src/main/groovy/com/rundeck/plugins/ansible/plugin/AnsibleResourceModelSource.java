@@ -947,7 +947,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     if(runner.getVaultPass() != null){
       VaultPrompt vaultPrompt = VaultPrompt.builder()
               .vaultId("None")
-              .vaultPassword(runner.getVaultPass() + "\n")
+              .vaultPassword(runner.getVaultPass())
               .build();
       ansibleInventoryListBuilder.vaultPrompt(vaultPrompt);
     }
