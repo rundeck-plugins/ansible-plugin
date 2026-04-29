@@ -1190,25 +1190,16 @@ public class AnsibleRunnerContextBuilder {
         String baseTmpDir = AnsibleUtil.getCustomTmpPathDir(framework);
 
         if (executionId != null && !executionId.isEmpty()) {
-            java.nio.file.Path basePath = Paths.get(baseTmpDir);
-            try {
-                // createDirectories is idempotent: safe under concurrent invocations.
-                Files.createDirectories(basePath);
-            } catch (IOException e) {
-                String errorMsg = "Failed to ensure base tmp directory exists: " + basePath;
-                log.error(errorMsg, e);
-                throw new IllegalStateException(errorMsg, e);
-            }
-
-            // Atomic + unique by construction; the executionId prefix lets operators filter all
-            // directories belonging to a given Rundeck execution with a single glob.
+            // Atomic + unique by construction. No coordination needed between sibling threads
+            // sharing the same Rundeck executionId. The executionId prefix lets operators filter
+            // all directories belonging to a given Rundeck execution with a single glob.
             try {
                 executionSpecificDir = Files
-                        .createTempDirectory(basePath, "ansible-exec-" + executionId + "-builder-")
+                        .createTempDirectory(Paths.get(baseTmpDir), "ansible-exec-" + executionId + "-builder-")
                         .toFile();
                 log.debug("Created builder-specific directory: {}", executionSpecificDir.getAbsolutePath());
             } catch (IOException e) {
-                String errorMsg = "Failed to create builder-specific directory under: " + basePath;
+                String errorMsg = "Failed to create builder-specific directory under: " + baseTmpDir;
                 log.error(errorMsg, e);
                 throw new IllegalStateException(errorMsg, e);
             }
