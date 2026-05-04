@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
       - name: Get Fetch Tags
@@ -33,7 +33,7 @@ jobs:
         id: get_version
         run: VERSION=$(./gradlew currentVersion -q -Prelease.quiet) && echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
       - name: Upload plugin jar
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           # Artifact name
           name: Grails-Plugin-${{ steps.get_version.outputs.VERSION }}
