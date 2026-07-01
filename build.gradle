@@ -1,5 +1,5 @@
 plugins {
-  id 'pl.allegro.tech.build.axion-release' version '1.17.2'
+  id 'pl.allegro.tech.build.axion-release' version '1.21.2'
   id 'io.github.gradle-nexus.publish-plugin' version '2.0.0'
 }
 
@@ -48,6 +48,7 @@ scmVersion {
         prefix = ''           // NO "v" prefix - see PLUGIN_TAGGING_ARCHITECTURE.md
         versionSeparator = ''
     }
+    versionCreator 'simple'  // Use simple version creator (just tag name); tolerates legacy v* tags
 }
 
 version = scmVersion.version  // Dynamic version from git tag

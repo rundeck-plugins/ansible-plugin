@@ -6,19 +6,19 @@ kotlin-stdlib = "2.1.0"
 
 # Current dependency versions (maintained for compatibility)
 gson = "2.10.1"
-jackson = "2.21.2"
+jackson = "2.22.0"
 snakeyaml = "2.2"
 groovy = "4.0.29"
 lombok = "1.18.30"
 spock = "2.4-groovy-4.0"
 testcontainers = "1.19.0"
-rd-api-client = "2.0.10"
+rd-api-client = "2.1.2"
 jsch = "0.1.55"
 bytebuddy = "1.14.11"
 objenesis = "3.4"
 
 # Rundeck version
-rundeck-core = "6.0.0-alpha1-20260407"
+rundeck-core = "6.1.0-SNAPSHOT"
 
 [libraries]
 # Security overrides

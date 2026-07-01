@@ -8,14 +8,14 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
       - name: Get Fetch Tags
         run: git -c protocol.version=2 fetch --tags --progress --no-recurse-submodules origin
         if: "!contains(github.ref, 'refs/tags')"
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: 17
           distribution: 'zulu'
@@ -33,7 +33,7 @@ jobs:
         id: get_version
         run: VERSION=$(./gradlew currentVersion -q -Prelease.quiet) && echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
       - name: Upload plugin jar
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           # Artifact name
           name: Grails-Plugin-${{ steps.get_version.outputs.VERSION }}
