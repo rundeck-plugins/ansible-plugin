@@ -5,6 +5,9 @@ on:
     branches: [ main, master ]
   pull_request:
     branches: [ main, master ]
+  schedule:
+    # Weekly on Monday 06:00 UTC (GitHub Actions cron is UTC-only)
+    - cron: '0 6 * * 1'
   workflow_dispatch:
 
 jobs:
