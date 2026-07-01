@@ -6,7 +6,7 @@ kotlin-stdlib = "2.1.0"
 
 # Current dependency versions (maintained for compatibility)
 gson = "2.10.1"
-jackson = "2.21.2"
+jackson = "2.22.0"
 snakeyaml = "2.2"
 groovy = "4.0.29"
 lombok = "1.18.30"
@@ -18,7 +18,7 @@ bytebuddy = "1.14.11"
 objenesis = "3.4"
 
 # Rundeck version
-rundeck-core = "6.0.0-SNAPSHOT"
+rundeck-core = "6.1.0-SNAPSHOT"
 
 [libraries]
 # Security overrides
