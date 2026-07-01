@@ -42,6 +42,12 @@ public class AnsibleRunnerContextBuilder {
     private final Map<String, Object> jobConf;
     private final Collection<INodeEntry> nodes;
     private final Collection<File> tempFiles;
+    /**
+     * Per-builder working directory (e.g. {@code ansible-exec-<executionId>-builder-<rand>/})
+     * created atomically with
+     * {@link Files#createTempDirectory(java.nio.file.Path, String, java.nio.file.attribute.FileAttribute[])}.
+     * EXCLUSIVELY owned by this builder; safe to delete recursively.
+     */
     private File executionSpecificDir;
 
     private AnsiblePluginGroup pluginGroup;
@@ -827,20 +833,25 @@ public class AnsibleRunnerContextBuilder {
         }
         tempFiles.clear();
 
-        // Clean up execution-specific directory (including group_vars when inventory was generated/inline)
-        // Note: group_vars created alongside user-provided inventory files is cleaned up by AnsibleRunner
+        // Clean up the builder-specific working directory (including group_vars when inventory
+        // was generated/inline). Note: group_vars created alongside user-provided inventory files
+        // is cleaned up by AnsibleRunner.
+        // executionSpecificDir is an EXCLUSIVE per-builder directory (ansible-exec-<execId>-builder-<rand>/),
+        // so recursive deletion is always safe — no sibling builder shares files with it.
         if (executionSpecificDir != null && executionSpecificDir.exists()) {
             if (!getDebug()) {
-                log.debug("Cleaning up execution-specific directory: {}", executionSpecificDir.getAbsolutePath());
+                log.debug("Cleaning up builder-specific directory: {}", executionSpecificDir.getAbsolutePath());
                 if (!deleteDirectoryRecursively(executionSpecificDir)) {
-                    log.warn("Failed to completely delete execution-specific directory: {}", executionSpecificDir.getAbsolutePath());
+                    log.warn("Failed to completely delete builder-specific directory: {}", executionSpecificDir.getAbsolutePath());
                 } else {
-                    log.debug("Successfully deleted execution-specific directory: {}", executionSpecificDir.getAbsolutePath());
+                    log.debug("Successfully deleted builder-specific directory: {}", executionSpecificDir.getAbsolutePath());
                 }
             } else {
-                // In debug mode, the execution-specific directory is intentionally preserved for troubleshooting.
-                // Note: These directories will accumulate over time and may require periodic manual cleanup.
-                log.debug("Debug mode enabled; not cleaning up execution-specific directory: {}", executionSpecificDir.getAbsolutePath());
+                // In debug mode the per-builder directory is intentionally preserved for troubleshooting.
+                // Sibling directories of the same Rundeck execution share the ansible-exec-<execId>-* prefix
+                // for easy filtering. These directories will accumulate over time and may require periodic
+                // manual cleanup.
+                log.debug("Debug mode enabled; not cleaning up builder-specific directory: {}", executionSpecificDir.getAbsolutePath());
             }
         }
     }
@@ -1145,16 +1156,25 @@ public class AnsibleRunnerContextBuilder {
     }
 
     /**
-     * Creates and returns an execution-specific temporary directory path.
-     * This ensures that each execution has its own isolated directory for inventory and group_vars,
-     * preventing conflicts when multiple workflow step executions run in parallel.
+     * Creates and returns a builder-specific temporary directory path.
      *
-     * @return The path to the execution-specific directory
+     * <p>Each builder receives a unique flat directory directly under the configured base tmp
+     * dir, named {@code ansible-exec-<executionId>-builder-<rand>/}. The directory is created
+     * atomically with {@link Files#createTempDirectory(java.nio.file.Path, String, java.nio.file.attribute.FileAttribute[])},
+     * which guarantees uniqueness without any coordination between sibling threads sharing the
+     * same Rundeck executionId.</p>
+     *
+     * <p>The {@code ansible-exec-<executionId>} prefix preserves the ability to filter all
+     * directories belonging to a given Rundeck execution (useful in debug mode), while keeping
+     * each directory exclusively owned by a single builder. Recursive cleanup of one builder's
+     * directory cannot affect siblings.</p>
+     *
+     * @return The absolute path to the builder-specific directory
      */
     String getExecutionSpecificTmpDir() {
         // Return cached directory if already created
         if (executionSpecificDir != null) {
-            log.debug("Using cached execution-specific directory: {}", executionSpecificDir.getAbsolutePath());
+            log.debug("Using cached builder-specific directory: {}", executionSpecificDir.getAbsolutePath());
             return executionSpecificDir.getAbsolutePath();
         }
 
@@ -1169,18 +1189,17 @@ public class AnsibleRunnerContextBuilder {
         // Get base tmp directory
         String baseTmpDir = AnsibleUtil.getCustomTmpPathDir(framework);
 
-        // Create execution-specific directory
         if (executionId != null && !executionId.isEmpty()) {
-            executionSpecificDir = new File(baseTmpDir, "ansible-exec-" + executionId);
-            log.debug("Creating execution-specific directory: {}", executionSpecificDir.getAbsolutePath());
+            // Atomic + unique by construction. No coordination needed between sibling threads
+            // sharing the same Rundeck executionId. The executionId prefix lets operators filter
+            // all directories belonging to a given Rundeck execution with a single glob.
             try {
-                // Use Files.createDirectories() which is idempotent (safe to call if directory exists)
-                // and handles race conditions properly. Unlike mkdirs(), it doesn't return false
-                // when the directory already exists - it only throws IOException on actual failure.
-                Files.createDirectories(executionSpecificDir.toPath());
-                log.debug("Successfully ensured execution-specific directory exists: {}", executionSpecificDir.getAbsolutePath());
+                executionSpecificDir = Files
+                        .createTempDirectory(Paths.get(baseTmpDir), "ansible-exec-" + executionId + "-builder-")
+                        .toFile();
+                log.debug("Created builder-specific directory: {}", executionSpecificDir.getAbsolutePath());
             } catch (IOException e) {
-                String errorMsg = "Failed to create execution-specific directory: " + executionSpecificDir.getAbsolutePath();
+                String errorMsg = "Failed to create builder-specific directory under: " + baseTmpDir;
                 log.error(errorMsg, e);
                 throw new IllegalStateException(errorMsg, e);
             }
