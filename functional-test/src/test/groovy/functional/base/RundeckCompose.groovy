@@ -40,6 +40,30 @@ class RundeckCompose extends DockerComposeContainer<RundeckCompose> {
         return client
     }
 
+    /**
+     * Dump recent Rundeck service logs to stderr (e.g. after failed project import). Only works while compose is up.
+     */
+    void appendRundeckContainerLogsToStdErr(String header, int maxChars = 120_000) {
+        try {
+            def opt = getContainerByServiceName("rundeck")
+            if (!opt.isPresent()) {
+                System.err.println("${header}\n(no rundeck service container in compose state)")
+                return
+            }
+            String logs = opt.get().getLogs()
+            if (logs == null) {
+                System.err.println("${header}\n(logs null)")
+                return
+            }
+            if (logs.length() > maxChars) {
+                int start = logs.length() - maxChars
+                logs = "(truncated to last ${maxChars} chars of ${logs.length()})\n" + logs.substring(start)
+            }
+            System.err.println("${header}\n${logs}")
+        } catch (Exception e) {
+            System.err.println("${header}\n(could not read container logs: ${e.class.name}: ${e.message})")
+        }
+    }
 
     static class TestLogger implements Client.Logger {
         @Override

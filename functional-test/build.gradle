@@ -37,12 +37,10 @@ dependencies {
 tasks.register('functionalTest', Test) {
     useJUnitPlatform()
 
-    // Rundeck test image version
-    // Minimum supported Rundeck version for this plugin: 5.1.1 (see main README/changelog).
-    // Functional tests intentionally run against a newer version, Rundeck 5.18.0, to validate
-    // compatibility with current releases. When raising the minimum supported version, update
-    // this test image tag in tandem.
-    systemProperty('RUNDECK_TEST_IMAGE', "rundeck/rundeck:5.18.0")
+    // Rundeck Docker image tag must match `rundeck-core` in ../gradle/libs.versions.toml (single source of truth).
+    systemProperty('RUNDECK_TEST_IMAGE', "rundeck/rundeck:${libs.versions.rundeck.core.get()}")
+    // Project archive manifest must match server generation; see TestUtil.createArchiveJarFile
+    systemProperty('RUNDECK_ARCHIVE_APP_VERSION', libs.versions.rundeck.core.get())
 
     // Docker configuration for Testcontainers
     // For Rancher Desktop on macOS: Use /Users/<username>/.rd/docker.sock
@@ -51,6 +49,16 @@ tasks.register('functionalTest', Test) {
     // You can also configure this via ~/.testcontainers.properties (see functional-test/README.md)
 
     description = "Run Ansible integration tests"
+
+    // CI / local: surface Spock stderr (e.g. ProjectImportStatus JSON) and full stack traces in console + tee logs
+    testLogging {
+        events 'failed', 'passed', 'skipped', 'standard_out', 'standard_error'
+        exceptionFormat 'full'
+        showExceptions true
+        showCauses true
+        showStackTraces true
+        showStandardStreams true
+    }
 }
 
 tasks.register('copyPluginArtifact', Copy) {

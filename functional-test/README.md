@@ -5,8 +5,8 @@ This directory contains functional tests for the Rundeck Ansible plugin using Te
 ## Prerequisites
 
 - Docker (Docker Desktop or Rancher Desktop)
-- Java 11 or later
-- Gradle 7.2 or later
+- Java 17
+- Gradle 8
 
 ## Docker Configuration
 
