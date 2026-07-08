@@ -1,6 +1,7 @@
 package com.rundeck.plugins.ansible.ansible
 
 import com.dtolabs.rundeck.core.common.Framework
+import com.dtolabs.rundeck.core.common.INodeEntry
 import com.dtolabs.rundeck.core.common.INodeSet
 import com.dtolabs.rundeck.core.execution.ExecutionContext
 import com.dtolabs.rundeck.core.execution.ExecutionLogger
@@ -253,6 +254,185 @@ class AnsibleRunnerContextBuilderSpec extends Specification {
 
         and: "no leftover ansible-exec-55555-builder-* directories remain after cleanup"
         baseTmpDir.listFiles({ f -> f.name.startsWith("ansible-exec-55555-builder-") } as FileFilter).length == 0
+    }
+
+    // -------------------------------------------------------------------------
+    // getBaseDir() — property resolution hierarchy (RUN-4228)
+    // Priority: jobConf > node attribute > project property > framework property
+    // -------------------------------------------------------------------------
+
+    private AnsibleRunnerContextBuilder baseDirBuilder(Map params = [:]) {
+        def jobConf = (params.jobConf ?: [:]) as Map<String, Object>
+        INodeEntry node = params.node as INodeEntry
+        String projectValue = params.projectValue
+        String frameworkValue = params.frameworkValue
+        Map dataContext = params.dataContext ?: [:]
+
+        def propertyLookup = Mock(PropertyLookup)
+        propertyLookup.getProperty("framework.tmp.dir") >> baseTmpDir.absolutePath
+
+        def framework = Mock(Framework)
+        framework.getPropertyLookup() >> propertyLookup
+        // Mock returns false/null by default for unmatched calls — only stub what each test needs
+
+        if (projectValue != null) {
+            framework.hasProjectProperty(
+                AnsibleDescribable.PROJ_PROP_PREFIX + AnsibleDescribable.ANSIBLE_BASE_DIR_PATH,
+                'test-project'
+            ) >> true
+            framework.getProjectProperty(
+                'test-project',
+                AnsibleDescribable.PROJ_PROP_PREFIX + AnsibleDescribable.ANSIBLE_BASE_DIR_PATH
+            ) >> projectValue
+        }
+
+        if (frameworkValue != null) {
+            framework.hasProperty(
+                AnsibleDescribable.FWK_PROP_PREFIX + AnsibleDescribable.ANSIBLE_BASE_DIR_PATH
+            ) >> true
+            framework.getProperty(
+                AnsibleDescribable.FWK_PROP_PREFIX + AnsibleDescribable.ANSIBLE_BASE_DIR_PATH
+            ) >> frameworkValue
+        }
+
+        def execContext = Mock(ExecutionContext)
+        execContext.getDataContext() >> dataContext
+        execContext.getFrameworkProject() >> 'test-project'
+
+        if (node != null) {
+            return new AnsibleRunnerContextBuilder(node, execContext, framework, jobConf)
+        }
+
+        def nodeSet = Mock(INodeSet)
+        nodeSet.getNodes() >> []
+        return new AnsibleRunnerContextBuilder(execContext, framework, nodeSet, jobConf)
+    }
+
+    def "getBaseDir returns null when not configured at any level"() {
+        expect:
+        baseDirBuilder().getBaseDir() == null
+    }
+
+    def "getBaseDir returns value from job configuration"() {
+        given:
+        def builder = baseDirBuilder(jobConf: [(AnsibleDescribable.ANSIBLE_BASE_DIR_PATH): '/job/playbooks'])
+
+        expect:
+        builder.getBaseDir() == '/job/playbooks'
+    }
+
+    def "getBaseDir returns project-level property when not set in job config"() {
+        given:
+        def builder = baseDirBuilder(projectValue: '/project/playbooks')
+
+        expect:
+        builder.getBaseDir() == '/project/playbooks'
+    }
+
+    def "getBaseDir returns framework-level property when neither job config nor project is set"() {
+        given:
+        def builder = baseDirBuilder(frameworkValue: '/framework/playbooks')
+
+        expect:
+        builder.getBaseDir() == '/framework/playbooks'
+    }
+
+    def "getBaseDir returns node attribute when set and job config is empty"() {
+        given:
+        def node = Mock(INodeEntry) {
+            getAttributes() >> [(AnsibleDescribable.ANSIBLE_BASE_DIR_PATH): '/node/playbooks']
+        }
+        def builder = baseDirBuilder(node: node)
+
+        expect:
+        builder.getBaseDir() == '/node/playbooks'
+    }
+
+    def "getBaseDir job config takes precedence over project property"() {
+        given:
+        def builder = baseDirBuilder(
+            jobConf: [(AnsibleDescribable.ANSIBLE_BASE_DIR_PATH): '/job/playbooks'],
+            projectValue: '/project/playbooks'
+        )
+
+        expect:
+        builder.getBaseDir() == '/job/playbooks'
+    }
+
+    def "getBaseDir project property takes precedence over framework property"() {
+        given:
+        def builder = baseDirBuilder(
+            projectValue: '/project/playbooks',
+            frameworkValue: '/framework/playbooks'
+        )
+
+        expect:
+        builder.getBaseDir() == '/project/playbooks'
+    }
+
+    def "getBaseDir node attribute takes precedence over project property"() {
+        given:
+        def node = Mock(INodeEntry) {
+            getAttributes() >> [(AnsibleDescribable.ANSIBLE_BASE_DIR_PATH): '/node/playbooks']
+        }
+        def builder = baseDirBuilder(node: node, projectValue: '/project/playbooks')
+
+        expect:
+        builder.getBaseDir() == '/node/playbooks'
+    }
+
+    def "getBaseDir falls back to PluginGroup when no property is set at any other level"() {
+        given:
+        def pluginGroup = new AnsiblePluginGroup()
+        pluginGroup.setAnsibleBaseDirPath('/plugingroup/playbooks')
+
+        def propertyLookup = Mock(PropertyLookup)
+        propertyLookup.getProperty("framework.tmp.dir") >> baseTmpDir.absolutePath
+        def framework = Mock(Framework) { getPropertyLookup() >> propertyLookup }
+        def execContext = Mock(ExecutionContext) {
+            getDataContext() >> [:]
+            getFrameworkProject() >> 'test-project'
+            getExecutionLogger() >> Mock(ExecutionLogger)
+        }
+        def nodeSet = Mock(INodeSet) { getNodes() >> [] }
+        def builder = new AnsibleRunnerContextBuilder(execContext, framework, nodeSet, [:], pluginGroup)
+
+        expect:
+        builder.getBaseDir() == '/plugingroup/playbooks'
+    }
+
+    def "getBaseDir job config takes precedence over PluginGroup"() {
+        given:
+        def pluginGroup = new AnsiblePluginGroup()
+        pluginGroup.setAnsibleBaseDirPath('/plugingroup/playbooks')
+
+        def propertyLookup = Mock(PropertyLookup)
+        propertyLookup.getProperty("framework.tmp.dir") >> baseTmpDir.absolutePath
+        def framework = Mock(Framework) { getPropertyLookup() >> propertyLookup }
+        def execContext = Mock(ExecutionContext) {
+            getDataContext() >> [:]
+            getFrameworkProject() >> 'test-project'
+        }
+        def nodeSet = Mock(INodeSet) { getNodes() >> [] }
+        def builder = new AnsibleRunnerContextBuilder(
+            execContext, framework, nodeSet,
+            [(AnsibleDescribable.ANSIBLE_BASE_DIR_PATH): '/job/playbooks'],
+            pluginGroup
+        )
+
+        expect:
+        builder.getBaseDir() == '/job/playbooks'
+    }
+
+    def "getBaseDir interpolates data context variables in the path"() {
+        given:
+        def builder = baseDirBuilder(
+            jobConf: [(AnsibleDescribable.ANSIBLE_BASE_DIR_PATH): '/opt/ansible/${job.project}/playbooks'],
+            dataContext: ['job': ['project': 'my-project']]
+        )
+
+        expect:
+        builder.getBaseDir() == '/opt/ansible/my-project/playbooks'
     }
 
     def "debug mode preserves the per-builder directory"() {

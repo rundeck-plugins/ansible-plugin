@@ -780,10 +780,23 @@ public class AnsibleRunnerContextBuilder {
                 getJobConf()
         );
 
-        if (null != baseDir && baseDir.contains("${")) {
-            return DataContextUtils.replaceDataReferencesInString(baseDir, getContext().getDataContext());
+        if (null == baseDir || baseDir.isEmpty()) {
+            if (this.pluginGroup != null && this.pluginGroup.getAnsibleBaseDirPath() != null && !this.pluginGroup.getAnsibleBaseDirPath().isEmpty()) {
+                this.context.getExecutionLogger().log(
+                        4, "plugin group set getAnsibleBaseDirPath: " + this.pluginGroup.getAnsibleBaseDirPath()
+                );
+                baseDir = this.pluginGroup.getAnsibleBaseDirPath();
+            }
         }
-        return baseDir;
+
+        String resolved;
+        if (null != baseDir && baseDir.contains("${")) {
+            resolved = DataContextUtils.replaceDataReferencesInString(baseDir, getContext().getDataContext());
+        } else {
+            resolved = baseDir;
+        }
+        log.debug("[ansible] base-dir-path resolved to: {}", resolved != null ? resolved : "(not configured)");
+        return resolved;
     }
 
     public String getBinariesFilePath() {
