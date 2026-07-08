@@ -205,6 +205,8 @@ class BaseTestConfiguration extends Specification{
             sleep(3000)
             result = client.apiCall { api -> api.listNodes(projectName, ".*") }
         }
+        assert result.get(nodeName) != null,
+            "Node '${nodeName}' did not become available within 3 minutes in project '${projectName}'"
     }
 
     private void touchProjectConfigTime(String projectName) {

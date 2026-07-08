@@ -53,7 +53,7 @@ services:
     build:
       context: rundeck
       args:
-        RUNDECK_IMAGE: rundeck/rundeck:SNAPSHOT
+        RUNDECK_IMAGE: ${RUNDECK_IMAGE:-rundeck/rundeck:SNAPSHOT}
     image: rundeck-ansible-plugin:latest
     command: "-Dansible.debug=false"
     environment:
