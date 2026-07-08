@@ -31,6 +31,14 @@ public class AnsiblePluginGroup implements PluginGroup, Describable {
         this.ansibleBinariesDirPath = ansibleBinariesDirPath;
     }
 
+    public String getAnsibleBaseDirPath() {
+        return ansibleBaseDirPath;
+    }
+
+    public void setAnsibleBaseDirPath(String ansibleBaseDirPath) {
+        this.ansibleBaseDirPath = ansibleBaseDirPath;
+    }
+
     public Boolean getEncryptExtraVars() {
         return encryptExtraVars;
     }
@@ -50,6 +58,12 @@ public class AnsiblePluginGroup implements PluginGroup, Describable {
             description = "Set ansible binaries directory path."
     )
     String ansibleBinariesDirPath;
+
+    @PluginProperty(
+            title = "Ansible base directory path",
+            description = "Set ansible base directory path."
+    )
+    String ansibleBaseDirPath;
 
     @PluginProperty(
             title = "Encrypt Extra Vars.",

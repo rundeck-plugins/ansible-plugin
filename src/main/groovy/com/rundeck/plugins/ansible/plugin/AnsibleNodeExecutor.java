@@ -35,6 +35,7 @@ public class AnsibleNodeExecutor implements NodeExecutor, AnsibleDescribable, Pr
         builder.property(EXECUTABLE_PROP);
         builder.property(WINDOWS_EXECUTABLE_PROP);
         builder.property(CONFIG_FILE_PATH);
+        builder.property(BASE_DIR_PROP);
         builder.property(GENERATE_INVENTORY_PROP);
         builder.property(GENERATE_INVENTORY_NODES_AUTH);
         builder.property(SSH_AUTH_TYPE_PROP);
@@ -62,6 +63,8 @@ public class AnsibleNodeExecutor implements NodeExecutor, AnsibleDescribable, Pr
         builder.frameworkMapping(ANSIBLE_WINDOWS_EXECUTABLE,FWK_PROP_PREFIX + ANSIBLE_WINDOWS_EXECUTABLE);
         builder.mapping(ANSIBLE_CONFIG_FILE_PATH,PROJ_PROP_PREFIX + ANSIBLE_CONFIG_FILE_PATH);
         builder.frameworkMapping(ANSIBLE_CONFIG_FILE_PATH,FWK_PROP_PREFIX + ANSIBLE_CONFIG_FILE_PATH);
+        builder.mapping(ANSIBLE_BASE_DIR_PATH,PROJ_PROP_PREFIX + ANSIBLE_BASE_DIR_PATH);
+        builder.frameworkMapping(ANSIBLE_BASE_DIR_PATH,FWK_PROP_PREFIX + ANSIBLE_BASE_DIR_PATH);
         builder.mapping(ANSIBLE_GENERATE_INVENTORY,PROJ_PROP_PREFIX + ANSIBLE_GENERATE_INVENTORY);
         builder.frameworkMapping(ANSIBLE_GENERATE_INVENTORY,FWK_PROP_PREFIX + ANSIBLE_GENERATE_INVENTORY);
         builder.mapping(ANSIBLE_GENERATE_INVENTORY_NODES_AUTH,PROJ_PROP_PREFIX + ANSIBLE_GENERATE_INVENTORY_NODES_AUTH);
