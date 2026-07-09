@@ -1022,6 +1022,26 @@ public class AnsibleRunnerContextBuilder {
         return options;
     }
 
+    public Map<String,String> getJobOptions(){
+        Map<String, String> options = new HashMap<>();
+        
+        if (context == null || context.getDataContext() == null) {
+            return options;
+        }
+
+        Map<String, String> jobOptions = context.getDataContext().get("job");
+        if (jobOptions == null) {
+            return options;
+        }
+
+        for (Map.Entry<String, String> entry : jobOptions.entrySet()) {
+            if (entry.getValue() != null) {
+                options.put("RD_JOB_" + entry.getKey().toUpperCase(Locale.ROOT), entry.getValue());
+            }
+        }
+        return options;
+    }
+
     /**
      * Returns a map of node names to their respective authentication details.
      * Each entry in the outer map corresponds to a node, with the key being the node name
