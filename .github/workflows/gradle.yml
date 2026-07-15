@@ -44,7 +44,7 @@ jobs:
           ls -la functional-test/build/ci-reports/ 2>/dev/null || echo "(missing)"
       - name: Upload functional test reports and logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ansible-functional-test-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
@@ -58,7 +58,7 @@ jobs:
         id: get_version
         run: VERSION=$(./gradlew currentVersion -q -Prelease.quiet) && echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
       - name: Upload plugin jar
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           # Artifact name
           name: Grails-Plugin-${{ steps.get_version.outputs.VERSION }}
