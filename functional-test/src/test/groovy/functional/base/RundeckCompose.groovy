@@ -15,6 +15,12 @@ class RundeckCompose extends DockerComposeContainer<RundeckCompose> {
     RundeckCompose(URI composeFilePath) {
         super(new File(composeFilePath))
 
+        // Testcontainers 1.19.0's DockerComposeContainer defaults to spinning up a containerized
+        // `docker/compose:1.29.2` image to run compose, rather than using the compose binary already
+        // on the host. That image is long EOL and fails to start on current GitHub Actions runners.
+        // Force local compose so it shells out to the runner's installed docker compose instead.
+        withLocalCompose(true)
+
         withExposedService("rundeck", 4440,
                 Wait.forHttp("/api/41/system/info").forStatusCode(403).withStartupTimeout(Duration.ofMinutes(5))
         )
