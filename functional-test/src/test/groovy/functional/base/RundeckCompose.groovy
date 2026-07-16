@@ -3,17 +3,22 @@ package functional.base
 import org.rundeck.client.RundeckClient
 import org.rundeck.client.api.RundeckApi
 import org.rundeck.client.util.Client
-import org.testcontainers.containers.DockerComposeContainer
+import org.testcontainers.containers.ComposeContainer
 import org.testcontainers.containers.wait.strategy.Wait
 import java.time.Duration
 
-class RundeckCompose extends DockerComposeContainer<RundeckCompose> {
+class RundeckCompose extends ComposeContainer {
 
     public static final String RUNDECK_IMAGE = System.getenv("RUNDECK_TEST_IMAGE") ?: System.getProperty("RUNDECK_TEST_IMAGE")
 
 
     RundeckCompose(URI composeFilePath) {
         super(new File(composeFilePath))
+
+        // GitHub Actions runners only ship the `docker compose` (V2) plugin, not the legacy
+        // `docker-compose` binary or a working containerized compose fallback. ComposeContainer's
+        // local mode shells out to `docker compose`, which the runner actually has on its PATH.
+        withLocalCompose(true)
 
         withExposedService("rundeck", 4440,
                 Wait.forHttp("/api/41/system/info").forStatusCode(403).withStartupTimeout(Duration.ofMinutes(5))
