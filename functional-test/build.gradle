@@ -26,6 +26,10 @@ dependencies {
     testImplementation libs.testcontainers.spock
     testImplementation libs.rd.api.client
 
+    // Without an SLF4J binding, Testcontainers' Docker Compose process output (and failure
+    // reasons from `docker compose up -d`) silently vanish into the NOP logger.
+    testImplementation libs.slf4j.simple
+
     testImplementation libs.jsch
 
     // Security: Explicit inclusion of secure versions to override transitive dependencies
