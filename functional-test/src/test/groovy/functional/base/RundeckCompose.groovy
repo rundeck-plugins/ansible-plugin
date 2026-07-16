@@ -3,11 +3,11 @@ package functional.base
 import org.rundeck.client.RundeckClient
 import org.rundeck.client.api.RundeckApi
 import org.rundeck.client.util.Client
-import org.testcontainers.containers.DockerComposeContainer
+import org.testcontainers.containers.ComposeContainer
 import org.testcontainers.containers.wait.strategy.Wait
 import java.time.Duration
 
-class RundeckCompose extends DockerComposeContainer<RundeckCompose> {
+class RundeckCompose extends ComposeContainer {
 
     public static final String RUNDECK_IMAGE = System.getenv("RUNDECK_TEST_IMAGE") ?: System.getProperty("RUNDECK_TEST_IMAGE")
 
@@ -15,10 +15,9 @@ class RundeckCompose extends DockerComposeContainer<RundeckCompose> {
     RundeckCompose(URI composeFilePath) {
         super(new File(composeFilePath))
 
-        // Testcontainers 1.19.0's DockerComposeContainer defaults to spinning up a containerized
-        // `docker/compose:1.29.2` image to run compose, rather than using the compose binary already
-        // on the host. That image is long EOL and fails to start on current GitHub Actions runners.
-        // Force local compose so it shells out to the runner's installed docker compose instead.
+        // GitHub Actions runners only ship the `docker compose` (V2) plugin, not the legacy
+        // `docker-compose` binary or a working containerized compose fallback. ComposeContainer's
+        // local mode shells out to `docker compose`, which the runner actually has on its PATH.
         withLocalCompose(true)
 
         withExposedService("rundeck", 4440,
