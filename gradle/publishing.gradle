@@ -5,18 +5,10 @@
  * publishDescription = 'description' (optional)
  * githubSlug = Github slug e.g. 'rundeck/rundeck-cli'
  * developers = [ [id:'id', name:'name', email: 'email' ] ] list of developers
- *
- * Define project properties to sign and publish when invoking publish task:
- *
- *     ./gradlew \
- *     -PsigningKey="base64 encoded gpg key" \
- *     -PsigningPassword="password for key" \
- *     -PsonatypeUsername="sonatype token user" \
- *     -PsonatypePassword="sonatype token password" \
- *     publishToSonatype closeAndReleaseSonatypeStagingRepository
  */
 apply plugin: 'maven-publish'
-apply plugin: 'signing'
+
+def pkgcldRepoUrl = System.getenv("PKGCLD_REPO_URL")?.trim()
 
 publishing {
     publications {
@@ -56,31 +48,20 @@ publishing {
         }
     }
     repositories {
-        def pkgcldWriteToken = System.getenv("PKGCLD_WRITE_TOKEN") ?: project.findProperty("pkgcldWriteToken")
-        if (pkgcldWriteToken) {
+        // Only register the PackageCloud repo when its URL is configured, so plain
+        // builds/tests (which don't set PKGCLD_REPO_URL) don't fail at configuration time.
+        if (pkgcldRepoUrl) {
             maven {
-                name = "PackageCloudTest"
-                url = uri("https://packagecloud.io/pagerduty/rundeckpro-test/maven2")
+                name = "PackageCloud"
+                url = uri(pkgcldRepoUrl)
                 authentication {
                     header(HttpHeaderAuthentication)
                 }
                 credentials(HttpHeaderCredentials) {
                     name = "Authorization"
-                    value = "Bearer " + pkgcldWriteToken
+                    value = "Bearer " + (System.getenv("PKGCLD_WRITE_TOKEN") ?: project.findProperty("pkgcldWriteToken"))
                 }
             }
         }
-    }
-}
-def base64Decode = { String prop ->
-    project.findProperty(prop) ?
-            new String(Base64.getDecoder().decode(project.findProperty(prop).toString())).trim() :
-            null
-}
-
-if (project.hasProperty('signingKey') && project.hasProperty('signingPassword')) {
-    signing {
-        useInMemoryPgpKeys(base64Decode("signingKey"), project.signingPassword)
-        sign(publishing.publications)
     }
 }

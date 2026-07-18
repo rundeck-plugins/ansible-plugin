@@ -9,6 +9,8 @@ jobs:
   build:
     name: Publish Release
     runs-on: ubuntu-latest
+    env:
+      PKGCLD_REPO_URL: ${{ vars.PKGCLD_REPO_URL }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -33,10 +35,7 @@ jobs:
             build/libs/ansible-plugin-${{ steps.get_version.outputs.VERSION }}.jar
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Publish to Maven Central
-        run: ./gradlew -PsigningKey=${SIGNING_KEY_B64} -PsigningPassword=${SIGNING_PASSWORD} -PsonatypeUsername=${SONATYPE_USERNAME} -PsonatypePassword=${SONATYPE_PASSWORD} publishToSonatype closeAndReleaseSonatypeStagingRepository
+      - name: Publish to PackageCloud
+        run: ./gradlew publishAllPublicationsToPackageCloudRepository
         env:
-          SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
-          SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
-          SIGNING_KEY_B64: ${{ secrets.SIGNING_KEY_B64 }}
-          SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
+          PKGCLD_WRITE_TOKEN: ${{ secrets.PKGCLD_WRITE_TOKEN }}
