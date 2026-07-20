@@ -37,8 +37,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Publish to PackageCloud
         run: |
-          if [ -z "$PKGCLD_REPO_URL" ] || [ -z "$PKGCLD_WRITE_TOKEN" ]; then
-            echo "::error::PKGCLD_REPO_URL and PKGCLD_WRITE_TOKEN must both be set to publish to PackageCloud"
+          if [ -z "$PKGCLD_WRITE_TOKEN" ]; then
+            echo "::error::PKGCLD_WRITE_TOKEN must be set to publish to PackageCloud"
             exit 1
           fi
           ./gradlew publishAllPublicationsToPackageCloudRepository

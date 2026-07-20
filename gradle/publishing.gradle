@@ -8,7 +8,7 @@
  */
 apply plugin: 'maven-publish'
 
-def pkgcldRepoUrl = System.getenv("PKGCLD_REPO_URL")?.trim()
+def pkgcldRepoUrl = (System.getenv("PKGCLD_REPO_URL") ?: "https://packagecloud.io/pagerduty/rundeck-plugins/maven2").trim()
 
 publishing {
     publications {
@@ -48,19 +48,15 @@ publishing {
         }
     }
     repositories {
-        // Only register the PackageCloud repo when its URL is configured, so plain
-        // builds/tests (which don't set PKGCLD_REPO_URL) don't fail at configuration time.
-        if (pkgcldRepoUrl) {
-            maven {
-                name = "PackageCloud"
-                url = uri(pkgcldRepoUrl)
-                authentication {
-                    header(HttpHeaderAuthentication)
-                }
-                credentials(HttpHeaderCredentials) {
-                    name = "Authorization"
-                    value = "Bearer " + (System.getenv("PKGCLD_WRITE_TOKEN") ?: project.findProperty("pkgcldWriteToken"))
-                }
+        maven {
+            name = "PackageCloud"
+            url = uri(pkgcldRepoUrl)
+            authentication {
+                header(HttpHeaderAuthentication)
+            }
+            credentials(HttpHeaderCredentials) {
+                name = "Authorization"
+                value = "Bearer " + (System.getenv("PKGCLD_WRITE_TOKEN") ?: project.findProperty("pkgcldWriteToken"))
             }
         }
     }
