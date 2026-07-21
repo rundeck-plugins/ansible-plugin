@@ -9,6 +9,8 @@ jobs:
   build:
     name: Publish Release
     runs-on: ubuntu-latest
+    env:
+      PKGCLD_REPO_URL: ${{ vars.PKGCLD_REPO_URL }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -33,10 +35,38 @@ jobs:
             build/libs/ansible-plugin-${{ steps.get_version.outputs.VERSION }}.jar
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Publish to Maven Central
-        run: ./gradlew -PsigningKey=${SIGNING_KEY_B64} -PsigningPassword=${SIGNING_PASSWORD} -PsonatypeUsername=${SONATYPE_USERNAME} -PsonatypePassword=${SONATYPE_PASSWORD} publishToSonatype closeAndReleaseSonatypeStagingRepository
+      - name: Publish to PackageCloud
+        run: |
+          if [ -z "$PKGCLD_WRITE_TOKEN" ]; then
+            echo "::error::PKGCLD_WRITE_TOKEN must be set to publish to PackageCloud"
+            exit 1
+          fi
+          ./gradlew publishAllPublicationsToPackageCloudRepository
         env:
-          SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
-          SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
+          PKGCLD_WRITE_TOKEN: ${{ secrets.PKGCLD_WRITE_TOKEN }}
+      - name: Sign and upload GPG signatures to PackageCloud
+        run: |
+          set -e
+          VERSION="${{ steps.get_version.outputs.VERSION }}"
+          BASE_URL="${PKGCLD_REPO_URL:-https://packagecloud.io/pagerduty/rundeck-plugins/maven2}/org/rundeck/plugins/ansible-plugin/${VERSION}"
+
+          echo "$SIGNING_KEY_B64" | base64 -d | gpg --batch --yes --import
+          KEY_ID=$(gpg --list-secret-keys --with-colons | awk -F: '/^sec/ {print $5; exit}')
+
+          sign_and_upload() {
+            local FILE="$1"
+            local REMOTE_NAME="$2"
+            gpg --batch --yes --pinentry-mode loopback --passphrase "$SIGNING_PASSWORD" --default-key "$KEY_ID" --detach-sign --armor "$FILE"
+            curl -sf -H "Authorization: Bearer ${PKGCLD_WRITE_TOKEN}" \
+              -X PUT --data-binary "@${FILE}.asc" \
+              "${BASE_URL}/${REMOTE_NAME}.asc"
+          }
+
+          sign_and_upload "build/libs/ansible-plugin-${VERSION}.jar" "ansible-plugin-${VERSION}.jar"
+          sign_and_upload "build/libs/ansible-plugin-${VERSION}-sources.jar" "ansible-plugin-${VERSION}-sources.jar"
+          sign_and_upload "build/libs/ansible-plugin-${VERSION}-javadoc.jar" "ansible-plugin-${VERSION}-javadoc.jar"
+          sign_and_upload "build/publications/ansible-plugin/pom-default.xml" "ansible-plugin-${VERSION}.pom"
+        env:
           SIGNING_KEY_B64: ${{ secrets.SIGNING_KEY_B64 }}
           SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
+          PKGCLD_WRITE_TOKEN: ${{ secrets.PKGCLD_WRITE_TOKEN }}
