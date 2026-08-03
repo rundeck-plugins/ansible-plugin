@@ -1,9 +1,4 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
-    "config:recommended"
-  ],
-  "minimumReleaseAge": "4 days",
-  "commitMessagePrefix": "[RUN-0000] {{prettyTitle}}",
-  "internalChecksFilter": "flexible"
+  "extends": ["github>rundeck-plugins/.github"]
 }
