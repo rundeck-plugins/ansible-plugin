@@ -23,6 +23,10 @@ public class ProcessExecutor {
 
     private boolean debug;
 
+    // Terminator vault-client.py reads to know the password is complete, since the
+    // password itself may legitimately contain newlines and can no longer be used
+    // as the delimiter.
+    private static final int END_OF_TEXT = 3;
 
     public Process run() throws IOException {
 
@@ -66,17 +70,6 @@ public class ProcessExecutor {
 
     private void processPrompt(OutputStreamWriter stdinw, final VaultPrompt vaultPrompt) throws Exception {
         if(promptStdinLogFile!=null){
-            Thread stdinThread = new Thread(() -> {
-                try {
-                    stdinw.write(vaultPrompt.getVaultPassword());
-                    stdinw.write(3); // end of text
-                    stdinw.flush();
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-            }
-            );
-
             //wait for prompt
             boolean promptFound = false;
             long start = System.currentTimeMillis();
@@ -93,8 +86,13 @@ public class ProcessExecutor {
                         System.out.println(currentLine);
                     }
                     promptFound = true;
-                    //send password / content
-                    stdinThread.start();
+                    // Send password/content synchronously -- run() closes stdinw right
+                    // after processPrompt() returns, so writing from a background
+                    // thread here (as before) raced that close and could truncate
+                    // the write.
+                    stdinw.write(vaultPrompt.getVaultPassword());
+                    stdinw.write(END_OF_TEXT);
+                    stdinw.flush();
                 }
                 Thread.sleep(2000);
             }
