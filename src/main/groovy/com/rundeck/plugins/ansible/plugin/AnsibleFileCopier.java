@@ -40,6 +40,7 @@ public class AnsibleFileCopier implements FileCopier, AnsibleDescribable, ProxyR
         builder.property(BINARIES_DIR_PATH_PROP);
         builder.property(INVENTORY_INLINE_PROP);
         builder.property(CONFIG_FILE_PATH);
+        builder.property(BASE_DIR_PROP);
         builder.property(SSH_AUTH_TYPE_PROP);
          builder.property(SSH_USER_PROP);
         builder.property(SSH_PASSWORD_STORAGE_PROP);
@@ -56,8 +57,12 @@ public class AnsibleFileCopier implements FileCopier, AnsibleDescribable, ProxyR
         builder.property(VAULT_KEY_FILE_PROP);
         builder.property(VAULT_KEY_STORAGE_PROP);
 
+        builder.mapping(ANSIBLE_BINARIES_DIR_PATH,PROJ_PROP_PREFIX + ANSIBLE_BINARIES_DIR_PATH);
+        builder.frameworkMapping(ANSIBLE_BINARIES_DIR_PATH,FWK_PROP_PREFIX + ANSIBLE_BINARIES_DIR_PATH);
         builder.mapping(ANSIBLE_CONFIG_FILE_PATH,PROJ_PROP_PREFIX + ANSIBLE_CONFIG_FILE_PATH);
         builder.frameworkMapping(ANSIBLE_CONFIG_FILE_PATH,FWK_PROP_PREFIX + ANSIBLE_CONFIG_FILE_PATH);
+        builder.mapping(ANSIBLE_BASE_DIR_PATH,PROJ_PROP_PREFIX + ANSIBLE_BASE_DIR_PATH);
+        builder.frameworkMapping(ANSIBLE_BASE_DIR_PATH,FWK_PROP_PREFIX + ANSIBLE_BASE_DIR_PATH);
         builder.mapping(ANSIBLE_VAULT_PATH,PROJ_PROP_PREFIX + ANSIBLE_VAULT_PATH);
         builder.frameworkMapping(ANSIBLE_VAULT_PATH,FWK_PROP_PREFIX + ANSIBLE_VAULT_PATH);
         builder.mapping(ANSIBLE_VAULTSTORE_PATH,PROJ_PROP_PREFIX + ANSIBLE_VAULTSTORE_PATH);

@@ -59,6 +59,9 @@ public class AnsiblePlaybookWorflowNodeStep implements NodeStepPlugin, AnsibleDe
         builder.property(BECOME_USER_PROP);
         builder.property(BECOME_PASSWORD_STORAGE_PROP);
 
+        builder.mapping(ANSIBLE_BASE_DIR_PATH,PROJ_PROP_PREFIX + ANSIBLE_BASE_DIR_PATH);
+        builder.frameworkMapping(ANSIBLE_BASE_DIR_PATH,FWK_PROP_PREFIX + ANSIBLE_BASE_DIR_PATH);
+
         DESC=builder.build();
     }
 

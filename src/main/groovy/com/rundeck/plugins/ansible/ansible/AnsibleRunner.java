@@ -694,6 +694,10 @@ public class AnsibleRunner {
                 processExecutorBuilder.baseDirectory(baseDirectory.toFile());
             }
 
+            if (debug) {
+                System.out.println(" ansible-base-dir: " + (baseDirectory != null ? baseDirectory.toAbsolutePath() : "(not configured, using tmp dir)"));
+            }
+
             //SET env variables
             Map<String, String> processEnvironment = new HashMap<>();
 
