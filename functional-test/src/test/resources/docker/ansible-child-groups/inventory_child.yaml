@@ -1,0 +1,27 @@
+ungrouped:
+  hosts:
+    mail.example.com:
+webservers:
+  hosts:
+    foo.example.com:
+    bar.example.com:
+dbservers:
+  hosts:
+    one.example.com:
+    two.example.com:
+    three.example.com:
+east:
+  hosts:
+    foo.example.com:
+    one.example.com:
+    two.example.com:
+west:
+  hosts:
+    bar.example.com:
+    three.example.com:
+prod:
+  children:
+    east:
+test:
+  children:
+    west:

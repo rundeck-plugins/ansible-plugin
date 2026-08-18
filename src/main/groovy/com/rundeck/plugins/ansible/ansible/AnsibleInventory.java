@@ -59,7 +59,7 @@ public class AnsibleInventory {
     for (String r: reserved){
       attributes.remove(r);
     }
-    all.addHost(nodeName, host, attributes);
+
     // Create Ansible groups by attribute
     // Group by osFamily is needed for windows hosts setup
     String[] attributeGroups = { "osFamily", "tags" };
@@ -67,10 +67,19 @@ public class AnsibleInventory {
       if (attributes.containsKey(g)) {
         String[] groupNames = attributes.get(g).toLowerCase().split(",");
         for (String groupName: groupNames) {
-          all.getOrAddChildHostGroup(groupName.trim()).addHost(nodeName);
+          // Sanitize group name: Ansible only allows letters, numbers, underscores, and hyphens
+          // Note: group names are already lowercased above, so we only need to match lowercase
+          // Replace invalid characters (like colons, spaces, special chars) with underscores
+          String sanitizedGroupName = groupName.trim().replaceAll("[^a-z0-9_\\-]", "_");
+          all.getOrAddChildHostGroup(sanitizedGroupName).addHost(nodeName);
         }
       }
     }
+
+    //remove "tags" since it's reserved in Ansible and we've already used it for grouping
+    attributes.remove("tags");
+
+    all.addHost(nodeName, host, attributes);
     return this;
   }
 }

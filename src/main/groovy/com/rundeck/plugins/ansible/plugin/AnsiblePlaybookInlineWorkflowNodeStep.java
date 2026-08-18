@@ -60,6 +60,9 @@ public class AnsiblePlaybookInlineWorkflowNodeStep implements NodeStepPlugin, An
         builder.property(BECOME_USER_PROP);
         builder.property(BECOME_PASSWORD_STORAGE_PROP);
 
+        builder.mapping(ANSIBLE_BASE_DIR_PATH,PROJ_PROP_PREFIX + ANSIBLE_BASE_DIR_PATH);
+        builder.frameworkMapping(ANSIBLE_BASE_DIR_PATH,FWK_PROP_PREFIX + ANSIBLE_BASE_DIR_PATH);
+
         DESC=builder.build();
     }
 
@@ -79,7 +82,9 @@ public class AnsiblePlaybookInlineWorkflowNodeStep implements NodeStepPlugin, An
         configuration.put(AnsibleDescribable.ANSIBLE_LIMIT,entry.getNodename());
 
         // set log level
-        if (context.getDataContext().get("job").get("loglevel").equals("DEBUG")) {
+        String loglevel = AnsibleUtil.getJobLogLevel(context);
+
+        if ("DEBUG".equals(loglevel)) {
             configuration.put(AnsibleDescribable.ANSIBLE_DEBUG,"True");
         } else {
             configuration.put(AnsibleDescribable.ANSIBLE_DEBUG,"False");
@@ -93,6 +98,7 @@ public class AnsiblePlaybookInlineWorkflowNodeStep implements NodeStepPlugin, An
 
         try {
             runner = AnsibleRunner.buildAnsibleRunner(contextBuilder);
+            runner.setCustomTmpDirPath(AnsibleUtil.getCustomTmpPathDir(contextBuilder.getFramework()));
         } catch (ConfigurationException e) {
             throw new NodeStepException("Error configuring Ansible runner: "+e.getMessage(), AnsibleException.AnsibleFailureReason.ParseArgumentsError,e.getMessage());
         }

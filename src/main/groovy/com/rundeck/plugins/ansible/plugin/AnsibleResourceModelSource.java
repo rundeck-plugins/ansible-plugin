@@ -24,11 +24,16 @@ import com.rundeck.plugins.ansible.ansible.AnsibleException;
 import com.rundeck.plugins.ansible.ansible.AnsibleInventoryList;
 import com.rundeck.plugins.ansible.ansible.AnsibleRunner;
 import com.rundeck.plugins.ansible.ansible.InventoryList;
+import com.rundeck.plugins.ansible.util.AnsibleUtil;
 import com.rundeck.plugins.ansible.util.VaultPrompt;
 import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.rundeck.app.spi.Services;
 import org.rundeck.storage.api.PathUtil;
 import org.rundeck.storage.api.StorageException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.SafeConstructor;
@@ -47,7 +52,6 @@ import java.nio.file.Paths;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -56,12 +60,45 @@ import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Set;
 
-import static com.rundeck.plugins.ansible.ansible.InventoryList.*;
+import static com.rundeck.plugins.ansible.ansible.AnsibleDescribable.ANSIBLE_YAML_DATA_SIZE;
+import static com.rundeck.plugins.ansible.ansible.AnsibleDescribable.ANSIBLE_YAML_MAX_ALIASES;
+import static com.rundeck.plugins.ansible.ansible.InventoryList.ALL;
+import static com.rundeck.plugins.ansible.ansible.InventoryList.CHILDREN;
+import static com.rundeck.plugins.ansible.ansible.InventoryList.HOSTS;
+import static com.rundeck.plugins.ansible.ansible.InventoryList.NodeTag;
 
+@Slf4j
 public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRunnerPlugin {
 
+  private static final Logger logger = LoggerFactory.getLogger(AnsibleResourceModelSource.class);
   public static final String HOST_TPL_J2 = "host-tpl.j2";
   public static final String GATHER_HOSTS_YML = "gather-hosts.yml";
+
+  // Ansible Special variables as of Ansible 2.9
+  // https://docs.ansible.com/ansible/latest/reference_appendices/special_variables.html
+  private static final List<String> ANSIBLE_SPECIAL_VARS = List.of(
+    "ansible_",  // most ansible vars prefix
+    "discovered_interpreter_python",
+    "facts",   // rundeck used to gather host_vars
+    "gather_subset",
+    "group_names",
+    "groups",
+    "hostvars",
+    "inventory_dir",
+    "inventory_file",
+    "inventory_hostname",
+    "inventory_hostname_short",
+    "module_setup",
+    "omit",
+    "play_hosts",
+    "playbook_dir",
+    "role_name",
+    "role_names",
+    "role_path",
+    "tmpdir"  // rundeck used to gather host_vars
+  );
+
+  private final Gson gson = new Gson();
 
   @Setter
   private Framework framework;
@@ -77,8 +114,6 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
 
   private String inventory;
   private boolean gatherFacts;
-  @Setter
-  private Integer yamlDataSize;
   private boolean ignoreErrors = false;
   private String limit;
   private String ignoreTagPrefix;
@@ -125,14 +160,23 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
 
   protected boolean encryptExtraVars = false;
 
+  protected  String customTmpDirPath;
+
+  @Setter
+  private Integer yamlDataSize;
+  @Setter
+  private Integer yamlMaxAliases;
+
   @Setter
   private AnsibleInventoryList.AnsibleInventoryListBuilder ansibleInventoryListBuilder = null;
+
+  private Map<String, NodeEntryImpl> ansibleNodes = new HashMap<>();
 
   public AnsibleResourceModelSource(final Framework framework) {
       this.framework = framework;
   }
 
-    private static String resolveProperty(
+  private static String resolveProperty(
             final String attribute,
             final String defaultValue,
             final Properties configuration,
@@ -180,12 +224,10 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     configDataContext.put("context", configdata);
     executionDataContext = ScriptDataContextUtil.createScriptDataContextForProject(framework, project);
     executionDataContext.putAll(configDataContext);
-
+    customTmpDirPath = AnsibleUtil.getCustomTmpPathDir(framework);
     inventory = resolveProperty(AnsibleDescribable.ANSIBLE_INVENTORY,null,configuration,executionDataContext);
     gatherFacts = "true".equals(resolveProperty(AnsibleDescribable.ANSIBLE_GATHER_FACTS,null,configuration,executionDataContext));
     ignoreErrors = "true".equals(resolveProperty(AnsibleDescribable.ANSIBLE_IGNORE_ERRORS,null,configuration,executionDataContext));
-
-    yamlDataSize = resolveIntProperty(AnsibleDescribable.ANSIBLE_YAML_DATA_SIZE,10, configuration, executionDataContext);
 
     limit = (String) resolveProperty(AnsibleDescribable.ANSIBLE_LIMIT,null,configuration,executionDataContext);
     ignoreTagPrefix = (String) resolveProperty(AnsibleDescribable.ANSIBLE_IGNORE_TAGS,null,configuration,executionDataContext);
@@ -242,6 +284,10 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
 
     encryptExtraVars = "true".equals(resolveProperty(AnsibleDescribable.ANSIBLE_ENCRYPT_EXTRA_VARS,"false",configuration,executionDataContext));
 
+    // Inventory Yaml
+    yamlDataSize = resolveIntProperty(ANSIBLE_YAML_DATA_SIZE,10, configuration, executionDataContext);
+    yamlMaxAliases = resolveIntProperty(ANSIBLE_YAML_MAX_ALIASES,1000, configuration, executionDataContext);
+
   }
 
   public AnsibleRunner.AnsibleRunnerBuilder buildAnsibleRunner() throws ResourceModelSourceException {
@@ -251,6 +297,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     if ("true".equals(System.getProperty("ansible.debug"))) {
       runnerBuilder.debug(true);
     }
+    runnerBuilder.customTmpDirPath(AnsibleUtil.getCustomTmpPathDir(framework));
 
     if (limit != null && limit.length() > 0) {
       List<String> limitList = new ArrayList<>();
@@ -411,7 +458,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     final Gson gson = new Gson();
     Path tempDirectory;
     try {
-      tempDirectory = Files.createTempDirectory("ansible-hosts");
+      tempDirectory = Files.createTempDirectory(Path.of(customTmpDirPath),"ansible-hosts");
     } catch (IOException e) {
       throw new ResourceModelSourceException("Error creating temporary directory: " + e.getMessage(), e);
     }
@@ -422,7 +469,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     } catch (IOException e) {
       throw new ResourceModelSourceException("Error copying files: " + e.getMessage(), e);
     }
-
+    runnerBuilder.customTmpDirPath(customTmpDirPath);
     runnerBuilder.tempDirectory(tempDirectory);
     runnerBuilder.retainTempDirectory(true);
 
@@ -608,33 +655,17 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
 
 
           if (importInventoryVars == true) {
-            // Add ALL vars as node attributes, except Ansible Special variables, as of Ansible 2.9
-            // https://docs.ansible.com/ansible/latest/reference_appendices/special_variables.html
-            List<String> specialVarsList = new ArrayList<>();
-            specialVarsList.add("ansible_");  // most ansible vars prefix
-            specialVarsList.add("discovered_interpreter_python");
-            specialVarsList.add("facts");   // rundeck used to gather host_vars
-            specialVarsList.add("gather_subset");
-            specialVarsList.add("group_names");
-            specialVarsList.add("groups");
-            specialVarsList.add("hostvars");
-            specialVarsList.add("inventory_dir");
-            specialVarsList.add("inventory_file");
-            specialVarsList.add("inventory_hostname");
-            specialVarsList.add("inventory_hostname_short");
-            specialVarsList.add("module_setup");
-            specialVarsList.add("omit");
-            specialVarsList.add("play_hosts");
-            specialVarsList.add("playbook_dir");
-            specialVarsList.add("role_name");
-            specialVarsList.add("role_names");
-            specialVarsList.add("role_path");
-            specialVarsList.add("tmpdir");  // rundeck used to gather host_vars
+            // Add ALL vars as node attributes, except Ansible Special variables
+            List<String> specialVarsList = new ArrayList<>(ANSIBLE_SPECIAL_VARS);
 
             if (ignoreInventoryVars != null && ignoreInventoryVars.length() > 0) {
               String[] ignoreInventoryVarsStrings = ignoreInventoryVars.split(",");
               for (String ignoreInventoryVarsString: ignoreInventoryVarsStrings) {
-                specialVarsList.add(ignoreInventoryVarsString.trim());
+                String trimmed = ignoreInventoryVarsString.trim();
+                // Only add non-empty strings to avoid matching everything
+                if (!trimmed.isEmpty()) {
+                  specialVarsList.add(trimmed);
+                }
               }
             }
 
@@ -695,9 +726,13 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     LoaderOptions snakeOptions = new LoaderOptions();
     // max inventory file size allowed to 10mb
     snakeOptions.setCodePointLimit(codePointLimit);
+    // max aliases. Default value is 1000
+    snakeOptions.setMaxAliasesForCollections(yamlMaxAliases);
     Yaml yaml = new Yaml(new SafeConstructor(snakeOptions));
 
     String listResp = getNodesFromInventory(runnerBuilder);
+
+    validateAliases(listResp);
 
     Map<String, Object> allInventory;
     try {
@@ -707,38 +742,185 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     }
 
     Map<String, Object> all = InventoryList.getValue(allInventory, ALL);
-    Map<String, Object> children = InventoryList.getValue(all, CHILDREN);
+
+    if (isTagMapValid(all, ALL)) {
+      Map<String, Object> children = InventoryList.getValue(all, CHILDREN);
+      processChildren(children, new HashSet<>());
+    }
+
+    ansibleNodes.forEach((k, node) -> nodes.putNode(node));
+    ansibleNodes.clear();
+  }
+
+  /**
+   * Processes the given set of nodes and populates the children map with the results.
+   *
+   * @param children a map to be populated with the processed children nodes
+   * @param tags    a set of tags to filter the nodes
+   * @throws ResourceModelSourceException if an error occurs while processing the nodes
+   */
+  public void processChildren(Map<String, Object> children, HashSet<String> tags) throws ResourceModelSourceException {
+    if (!isTagMapValid(children, CHILDREN)) {
+      return;
+    }
 
     for (Map.Entry<String, Object> pair : children.entrySet()) {
+
       String hostGroup = pair.getKey();
+      tags.add(hostGroup);
       Map<String, Object> hostNames = InventoryList.getType(pair.getValue());
-      Map<String, Object> hosts = InventoryList.getValue(hostNames, HOSTS);
 
-      for (Map.Entry<String, Object> hostNode : hosts.entrySet()) {
-        NodeEntryImpl node = new NodeEntryImpl();
-        node.setTags(Set.of(hostGroup));
-        String hostName = hostNode.getKey();
-        node.setHostname(hostName);
-        node.setNodename(hostName);
-        Map<String, Object> nodeValues = InventoryList.getType(hostNode.getValue());
-
-        InventoryList.tagHandle(NodeTag.HOSTNAME, node, nodeValues);
-        InventoryList.tagHandle(NodeTag.USERNAME, node, nodeValues);
-        InventoryList.tagHandle(NodeTag.OS_FAMILY, node, nodeValues);
-        InventoryList.tagHandle(NodeTag.OS_NAME, node, nodeValues);
-        InventoryList.tagHandle(NodeTag.OS_ARCHITECTURE, node, nodeValues);
-        InventoryList.tagHandle(NodeTag.OS_VERSION, node, nodeValues);
-        InventoryList.tagHandle(NodeTag.DESCRIPTION, node, nodeValues);
-
-        nodeValues.forEach((key, value) -> {
-          if (value != null) {
-            node.setAttribute(key, value.toString());
-          }
-        });
-
-        nodes.putNode(node);
+      if (hostNames.containsKey(CHILDREN)) {
+        Map<String, Object> subChildren = InventoryList.getValue(hostNames, CHILDREN);
+        processChildren(subChildren, tags);
+      } else {
+        processHosts(hostNames, tags);
+        tags.clear();
       }
     }
+  }
+
+  /**
+   * Processes the hosts within the given host names map and adds them to the nodes set.
+   *
+   * @param hostNames the map containing host names and their attributes
+   * @param tags      the set of tags to apply to the nodes
+   * @throws ResourceModelSourceException if an error occurs while processing the nodes
+   */
+  public void processHosts(Map<String, Object> hostNames, HashSet<String> tags) throws ResourceModelSourceException {
+    Map<String, Object> hosts = InventoryList.getValue(hostNames, HOSTS);
+
+    if (!isTagMapValid(hosts, HOSTS)) {
+      return;
+    }
+
+    for (Map.Entry<String, Object> hostNode : hosts.entrySet()) {
+      // Filter out invalid host keys that aren't Strings (can occur with YAML anchors/aliases)
+      Object hostKeyObj = hostNode.getKey();
+      if (hostKeyObj == null) {
+        log.warn("Skipping host entry with null key");
+        continue;
+      }
+      if (!(hostKeyObj instanceof String)) {
+        log.warn("Skipping invalid host entry with non-String key: {}", hostKeyObj.getClass().getName());
+        continue;
+      }
+
+      // Additional validation: skip keys that are JSON objects (likely serialized data structures)
+      String hostKey = (String) hostKeyObj;
+      try {
+        JsonElement jsonElement = JsonParser.parseString(hostKey);
+        if (jsonElement.isJsonObject()) {
+          log.warn("Skipping host entry with key that is a JSON object (likely serialized data): {}",
+                   hostKey.length() > 100 ? hostKey.substring(0, 100) + "..." : hostKey);
+          continue;
+        }
+      } catch (Exception e) {
+        // Not valid JSON - treat as a legitimate host key and continue processing
+      }
+
+      NodeEntryImpl node = createNodeEntry(hostNode);
+      addNode(node, tags);
+    }
+  }
+
+  /**
+   * Creates a NodeEntryImpl object from the given host node entry and tags.
+   *
+   * @param hostNode the entry containing the host name and its attributes
+   * @return the created NodeEntryImpl object
+   */
+  public NodeEntryImpl createNodeEntry(Map.Entry<String, Object> hostNode) throws ResourceModelSourceException {
+    NodeEntryImpl node = new NodeEntryImpl();
+    String hostName = hostNode.getKey();
+    node.setHostname(hostName);
+    node.setNodename(hostName);
+    Map<String, Object> nodeValues = InventoryList.getType(hostNode.getValue());
+
+    applyNodeTags(node, nodeValues);
+
+    if (importInventoryVars) {
+      // Build list of variables to ignore, matching processWithGatherFacts behavior
+      List<String> ignoreVarsList = new ArrayList<>(ANSIBLE_SPECIAL_VARS);
+
+      if (ignoreInventoryVars != null && ignoreInventoryVars.length() > 0) {
+        String[] ignoreInventoryVarsStrings = ignoreInventoryVars.split(",");
+        for (String ignoreInventoryVarsString: ignoreInventoryVarsStrings) {
+          String trimmed = ignoreInventoryVarsString.trim();
+          // Only add non-empty strings to avoid matching everything
+          if (!trimmed.isEmpty()) {
+            ignoreVarsList.add(trimmed);
+          }
+        }
+      }
+
+      nodeValues.forEach((key, value) -> {
+        // Skip variables that match ignored prefixes
+        if (skipVar(key, ignoreVarsList)) {
+          return;
+        }
+
+        if (value != null) {
+          if (value instanceof Map || value instanceof List) {
+            node.setAttribute(key, gson.toJson(value));
+          } else {
+            node.setAttribute(key, value.toString());
+          }
+        }
+      });
+    }
+
+    return node;
+  }
+
+  /**
+   * Applies predefined tags to the given node based on the provided node values.
+   *
+   * @param node       the node to which the tags will be applied
+   * @param nodeValues the map containing the node's attributes
+   */
+  public void applyNodeTags(NodeEntryImpl node, Map<String, Object> nodeValues) throws ResourceModelSourceException {
+    InventoryList.tagHandle(NodeTag.HOSTNAME, node, nodeValues);
+    InventoryList.tagHandle(NodeTag.USERNAME, node, nodeValues);
+    InventoryList.tagHandle(NodeTag.OS_FAMILY, node, nodeValues);
+    InventoryList.tagHandle(NodeTag.OS_NAME, node, nodeValues);
+    InventoryList.tagHandle(NodeTag.OS_ARCHITECTURE, node, nodeValues);
+    InventoryList.tagHandle(NodeTag.OS_VERSION, node, nodeValues);
+    InventoryList.tagHandle(NodeTag.DESCRIPTION, node, nodeValues);
+  }
+
+  /**
+   * Adds a node to the ansibleNodes map, merging tags if the node already exists.
+   *
+   * @param node The node to add.
+   * @param tags The tags to associate with the node.
+   */
+  public void addNode(NodeEntryImpl node, Set<String> tags) {
+    ansibleNodes.compute(node.getNodename(), (key, existingNode) -> {
+      if (existingNode != null) {
+        Set<String> mergedTags = new HashSet<>(getStringTags(existingNode));
+        mergedTags.addAll(tags);
+        existingNode.setTags(Set.copyOf(mergedTags));
+        return existingNode;
+      } else {
+        node.setTags(Set.copyOf(tags));
+        return node;
+      }
+    });
+  }
+
+  /**
+   * Retrieves the tags from a node and converts them to strings.
+   *
+   * @param node The node whose tags are to be retrieved.
+   * @return A set of strings representing the node's tags.  Returns an empty set if the node has no tags.
+   */
+  public Set<String> getStringTags(NodeEntryImpl node) {
+    Set<String> tags = new HashSet<>();
+    for (Object tag : node.getTags()) {
+      tags.add(tag.toString());
+    }
+    return tags;
   }
 
   /**
@@ -750,8 +932,14 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     AnsibleRunner runner = runnerBuilder.build();
 
     if (this.ansibleInventoryListBuilder == null) {
+      Path ansibleBinPath = null;
+      if (ansibleBinariesDirectoryPath != null && !ansibleBinariesDirectoryPath.isEmpty()) {
+        ansibleBinPath = (java.nio.file.Path.of(ansibleBinariesDirectoryPath));
+      }
+
       this.ansibleInventoryListBuilder = AnsibleInventoryList.builder()
               .inventory(inventory)
+              .ansibleBinariesDirectory(ansibleBinPath)
               .configFile(configFile)
               .debug(debug);
     }
@@ -769,7 +957,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     }
 
     AnsibleInventoryList inventoryList = this.ansibleInventoryListBuilder.build();
-
+    inventoryList.setCustomTmpDirPath(customTmpDirPath);
     try {
         return inventoryList.getNodeList();
     } catch (IOException | AnsibleException e) {
@@ -838,6 +1026,32 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
 
     return keys;
 
+  }
+
+  /**
+   * Validates if a tag is empty.
+   *
+   * @param tagMap  The map containing the tag content.
+   * @param tagName The name of the tag to validate.
+   * @return True if the tag is empty, false otherwise.
+   */
+  private boolean isTagMapValid(Map<String, Object> tagMap, String tagName) {
+    if (tagMap == null) {
+      log.warn("Tag '{}' is empty!", tagName);
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * Validates whether the YAML content contains aliases that exceed the maximum allowed.
+   * @param content String yaml
+   */
+  public void validateAliases(String content) {
+    int totalAliases = StringUtils.countMatches(content, ": *");
+    if (totalAliases > yamlMaxAliases) {
+      log.warn("The yaml inventory received has {} aliases and the maximum allowed is {}.", totalAliases, yamlMaxAliases);
+    }
   }
 
 }

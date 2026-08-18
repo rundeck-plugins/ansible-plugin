@@ -64,6 +64,7 @@ The following configuration attributes can be set on the Node, or in the project
 
 * `ansible-inventory` - Specifies the ansible inventory to use, can define a global inventory file at the project level without requiring setting the same variable for each job. It is also possible to provide an inventory _inline_ to a job. The default is /etc/ansible/hosts.
 * `ansible-executable` - The executable to use for node Node Executor. (default /bin/sh)
+* `ansible-base-dir-path` - Set ansible base directory path. This can be set project-wide to specify the working directory for Ansible operations.
 * `ansible-limit` - Global groups limits can be set at the project level to filter hosts/groups from the Ansible inventory. See http://docs.ansible.com/ansible/intro_patterns.html for syntax help.
 * `ansible-vault-path` - Default vault file path to use for Playbook Jobs.
 * `ansible-vault-storage-path` - Specifies a [Key Storage Path][] to look up the ansible vault password from. If specified, it will be used instead of the `ansible-vault-path`.
@@ -110,6 +111,7 @@ Become password configuration is very similar to ssh password, you can use eithe
 ## Installation ##
 
 - [Download the .jar file from GitHub](https://github.com/rundeck-plugins/ansible-plugin/releases) or compile it yourself (using Gradle, either your own the included wrapper)
+  - **Note**: This project now uses Gradle Version Catalogs for dependency management and includes security-hardened dependency versions
 - Copy the .jar file to your Rundeck plugins directory (`/var/lib/rundeck/libext` if you installed the .deb, for example)
 - Create a new project (this assumes you want every node in your project to be controlled via Ansible)
 - Choose "Ansible Resource Model Source" as the resource model source

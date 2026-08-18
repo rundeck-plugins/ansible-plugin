@@ -11,27 +11,62 @@ repositories {
 group = 'com.github.rundeck-plugins'
 
 configurations {
-    configurations {
-        instrumentedClasspath {
-            canBeConsumed = false
+    // Security: Force resolution (versions: root gradle/libs.versions.toml)
+    all {
+        resolutionStrategy {
+            force libs.commons.compress.get()
+            force libs.kotlin.stdlib.get()
         }
     }
 }
 dependencies {
-    testImplementation "org.spockframework:spock-core:2.1-groovy-3.0"
+    testImplementation libs.spock.core
 
-    testImplementation "org.testcontainers:testcontainers:1.17.2"
-    testImplementation "org.testcontainers:spock:1.17.2"
-    testImplementation group: 'org.rundeck.api', name: 'rd-api-client', version: '2.0.8'
+    testImplementation libs.testcontainers
+    testImplementation libs.testcontainers.spock
+    testImplementation libs.rd.api.client
 
-    testImplementation group: 'com.jcraft', name: 'jsch', version: '0.1.55'
+    // Without an SLF4J binding, Testcontainers' Docker Compose process output (and failure
+    // reasons from `docker compose up -d`) silently vanish into the NOP logger.
+    testImplementation libs.slf4j.simple
+
+    testImplementation libs.jsch
+
+    // Security: Explicit inclusion of secure versions to override transitive dependencies
+    testImplementation libs.commons.compress
+    testImplementation libs.kotlin.stdlib
 
 }
 
 tasks.register('functionalTest', Test) {
     useJUnitPlatform()
-    systemProperty('RUNDECK_TEST_IMAGE', "rundeck/rundeck:5.1.1")
+
+    // Rundeck Docker image tag is derived from `rundeck-core` in ../gradle/libs.versions.toml
+    // (single source of truth), but Docker Hub's tagging scheme doesn't match Maven's: unreleased
+    // versions are published as the single rolling `SNAPSHOT` tag, never as `<version>-SNAPSHOT`.
+    def rundeckCoreVersion = libs.versions.rundeck.core.get()
+    def rundeckDockerTag = rundeckCoreVersion.endsWith('-SNAPSHOT') ? 'SNAPSHOT' : rundeckCoreVersion
+    systemProperty('RUNDECK_TEST_IMAGE', "rundeck/rundeck:${rundeckDockerTag}")
+    // Project archive manifest must match server generation; see TestUtil.createArchiveJarFile
+    systemProperty('RUNDECK_ARCHIVE_APP_VERSION', rundeckCoreVersion)
+
+    // Docker configuration for Testcontainers
+    // For Rancher Desktop on macOS: Use /Users/<username>/.rd/docker.sock
+    // For Docker Desktop on macOS: Use /var/run/docker.sock
+    // For Linux: Use /var/run/docker.sock
+    // You can also configure this via ~/.testcontainers.properties (see functional-test/README.md)
+
     description = "Run Ansible integration tests"
+
+    // CI / local: surface Spock stderr (e.g. ProjectImportStatus JSON) and full stack traces in console + tee logs
+    testLogging {
+        events 'failed', 'passed', 'skipped', 'standard_out', 'standard_error'
+        exceptionFormat 'full'
+        showExceptions true
+        showCauses true
+        showStackTraces true
+        showStandardStreams true
+    }
 }
 
 tasks.register('copyPluginArtifact', Copy) {
