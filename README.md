@@ -1,8 +1,3 @@
-> [!TIP]
-> This fork main purpose is to forward the RUNDECK variables (such as RD_JOB_USERNAME, etc.) to the Ansible playbook. One reason is to give the ansible playbook the ability to proper identify who is running the playbook.
-
----
-
 [![Gitter](https://img.shields.io/gitter/room/rundeck-ansible-plugin/Lobby.svg)](https://gitter.im/rundeck-ansible-plugin/Lobby) [Read more about Rundeck + Ansible](https://www.rundeck.com/ansible)
 
 Please [report](https://github.com/rundeck-plugins/ansible-plugin/issues) any errors or suggestions!
@@ -52,6 +47,15 @@ Run any Ansible module! You can specify the module name and arguments.
 ### Run Ansible Playbooks ###
 
 Run a playbook as a node or workflow step (see note above). You can specify either a path to a playbook file (which must be accessible to Rundeck), or write an inline playbook.
+
+### Job Environment Variables ###
+
+Rundeck's job data context (job name, execution ID, username, etc.) is forwarded to the Ansible process as `RD_JOB_*` environment variables, the same way it's already available to script steps. For example, a playbook can read the user who triggered the job:
+
+```yaml
+- debug:
+    msg: "RD_JOB_USERNAME: {{ lookup('ansible.builtin.env', 'RD_JOB_USERNAME') }}"
+```
 
 ## Configuration ##
 
