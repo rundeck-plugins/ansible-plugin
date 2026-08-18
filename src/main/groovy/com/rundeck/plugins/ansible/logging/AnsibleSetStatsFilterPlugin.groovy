@@ -23,6 +23,8 @@ import java.util.Iterator
 import com.google.gson.JsonParser
 import com.google.gson.JsonObject
 import com.google.gson.JsonElement
+import com.google.gson.GsonBuilder
+import com.google.gson.Gson
 
 
 /**
@@ -49,6 +51,7 @@ class AnsibleSetStatsFilterPlugin implements LogFilterPlugin{
     OutputContext outputContext
     Map<String, String> allData
     ObjectMapper mapper
+    Gson gson
 
     @Override
     void init(final PluginLoggingContext context) {
@@ -56,6 +59,7 @@ class AnsibleSetStatsFilterPlugin implements LogFilterPlugin{
         setStatsGlobalPattern = Pattern.compile(regex)
         outputContext = context.getOutputContext()
         mapper = new ObjectMapper()
+        gson = new GsonBuilder().create()
         allData = [:]
     }
 
@@ -70,7 +74,13 @@ class AnsibleSetStatsFilterPlugin implements LogFilterPlugin{
                 Iterator<String> keys = obj.keySet().iterator()
                 while(keys.hasNext()) {
                         String key = keys.next()
-                        String value =  obj.get(key).getAsString()
+                        JsonElement element = obj.get(key)
+                        // Preserve the original unquoted output for plain scalars (the
+                        // overwhelmingly common set_stats case) so existing jobs reading
+                        // data.<key> don't suddenly see quoted strings, e.g. "foo" instead
+                        // of foo. Objects/arrays/null have no equivalent raw form, so those
+                        // are JSON-serialized -- this is the case this fix adds support for.
+                        String value = element.isJsonPrimitive() ? element.getAsString() : gson.toJson(element)
                         allData[key] = value
                         outputContext.addOutput("data", key, value)
                 }
