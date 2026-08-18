@@ -11,6 +11,8 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -21,6 +23,7 @@ import java.util.Map;
 public class AnsibleInventoryList {
 
     private String inventory;
+    private Path ansibleBinariesDirectory;
     private String configFile;
     private boolean debug;
 
@@ -32,8 +35,9 @@ public class AnsibleInventoryList {
     private File tempVaultFile;
     private File vaultPromptFile;
     private File tempLimitFile;
+    private String customTmpDirPath;
 
-    public static final String ANSIBLE_INVENTORY = "ansible-inventory";
+    public static final String ANSIBLE_INVENTORY_COMMAND = "ansible-inventory";
 
     /**
      * Executes Ansible command to bring all nodes from inventory
@@ -42,8 +46,15 @@ public class AnsibleInventoryList {
     public String getNodeList() throws IOException, AnsibleException {
 
         List<String> procArgs = new ArrayList<>();
-        procArgs.add(ANSIBLE_INVENTORY);
-        procArgs.add("--inventory-file" + "=" + inventory);
+        String ansibleCommand = ANSIBLE_INVENTORY_COMMAND;
+        if(ansibleBinariesDirectory!=null) {
+            ansibleCommand = Paths.get(ansibleBinariesDirectory.toFile().getAbsolutePath(), ansibleCommand).toFile().getAbsolutePath();
+        }
+        procArgs.add(ansibleCommand);
+        //inventory can be defined in ansible.cfg
+        if(inventory!=null && !inventory.isEmpty()){
+            procArgs.add("--inventory-file" + "=" + inventory);
+        }
         procArgs.add("--list");
         procArgs.add("-y");
 
@@ -59,6 +70,15 @@ public class AnsibleInventoryList {
 
         processAnsibleVault(stdinVariables, procArgs);
         processLimit(procArgs);
+
+        procArgs.add("2>/dev/null");
+
+        String allCmd = String.join(" ", procArgs);
+
+        procArgs.clear();
+        procArgs.add("bash");
+        procArgs.add("-c");
+        procArgs.add(allCmd);
 
         if(debug){
             System.out.println("getNodeList " + procArgs);
@@ -120,7 +140,7 @@ public class AnsibleInventoryList {
         if (vaultPrompt == null) { return; }
 
         if(ansibleVault == null){
-            tempInternalVaultFile = AnsibleVault.createVaultScriptAuth("ansible-script-vault");
+            tempInternalVaultFile = AnsibleVault.createVaultScriptAuth("ansible-script-vault",customTmpDirPath);
             ansibleVault = AnsibleVault.builder()
                     .masterPassword(vaultPrompt.getVaultPassword())
                     .vaultPasswordScriptFile(tempInternalVaultFile)
@@ -146,7 +166,7 @@ public class AnsibleInventoryList {
             for (String limit : limits) {
                 sb.append(limit).append("\n");
             }
-            tempLimitFile = AnsibleUtil.createTemporaryFile("targets", sb.toString());
+            tempLimitFile = AnsibleUtil.createTemporaryFile("","targets", sb.toString(),customTmpDirPath);
 
             procArgs.add("-l");
             procArgs.add("@" + tempLimitFile.getAbsolutePath());

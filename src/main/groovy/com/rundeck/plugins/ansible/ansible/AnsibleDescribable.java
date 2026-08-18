@@ -8,6 +8,7 @@ import com.dtolabs.rundeck.plugins.util.PropertyBuilder;
 
 import java.util.Arrays;
 import java.util.LinkedList;
+import java.util.Map;
 
 public interface AnsibleDescribable extends Describable {
 
@@ -90,12 +91,22 @@ public interface AnsibleDescribable extends Describable {
     	}
     }
 
+    // General variables
+    String SECONDARY = "SECONDARY";
+
     public static final String SERVICE_PROVIDER_TYPE = "ansible-service";
     public static final String ANSIBLE_PLAYBOOK_PATH = "ansible-playbook";
     public static final String ANSIBLE_PLAYBOOK_INLINE = "ansible-playbook-inline";
     public static final String ANSIBLE_INVENTORY_INLINE = "ansible-inventory-inline";
     public static final String ANSIBLE_INVENTORY = "ansible-inventory";
     public static final String ANSIBLE_GENERATE_INVENTORY = "ansible-generate-inventory";
+    /**
+     * Controls whether node authentication data is included when generating the inventory.
+     * This is an enhancement of {@link #ANSIBLE_GENERATE_INVENTORY} and only has effect
+     * when inventory generation is enabled. It is exposed as a separate top-level
+     * property for configuration/UI clarity.
+     */
+    public static final String ANSIBLE_GENERATE_INVENTORY_NODES_AUTH = "ansible-generate-inventory-nodes-auth";
     public static final String ANSIBLE_MODULE = "ansible-module";
     public static final String ANSIBLE_MODULE_ARGS = "ansible-module-args";
     public static final String ANSIBLE_DEBUG = "ansible-debug";
@@ -158,6 +169,15 @@ public interface AnsibleDescribable extends Describable {
 
     public static final String ANSIBLE_ENCRYPT_EXTRA_VARS = "ansible-encrypt-extra-vars";
 
+    // Inventory Yaml
+    String ANSIBLE_YAML_DATA_SIZE   = "ansible-yaml-data-size";
+    String ANSIBLE_YAML_MAX_ALIASES = "ansible-yaml-max-aliases";
+    String INVENTORY_YAML = "Inventory Yaml";
+    Map<String, Object> inventoryYamlOpt = Map.of(
+        StringRenderingConstants.GROUPING, SECONDARY,
+        StringRenderingConstants.GROUP_NAME, INVENTORY_YAML
+    );
+
     public static Property PLAYBOOK_PATH_PROP = PropertyUtil.string(
     			ANSIBLE_PLAYBOOK_PATH,
               "Playbook",
@@ -219,6 +239,13 @@ public interface AnsibleDescribable extends Describable {
     .title("Generate inventory")
     .description("Generate Ansible inventory from Rundeck nodes.")
     .build();
+
+    static final Property GENERATE_INVENTORY_NODES_AUTH = PropertyBuilder.builder()
+            .booleanType(ANSIBLE_GENERATE_INVENTORY_NODES_AUTH)
+            .required(false)
+            .title("Workflow Step: Generate Inventory and Pass Node Authentication from Rundeck Nodes")
+            .description("Pass authentication credentials from Rundeck nodes for Ansible Playbook Workflow Steps only (not supported for Node Steps). See the Ansible plugin documentation for details.")
+            .build();
 
     public static Property EXECUTABLE_PROP = PropertyUtil.freeSelect(
               ANSIBLE_EXECUTABLE,
@@ -350,7 +377,7 @@ public interface AnsibleDescribable extends Describable {
             .title("SSH Key File path")
             .description("File Path to the SSH Key to use")
             .renderingOption(StringRenderingConstants.GROUPING,"SECONDARY")
-            .renderingOption(StringRenderingConstants.GROUP_NAME,"SSH Connection")
+            .renderingOption(StringRenderingConstants.GROUP_NAME,"Authentication")
             .build();
 
 
@@ -364,50 +391,50 @@ public interface AnsibleDescribable extends Describable {
             .renderingOption(StringRenderingConstants.STORAGE_PATH_ROOT_KEY, "keys")
             .renderingOption(StringRenderingConstants.STORAGE_FILE_META_FILTER_KEY, "Rundeck-key-type=private")
             .renderingOption(StringRenderingConstants.GROUPING,"SECONDARY")
-            .renderingOption(StringRenderingConstants.GROUP_NAME,"SSH Connection")
+            .renderingOption(StringRenderingConstants.GROUP_NAME,"Authentication")
             .build();
 
     static final Property SSH_PASSWORD_STORAGE_PROP = PropertyBuilder.builder()
             .string(ANSIBLE_SSH_PASSWORD_STORAGE_PATH)
             .required(false)
-            .title("SSH Password Storage Path")
-            .description("Path to the ssh Password to use within Rundeck Storage.")
+            .title("Password Storage Path")
+            .description("Path to the Password to use within Rundeck Storage.")
             .renderingOption(StringRenderingConstants.SELECTION_ACCESSOR_KEY,
                     StringRenderingConstants.SelectionAccessor.STORAGE_PATH)
             .renderingOption(StringRenderingConstants.STORAGE_PATH_ROOT_KEY, "keys")
             .renderingOption(StringRenderingConstants.STORAGE_FILE_META_FILTER_KEY, "Rundeck-data-type=password")
             .renderingOption(StringRenderingConstants.GROUPING,"SECONDARY")
-            .renderingOption(StringRenderingConstants.GROUP_NAME,"SSH Connection")
+            .renderingOption(StringRenderingConstants.GROUP_NAME,"Authentication")
             .build();
 
     static final Property SSH_PASSWORD_PROP = PropertyBuilder.builder()
             .string(ANSIBLE_SSH_PASSWORD)
             .required(false)
-            .title("SSH Password")
-            .description("Ansible SSH password.")
+            .title("User Password")
+            .description("Ansible User Password.")
             .renderingOption(StringRenderingConstants.DISPLAY_TYPE_KEY,
                     StringRenderingConstants.DisplayType.PASSWORD)
             .renderingOption(StringRenderingConstants.GROUPING,"SECONDARY")
-            .renderingOption(StringRenderingConstants.GROUP_NAME,"SSH Connection")
+            .renderingOption(StringRenderingConstants.GROUP_NAME,"Authentication")
             .build();
 
     static final Property SSH_AUTH_TYPE_PROP = PropertyBuilder.builder()
             .select(ANSIBLE_SSH_AUTH_TYPE)
             .required(false)
-            .title("SSH Authentication")
-            .description("Type of SSH Authentication to use.")
+            .title("Authentication Type")
+            .description("Type of Authentication to use.")
             .values(Arrays.asList(AuthenticationType.getValues()))
             .renderingOption(StringRenderingConstants.GROUPING,"SECONDARY")
-            .renderingOption(StringRenderingConstants.GROUP_NAME,"SSH Connection")
+            .renderingOption(StringRenderingConstants.GROUP_NAME,"Authentication")
             .build();
 
     static final Property SSH_USER_PROP = PropertyBuilder.builder()
             .string(ANSIBLE_SSH_USER)
             .required(false)
-            .title("SSH User")
-            .description("SSH User to authenticate as (default=rundeck).")
+            .title("User")
+            .description("User to authenticate as (default=rundeck).")
             .renderingOption(StringRenderingConstants.GROUPING,"SECONDARY")
-            .renderingOption(StringRenderingConstants.GROUP_NAME,"SSH Connection")
+            .renderingOption(StringRenderingConstants.GROUP_NAME,"Authentication")
             .build();
 
     static final Property SSH_TIMEOUT_PROP = PropertyBuilder.builder()
@@ -416,7 +443,7 @@ public interface AnsibleDescribable extends Describable {
             .title("SSH Timeout")
             .description("SSH timeout, override the SSH timeout in seconds (default=10).")
             .renderingOption(StringRenderingConstants.GROUPING,"SECONDARY")
-            .renderingOption(StringRenderingConstants.GROUP_NAME,"SSH Connection")
+            .renderingOption(StringRenderingConstants.GROUP_NAME,"SSH Extra Configuration")
             .build();
 
     static final Property SSH_USE_AGENT = PropertyBuilder.builder()
@@ -425,7 +452,7 @@ public interface AnsibleDescribable extends Describable {
             .title("Use ssh-agent.")
             .description("Use ssh-agent to connect with a private key plus a passphrase.")
             .renderingOption(StringRenderingConstants.GROUPING,"SECONDARY")
-            .renderingOption(StringRenderingConstants.GROUP_NAME,"SSH Connection")
+            .renderingOption(StringRenderingConstants.GROUP_NAME,"SSH Extra Configuration")
             .build();
 
     static final Property SSH_PASSPHRASE = PropertyBuilder.builder()
@@ -438,7 +465,7 @@ public interface AnsibleDescribable extends Describable {
             .renderingOption(StringRenderingConstants.STORAGE_PATH_ROOT_KEY, "keys")
             .renderingOption(StringRenderingConstants.STORAGE_FILE_META_FILTER_KEY, "Rundeck-data-type=password")
             .renderingOption(StringRenderingConstants.GROUPING,"SECONDARY")
-            .renderingOption(StringRenderingConstants.GROUP_NAME,"SSH Connection")
+            .renderingOption(StringRenderingConstants.GROUP_NAME,"SSH Extra Configuration")
             .build();
 
     static final Property SSH_PASSPHRASE_OPTION = PropertyBuilder.builder()
@@ -448,7 +475,7 @@ public interface AnsibleDescribable extends Describable {
             .description("SSH Passphrase from secure option on a job, it just works if the ssh-agent is used.")
             .defaultValue(DEFAULT_ANSIBLE_SSH_PASSPHRASE_OPTION)
             .renderingOption(StringRenderingConstants.GROUPING,"SECONDARY")
-            .renderingOption(StringRenderingConstants.GROUP_NAME,"SSH Connection")
+            .renderingOption(StringRenderingConstants.GROUP_NAME,"SSH Extra Configuration")
             .build();
 
 
@@ -526,5 +553,25 @@ public interface AnsibleDescribable extends Describable {
             .required(false)
             .title("Encrypt Extra Vars.")
             .description("Encrypt the value of the extra vars keys.")
+            .build();
+
+    Property YAML_DATA_SIZE_PROP = PropertyBuilder.builder()
+            .integer(ANSIBLE_YAML_DATA_SIZE)
+            .required(false)
+            .title("Data Size")
+            .description("Set the MB size (Default value is 10)."+
+                    " Allows the plugin to process the yaml data response coming from Ansible."+
+                    " (This only applies when Gather Facts = No)")
+            .renderingOptions(inventoryYamlOpt)
+            .build();
+
+    Property YAML_MAX_ALIASES_PROP = PropertyBuilder.builder()
+            .integer(ANSIBLE_YAML_MAX_ALIASES)
+            .required(false)
+            .title("Max Aliases")
+            .description("Set max size (Default value is 1000)."+
+                    " Allows to set the maximum number of aliases that the inventory can have."+
+                    " (This only applies when Gather Facts = No)")
+            .renderingOptions(inventoryYamlOpt)
             .build();
 }

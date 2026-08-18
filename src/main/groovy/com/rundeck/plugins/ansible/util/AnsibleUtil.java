@@ -1,9 +1,13 @@
 package com.rundeck.plugins.ansible.util;
 
+import com.dtolabs.rundeck.core.common.Framework;
 import com.dtolabs.rundeck.core.execution.ExecutionContext;
 import com.dtolabs.rundeck.core.execution.proxy.DefaultSecretBundle;
 import com.dtolabs.rundeck.core.execution.proxy.SecretBundle;
+import com.dtolabs.rundeck.core.execution.workflow.steps.PluginStepContextImpl;
 import com.dtolabs.rundeck.core.plugins.configuration.Property;
+import com.dtolabs.rundeck.core.utils.PropertyLookup;
+import com.dtolabs.rundeck.plugins.step.PluginStepContext;
 import com.rundeck.plugins.ansible.ansible.AnsibleDescribable;
 import com.rundeck.plugins.ansible.ansible.AnsibleRunnerContextBuilder;
 import com.rundeck.plugins.ansible.plugin.AnsibleNodeExecutor;
@@ -82,6 +86,16 @@ public class AnsibleUtil {
 
     }
 
+    public static List<String> getSecretsPathWorkflowSteps(AnsibleRunnerContextBuilder builder){
+        List<String> secretPaths = getSecretsPath(builder);
+        List<String> secretPathsNodes =builder.getListNodesKeyPath();
+
+        if(secretPathsNodes!=null && !secretPathsNodes.isEmpty()){
+            secretPaths.addAll(secretPathsNodes);
+        }
+        return secretPaths;
+    }
+
     public static Map<String, String> getRuntimeProperties(ExecutionContext context, String propertyPrefix) {
         Map<String, String> properties = null;
 
@@ -103,19 +117,53 @@ public class AnsibleUtil {
         return filterProperties;
     }
 
-
-    public static File createTemporaryFile(String suffix, String data) throws IOException {
-        File tempVarsFile = File.createTempFile("ansible-runner", suffix);
+    public static File createTemporaryFile(String prefix, String suffix, String data, String path) throws IOException {
+        if(prefix.isEmpty()){
+            prefix ="ansible-runner";
+        }
+        File tempVarsFile = File.createTempFile(prefix, suffix, new File(path));
         Files.write(tempVarsFile.toPath(), data.getBytes());
         return tempVarsFile;
     }
-
 
     public static String randomString(){
         byte[] bytes = new byte[32];
         new SecureRandom().nextBytes(bytes);
         return Base64.getEncoder().encodeToString(bytes);
+    }
 
+    public static String getCustomTmpPathDir(Framework framework){
+        String customTmpDir = framework.getPropertyLookup().getProperty("framework.tmp.dir");
+        if (customTmpDir == null ||  customTmpDir.isEmpty()) {
+            customTmpDir = System.getProperty("java.io.tmpdir");
+        }
+        return  customTmpDir;
+    }
+
+    /**
+     * Safely retrieves the loglevel from the execution context's data context.
+     * Returns null if the loglevel cannot be retrieved (e.g., if data context or job is null).
+     *
+     * @param context The execution context
+     * @return The loglevel string, or null if not available
+     */
+    public static String getJobLogLevel(ExecutionContext context) {
+        if (context.getDataContext() != null &&
+            context.getDataContext().get("job") != null) {
+            return context.getDataContext().get("job").get("loglevel");
+        }
+        return null;
+    }
+
+    /**
+     * Safely retrieves the loglevel from the plugin step context's data context.
+     * Returns null if the loglevel cannot be retrieved (e.g., if data context or job is null).
+     *
+     * @param context The plugin step context
+     * @return The loglevel string, or null if not available
+     */
+    public static String getJobLogLevel(PluginStepContext context) {
+        return getJobLogLevel(context.getExecutionContext());
     }
 
 

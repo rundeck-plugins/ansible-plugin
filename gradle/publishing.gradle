@@ -1,0 +1,63 @@
+/**
+ * Define project extension values in the project gradle file before including this file:
+ *
+ * publishName = 'Name of Package'
+ * publishDescription = 'description' (optional)
+ * githubSlug = Github slug e.g. 'rundeck/rundeck-cli'
+ * developers = [ [id:'id', name:'name', email: 'email' ] ] list of developers
+ */
+apply plugin: 'maven-publish'
+
+def pkgcldRepoUrl = (System.getenv("PKGCLD_REPO_URL") ?: "https://packagecloud.io/pagerduty/rundeck-plugins/maven2").trim()
+
+publishing {
+    publications {
+        "${project.name}"(MavenPublication) { publication ->
+            from components.java
+
+            pom {
+                name = publishName
+                description = project.ext.hasProperty('publishDescription') ? project.ext.publishDescription :
+                        project.description ?: publishName
+                url = "https://github.com/${githubSlug}"
+                licenses {
+                    license {
+                        name = 'The Apache Software License, Version 2.0'
+                        url = 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+                        distribution = 'repo'
+                    }
+                }
+                scm {
+                    url = "https://github.com/${githubSlug}"
+                    connection = "scm:git:git@github.com/${githubSlug}.git"
+                    developerConnection = "scm:git:git@github.com:${githubSlug}.git"
+                }
+                if (project.ext.developers) {
+                    developers {
+                        project.ext.developers.each { dev ->
+                            developer {
+                                id = dev.id
+                                name = dev.name
+                                email = dev.email
+                            }
+                        }
+                    }
+                }
+            }
+
+        }
+    }
+    repositories {
+        maven {
+            name = "PackageCloud"
+            url = uri(pkgcldRepoUrl)
+            authentication {
+                header(HttpHeaderAuthentication)
+            }
+            credentials(HttpHeaderCredentials) {
+                name = "Authorization"
+                value = "Bearer " + (System.getenv("PKGCLD_WRITE_TOKEN") ?: project.findProperty("pkgcldWriteToken"))
+            }
+        }
+    }
+}

@@ -1,9 +1,14 @@
 plugins {
-  id 'pl.allegro.tech.build.axion-release' version '1.17.2'
-  id 'maven-publish'
+  id 'pl.allegro.tech.build.axion-release' version '1.21.3'
 }
 
-group = 'com.github.rundeck-plugins'
+group = 'org.rundeck.plugins'
+
+ext.publishName = "Ansible Integration ${project.version}"
+ext.githubSlug = 'rundeck-plugins/ansible-plugin'
+ext.developers = [
+        [id: 'rundeck', name: 'Rundeck Engineering', email: 'product@rundeck.com']
+]
 
 ext.rundeckPluginVersion = '1.2'
 ext.pluginClassNames = [
@@ -21,25 +26,66 @@ ext.pluginClassNames = [
 
 apply plugin: 'java'
 apply plugin: 'groovy'
-sourceCompatibility = 1.11
+
+// Maven Central (Sonatype) requires -sources.jar and -javadoc.jar on close; same as attribute-match java.gradle
+java {
+  sourceCompatibility = JavaVersion.VERSION_17
+  targetCompatibility = JavaVersion.VERSION_17
+  withSourcesJar()
+  withJavadocJar()
+}
+
+// Lombok @Builder inner types break strict javadoc; Central still requires a -javadoc.jar artifact
+tasks.withType(Javadoc).configureEach {
+  failOnError = false
+  options.encoding = 'UTF-8'
+}
 
 scmVersion {
     ignoreUncommittedChanges = false
     tag {
-        prefix = 'v'
+        prefix = ''           // NO "v" prefix - see PLUGIN_TAGGING_ARCHITECTURE.md
         versionSeparator = ''
     }
+    versionCreator 'simple'  // Use simple version creator (just tag name); tolerates legacy v* tags
 }
 
-version = scmVersion.version
+version = scmVersion.version  // Dynamic version from git tag
 
 repositories {
-  mavenCentral()
   mavenLocal()
+    maven {
+        name = 'Central Portal Snapshots'
+        url = 'https://central.sonatype.com/repository/maven-snapshots/'
+        content {
+            includeGroup('org.rundeck')
+        }
+    }  // Must be FIRST for Grails 7 development
+    maven {
+        name = 'Central Portal Snapshots'
+        url = 'https://central.sonatype.com/repository/maven-snapshots/'
+        
+        // Only search this repository for org.rundeck snapshots
+        content {
+            includeGroup('org.rundeck')
+        }
+    }
+  mavenCentral()
 }
 
 configurations {
   pluginLibs
+  
+  // Security: Force resolution of vulnerable dependencies (versions: gradle/libs.versions.toml)
+  all {
+    resolutionStrategy {
+      force libs.commons.lang3.get()
+      force libs.commons.compress.get()
+      force libs.kotlin.stdlib.get()
+      // Exclude old commons-lang to prevent conflicts
+      exclude group: 'commons-lang', module: 'commons-lang'
+    }
+  }
 
   implementation {
     extendsFrom pluginLibs
@@ -47,25 +93,43 @@ configurations {
 }
 
 dependencies {
-  pluginLibs 'com.google.code.gson:gson:2.10.1'
-  implementation('org.rundeck:rundeck-core:5.1.1-20240305')
-  implementation 'org.codehaus.groovy:groovy-all:3.0.15'
-  pluginLibs group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: '2.16.1'
-  pluginLibs group: 'com.fasterxml.jackson.dataformat', name: 'jackson-dataformat-yaml', version: '2.16.1'
-  implementation "org.yaml:snakeyaml:2.2"
+  pluginLibs libs.gson
+  // rundeck-core: compileOnly so SNAPSHOT is not in published POM; testImplementation for tests
+  compileOnly libs.rundeck.core
+  testImplementation libs.rundeck.core
+  implementation libs.groovy.all
+  pluginLibs libs.jackson.core
+  pluginLibs libs.jackson.dataformat.yaml
+  implementation libs.snakeyaml
 
-  compileOnly 'org.projectlombok:lombok:1.18.30'
-  annotationProcessor 'org.projectlombok:lombok:1.18.30'
 
-  testCompileOnly 'org.projectlombok:lombok:1.18.30'
-  testAnnotationProcessor 'org.projectlombok:lombok:1.18.30'
+  // Security: Explicit inclusion of secure versions
+  implementation libs.commons.lang3
+  implementation libs.commons.compress
 
-  testImplementation "org.spockframework:spock-core:2.1-groovy-3.0"
+  compileOnly libs.lombok
+  annotationProcessor libs.lombok
+
+  testCompileOnly libs.lombok
+  testAnnotationProcessor libs.lombok
+
+  testImplementation libs.spock.core
+  testImplementation libs.bytebuddy
+  testImplementation libs.objenesis
 
 }
 
 tasks.withType(Test).configureEach {
   useJUnitPlatform()
+  
+  // Java 17+ module access for cglib/Spock mocking
+  jvmArgs = [
+    '--add-opens=java.base/java.lang=ALL-UNNAMED',
+    '--add-opens=java.base/java.util=ALL-UNNAMED',
+    '--add-opens=java.base/java.lang.reflect=ALL-UNNAMED',
+    '--add-opens=java.base/java.io=ALL-UNNAMED',
+    '--add-opens=java.base/java.net=ALL-UNNAMED'
+  ]
 }
 
 task copyToLib(type: Copy) {
@@ -79,7 +143,7 @@ jar {
     def libList = configurations.pluginLibs.collect{'lib/' + it.name}.join(' ')
     attributes 'Rundeck-Plugin-Name' : 'Ansible Integration'
     attributes 'Rundeck-Plugin-Description' : 'This plugin brings basic Ansible support to Rundeck. It imports hosts from Ansible\'s inventory, including a bunch of facts, and can run modules and playbooks. There is also a node executor and file copier for your project.'
-    attributes 'Rundeck-Plugin-Rundeck-Compatibility-Version': '3.0.1+'
+    attributes 'Rundeck-Plugin-Rundeck-Compatibility-Version': '6.0.0+'
     attributes 'Rundeck-Plugin-Tags': 'java,node executor,resource model,workflow step,ansible'
     attributes 'Rundeck-Plugin-License': 'MIT'
     attributes 'Rundeck-Plugin-Source-Link': 'https://github.com/rundeck-plugins/ansible-plugin'
@@ -95,11 +159,4 @@ jar {
   dependsOn(copyToLib)
 }
 
-publishing {
-  publications {
-    maven(MavenPublication) {
-      artifactId = 'ansible-plugin'
-      from components.java
-    }
-  }
-}
+apply from: "${rootDir}/gradle/publishing.gradle"
