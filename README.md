@@ -48,6 +48,15 @@ Run any Ansible module! You can specify the module name and arguments.
 
 Run a playbook as a node or workflow step (see note above). You can specify either a path to a playbook file (which must be accessible to Rundeck), or write an inline playbook.
 
+### Job Environment Variables ###
+
+Rundeck's job data context (job name, execution ID, username, etc.) is forwarded to the Ansible process as `RD_JOB_*` environment variables, the same way it's already available to script steps. For example, a playbook can read the user who triggered the job:
+
+```yaml
+- debug:
+    msg: "RD_JOB_USERNAME: {{ lookup('ansible.builtin.env', 'RD_JOB_USERNAME') }}"
+```
+
 ## Configuration ##
 
 The Job Configuration, node, project and framework attributes can be used to customize how jobs are executed. On every run, the plugin will try to resolve

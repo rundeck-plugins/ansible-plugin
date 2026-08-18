@@ -96,6 +96,58 @@ class AnsibleRunnerContextBuilderSpec extends Specification {
     }
 
     // ----------------------------------------------------------------------------
+    // getJobOptions(): forwards the "job" data context as RD_JOB_* env vars
+    // ----------------------------------------------------------------------------
+
+    private AnsibleRunnerContextBuilder builderWithJobContext(Map<String, String> jobContext) {
+        def execContext = Mock(ExecutionContext)
+        execContext.getDataContext() >> (jobContext != null ? ['job': jobContext] : [:])
+
+        def nodes = Mock(INodeSet)
+        nodes.getNodes() >> []
+
+        return new AnsibleRunnerContextBuilder(execContext, Mock(Framework), nodes, [:])
+    }
+
+    def "getJobOptions converts job data context entries to upper-cased RD_JOB_ keys"() {
+        given:
+        def builder = builderWithJobContext(['username': 'alice', 'execid': '4242'])
+
+        expect:
+        builder.getJobOptions() == ['RD_JOB_USERNAME': 'alice', 'RD_JOB_EXECID': '4242']
+    }
+
+    def "getJobOptions returns an empty map when the job data context is absent"() {
+        given:
+        def builder = builderWithJobContext(null)
+
+        expect:
+        builder.getJobOptions() == [:]
+    }
+
+    def "getJobOptions skips entries with a null value"() {
+        given:
+        def builder = builderWithJobContext(['username': 'alice', 'url': null])
+
+        expect:
+        builder.getJobOptions() == ['RD_JOB_USERNAME': 'alice']
+    }
+
+    def "getJobOptions returns an empty map when the execution data context itself is null"() {
+        given:
+        def execContext = Mock(ExecutionContext)
+        execContext.getDataContext() >> null
+
+        def nodes = Mock(INodeSet)
+        nodes.getNodes() >> []
+
+        def builder = new AnsibleRunnerContextBuilder(execContext, Mock(Framework), nodes, [:])
+
+        expect:
+        builder.getJobOptions() == [:]
+    }
+
+    // ----------------------------------------------------------------------------
     // Race condition fix: getExecutionSpecificTmpDir() / cleanupTempFiles()
     // See ansible-plugin-race-condition-context.md
     // ----------------------------------------------------------------------------
