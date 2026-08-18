@@ -32,7 +32,13 @@ if secret:
 if sys.stdin.isatty():
     secret = getpass.getpass()
 else:
-    secret = sys.stdin.readline().rstrip()
+    chars = []
+    while 1:
+        c = sys.stdin.read(1)
+        if c == chr(3) or len(c) == 0: # end of text or nothing read
+            break
+        chars.append(c)
+    secret = ''.join(chars)
 
 if secret is None:
     sys.stderr.write('ERROR: secret is not set\n')

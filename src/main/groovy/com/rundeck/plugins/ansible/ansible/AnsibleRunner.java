@@ -737,7 +737,7 @@ public class AnsibleRunner {
             if (useAnsibleVault) {
                 VaultPrompt vaultPrompt = VaultPrompt.builder()
                         .vaultId("internal-encrypt")
-                        .vaultPassword(ansibleVault.getMasterPassword() + "\n")
+                        .vaultPassword(ansibleVault.getMasterPassword())
                         .build();
 
                 stdinVariables.add(vaultPrompt);
@@ -752,7 +752,7 @@ public class AnsibleRunner {
             if (vaultPass != null && !vaultPass.isEmpty()) {
                 VaultPrompt vaultPrompt = VaultPrompt.builder()
                         .vaultId("None")
-                        .vaultPassword(vaultPass + "\n")
+                        .vaultPassword(vaultPass)
                         .build();
 
                 stdinVariables.add(vaultPrompt);
