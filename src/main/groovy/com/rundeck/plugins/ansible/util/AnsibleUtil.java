@@ -20,6 +20,20 @@ import java.util.stream.Collectors;
 
 public class AnsibleUtil {
 
+    /**
+     * Normalizes an Ansible-provided OS family/system value (e.g. {@code ansible_system}
+     * values like "Linux"/"Windows"/"Darwin", or a raw distro family like "Debian") to
+     * Rundeck's canonical lowercase osFamily values ("unix"/"windows"), matching the
+     * convention used by other Node Resource plugins (EC2, Local, ServiceNow).
+     * RUN-4821.
+     */
+    public static String normalizeOsFamily(final String rawOsFamily) {
+        if (rawOsFamily == null) {
+            return null;
+        }
+        return rawOsFamily.equalsIgnoreCase("windows") ? "windows" : "unix";
+    }
+
     public static SecretBundle createBundle(AnsibleRunnerContextBuilder builder){
 
         DefaultSecretBundle secretBundle = new DefaultSecretBundle();
