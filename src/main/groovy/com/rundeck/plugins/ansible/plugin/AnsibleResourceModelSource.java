@@ -562,7 +562,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
 
           if (root.has("ansible_system") && !root.get("ansible_system").isJsonNull()) {
             node.setOsFamily(AnsibleUtil.normalizeOsFamily(root.get("ansible_system").getAsString()));
-          } else if (root.has("ansible_os_family")) {
+          } else if (root.has("ansible_os_family") && !root.get("ansible_os_family").isJsonNull()) {
             // Fallback for hosts that didn't report ansible_system: still normalize
             // rather than passing the raw distro family (e.g. "Debian") through.
             node.setOsFamily(AnsibleUtil.normalizeOsFamily(root.get("ansible_os_family").getAsString()));
@@ -570,7 +570,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
 
           if (root.has("ansible_os_name") && !root.get("ansible_os_name").isJsonNull()) {
             node.setOsName(root.get("ansible_os_name").getAsString());
-          } else if (root.has("ansible_os_family")) {
+          } else if (root.has("ansible_os_family") && !root.get("ansible_os_family").isJsonNull()) {
             node.setOsName(root.get("ansible_os_family").getAsString());
           }
 
