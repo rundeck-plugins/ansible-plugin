@@ -107,10 +107,10 @@ public class InventoryList {
         OS_FAMILY {
             @Override
             public void handle(NodeEntryImpl node, Map<String, Object> tags) {
-                // "osFamily" is an explicit, Rundeck-convention override authored directly
-                // in the inventory (already unix/windows) — trust it as-is. "ansible_os_family"
-                // (RUN-4821) is a raw Linux distro family (e.g. "Debian"), not a Rundeck
-                // osFamily value, so it must be normalized rather than passed through.
+                // "osFamily" is an explicit override authored directly in the inventory —
+                // trusted as-is even if it isn't unix/windows. "ansible_os_family" (RUN-4821)
+                // is a raw Linux distro family (e.g. "Debian"), not a Rundeck osFamily value,
+                // so it must be normalized rather than passed through.
                 if (tags.containsKey("osFamily")) {
                     Optional.ofNullable(InventoryList.findTag(List.of("osFamily"), tags))
                             .ifPresent(node::setOsFamily);

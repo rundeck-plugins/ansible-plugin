@@ -557,8 +557,8 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
             }
           }
 
-          // ansible_system     = Linux   = osFamily in Rundeck
-          // ansible_os_family  = Debian  = osName in Rundeck
+          // ansible_system     = Linux   -> normalized into osFamily (RUN-4821: unix/windows, not the raw value)
+          // ansible_os_family  = Debian  -> falls through into osName when no dedicated name fact is present
 
           if (root.has("ansible_system") && !root.get("ansible_system").isJsonNull()) {
             node.setOsFamily(AnsibleUtil.normalizeOsFamily(root.get("ansible_system").getAsString()));
