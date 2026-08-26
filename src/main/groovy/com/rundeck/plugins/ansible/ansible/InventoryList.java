@@ -2,6 +2,7 @@ package com.rundeck.plugins.ansible.ansible;
 
 import com.dtolabs.rundeck.core.common.NodeEntryImpl;
 import com.dtolabs.rundeck.core.resources.ResourceModelSourceException;
+import com.rundeck.plugins.ansible.util.AnsibleUtil;
 import lombok.Data;
 
 import java.util.List;
@@ -106,9 +107,18 @@ public class InventoryList {
         OS_FAMILY {
             @Override
             public void handle(NodeEntryImpl node, Map<String, Object> tags) {
-                final List<String> osNames = List.of("osFamily", "ansible_os_family");
-                String nameTag = InventoryList.findTag(osNames, tags);
-                Optional.ofNullable(nameTag).ifPresent(node::setOsFamily);
+                // "osFamily" is an explicit override authored directly in the inventory —
+                // trusted as-is even if it isn't unix/windows. "ansible_os_family" (RUN-4821)
+                // is a raw Linux distro family (e.g. "Debian"), not a Rundeck osFamily value,
+                // so it must be normalized rather than passed through.
+                if (tags.containsKey("osFamily")) {
+                    Optional.ofNullable(InventoryList.findTag(List.of("osFamily"), tags))
+                            .ifPresent(node::setOsFamily);
+                } else {
+                    Optional.ofNullable(InventoryList.findTag(List.of("ansible_os_family"), tags))
+                            .map(AnsibleUtil::normalizeOsFamily)
+                            .ifPresent(node::setOsFamily);
+                }
             }
         },
         OS_NAME {
@@ -116,6 +126,11 @@ public class InventoryList {
             public void handle(NodeEntryImpl node, Map<String, Object> tags) {
                 final List<String> familyNames = List.of("osName", "ansible_os_name");
                 String nameTag = InventoryList.findTag(familyNames, tags);
+                if (nameTag == null) {
+                    // Fall back to the raw distro family (e.g. "Debian") so that data isn't
+                    // lost now that it's no longer written into osFamily (RUN-4821).
+                    nameTag = InventoryList.findTag(List.of("ansible_os_family"), tags);
+                }
                 Optional.ofNullable(nameTag).ifPresent(node::setOsName);
             }
         },

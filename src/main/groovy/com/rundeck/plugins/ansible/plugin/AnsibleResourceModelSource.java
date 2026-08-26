@@ -215,6 +215,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     return false;
   }
 
+
     public void configure(Properties configuration) throws ConfigurationException {
 
     project = configuration.getProperty("project");
@@ -556,15 +557,21 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
             }
           }
 
-          // ansible_system     = Linux   = osFamily in Rundeck
-          // ansible_os_family  = Debian  = osName in Rundeck
+          // ansible_system     = Linux   -> normalized into osFamily (RUN-4821: unix/windows, not the raw value)
+          // ansible_os_family  = Debian  -> falls through into osName when no dedicated name fact is present
 
-          if (root.has("ansible_os_family")) {
-            node.setOsFamily(root.get("ansible_os_family").getAsString());
+          if (root.has("ansible_system") && !root.get("ansible_system").isJsonNull()) {
+            node.setOsFamily(AnsibleUtil.normalizeOsFamily(root.get("ansible_system").getAsString()));
+          } else if (root.has("ansible_os_family") && !root.get("ansible_os_family").isJsonNull()) {
+            // Fallback for hosts that didn't report ansible_system: still normalize
+            // rather than passing the raw distro family (e.g. "Debian") through.
+            node.setOsFamily(AnsibleUtil.normalizeOsFamily(root.get("ansible_os_family").getAsString()));
           }
 
           if (root.has("ansible_os_name") && !root.get("ansible_os_name").isJsonNull()) {
             node.setOsName(root.get("ansible_os_name").getAsString());
+          } else if (root.has("ansible_os_family") && !root.get("ansible_os_family").isJsonNull()) {
+            node.setOsName(root.get("ansible_os_family").getAsString());
           }
 
           if (root.has("ansible_architecture") && !root.get("ansible_architecture").isJsonNull()) {

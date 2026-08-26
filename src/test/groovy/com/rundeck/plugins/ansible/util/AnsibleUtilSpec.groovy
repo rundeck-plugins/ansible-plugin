@@ -59,5 +59,24 @@ class AnsibleUtilSpec extends Specification{
         ""                    | "/default/tmp"     || "/default/tmp"     // Case where framework.tmp.dir is empty
         null                  | "/default/tmp"     || "/default/tmp"     // Case where framework.tmp.dir is null
     }
+
+    // RUN-4821: shared normalization used by both the gather-facts JSON path
+    // (AnsibleResourceModelSource) and the static-inventory path (InventoryList) so
+    // osFamily is always Rundeck's canonical "unix"/"windows", never a raw
+    // ansible_system/ansible_os_family value like "Linux" or "Debian".
+    def "normalizeOsFamily normalizes #rawOsFamily to #expected"() {
+        expect:
+        AnsibleUtil.normalizeOsFamily(rawOsFamily) == expected
+
+        where:
+        rawOsFamily | expected
+        'Linux'     | 'unix'
+        'Windows'   | 'windows'
+        'windows'   | 'windows'
+        'Darwin'    | 'unix'
+        'Debian'    | 'unix'
+        'RedHat'    | 'unix'
+        null        | null
+    }
 }
 

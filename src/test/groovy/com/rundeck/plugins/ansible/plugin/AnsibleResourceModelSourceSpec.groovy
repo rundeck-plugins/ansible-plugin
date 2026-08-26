@@ -81,7 +81,7 @@ class AnsibleResourceModelSourceSpec extends Specification {
         node.tags[0] == 'ungrouped'
         if (node.hostname)    { node.hostname == nodeName }
         if (node.nodename)    { node.nodename == nodeName }
-        if (node.osFamily)    { node.osFamily == familyValue }
+        if (node.osFamily)    { node.osFamily == expectedOsFamily }
         if (node.osName)      { node.osName == nameValue }
         if (node.osVersion)   { node.osVersion == versionValue }
         if (node.osArch)      { node.osArch == archValue }
@@ -89,11 +89,11 @@ class AnsibleResourceModelSourceSpec extends Specification {
         if (node.description) { node.description == descValue }
 
         where:
-        nodeName | osFamily            | osName            | osVersion        | osArch                 | username           | description
-        'NODE_0' | 'osFamily'          | 'osName'          | 'osVersion'      | 'osArch'               | 'username'         | 'description'
-        'NODE_1' | 'ansible_os_family' | 'ansible_os_name' | 'ansible_kernel' | 'ansible_architecture' | 'ansible_user'     | 'ansible_distribution'
-        'NODE_2' | 'ansible_os_family' | 'ansible_os_name' | 'ansible_kernel' | 'ansible_architecture' | 'ansible_ssh_user' | 'ansible_distribution'
-        'NODE_3' | 'ansible_os_family' | 'ansible_os_name' | 'ansible_kernel' | 'ansible_architecture' | 'ansible_user_id'  | 'ansible_distribution'
+        nodeName | osFamily            | osName            | osVersion        | osArch                 | username           | description            | expectedOsFamily
+        'NODE_0' | 'osFamily'          | 'osName'          | 'osVersion'      | 'osArch'               | 'username'         | 'description'          | 'Linux'
+        'NODE_1' | 'ansible_os_family' | 'ansible_os_name' | 'ansible_kernel' | 'ansible_architecture' | 'ansible_user'     | 'ansible_distribution' | 'unix'
+        'NODE_2' | 'ansible_os_family' | 'ansible_os_name' | 'ansible_kernel' | 'ansible_architecture' | 'ansible_ssh_user' | 'ansible_distribution' | 'unix'
+        'NODE_3' | 'ansible_os_family' | 'ansible_os_name' | 'ansible_kernel' | 'ansible_architecture' | 'ansible_user_id'  | 'ansible_distribution' | 'unix'
     }
 
     void "ansible yaml data size parameter without an Exception"() {
@@ -757,7 +757,11 @@ fake-cert
         node != null
         node.getHostname() == '192.168.1.100'
         node.getUsername() == 'ubuntu'
-        node.getOsFamily() == 'Debian'
+        // RUN-4821: ansible_os_family ("Debian") is a raw distro family, not a Rundeck
+        // osFamily value, so it's normalized to "unix" and the distro name falls
+        // through to osName instead of being lost.
+        node.getOsFamily() == 'unix'
+        node.getOsName() == 'Debian'
 
         and: "ansible variables should NOT be in attributes (filtered by ansible_ prefix)"
         !node.getAttributes().containsKey('ansible_host')
