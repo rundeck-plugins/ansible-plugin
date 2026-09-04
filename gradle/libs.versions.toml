@@ -7,7 +7,7 @@ kotlin-stdlib = "2.4.10"
 # Current dependency versions (maintained for compatibility)
 gson = "2.14.0"
 jackson = "2.22.2"
-snakeyaml = "2.6"
+snakeyaml = "2.7"
 groovy = "4.0.33"
 lombok = "1.18.46"
 spock = "2.4-groovy-4.0"
