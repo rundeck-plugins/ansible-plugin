@@ -19,7 +19,7 @@ bytebuddy = "1.18.12"
 objenesis = "3.6"
 
 # Rundeck version
-rundeck-core = "6.1.0-20260803"
+rundeck-core = "7.0.0-SNAPSHOT"
 
 [libraries]
 # Security overrides
