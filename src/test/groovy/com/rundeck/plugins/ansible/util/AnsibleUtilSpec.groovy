@@ -76,6 +76,13 @@ class AnsibleUtilSpec extends Specification{
         'Darwin'    | 'unix'
         'Debian'    | 'unix'
         'RedHat'    | 'unix'
+        'FreeBSD'   | 'unix'
+        'Win32NT'   | 'windows'
+        'Win32S'    | 'windows'
+        'Win32Windows' | 'windows'
+        'WinCE'     | 'windows'
+        'WIN32NT'   | 'windows'
+        ' Windows ' | 'windows'
         null        | null
     }
 }

@@ -46,6 +46,7 @@ class InventoryListSpec extends Specification {
         "Debian"        | "unix"
         "RedHat"        | "unix"
         "Windows"       | "windows"
+        "Win32NT"       | "windows"
     }
 
     void "OS_FAMILY handle leaves osFamily unset when neither tag is present"() {
