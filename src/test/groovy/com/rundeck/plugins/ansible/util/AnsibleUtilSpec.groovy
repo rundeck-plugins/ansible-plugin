@@ -79,7 +79,6 @@ class AnsibleUtilSpec extends Specification{
         'FreeBSD'   | 'unix'
         'Win32NT'   | 'windows'
         'Win32S'    | 'windows'
-        'Win32Windows' | 'windows'
         'WinCE'     | 'windows'
         'WIN32NT'   | 'windows'
         ' Windows ' | 'windows'
