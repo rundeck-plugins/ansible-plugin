@@ -89,7 +89,7 @@ class AnsibleResourceModelSourceSpec extends Specification {
         node.osVersion == versionValue
         node.osArch == archValue
         node.username == usernameValue
-        // description not asserted: InventoryList DESCRIPTION tag mapping is broken, fixed separately.
+        node.description == descValue
 
         where:
         nodeName | osFamily            | osName            | osVersion        | osArch                 | username           | description            | expectedOsFamily

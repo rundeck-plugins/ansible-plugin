@@ -7,7 +7,10 @@ import lombok.Data;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Data
 public class InventoryList {
@@ -153,16 +156,25 @@ public class InventoryList {
         DESCRIPTION {
             @Override
             public void handle(NodeEntryImpl node, Map<String, Object> tags) {
-                Map<String, Object> lsbMap = InventoryList.getValue(tags, "ansible_lsb");
-                if (lsbMap != null) {
-                    String desc = InventoryList.valueString(lsbMap.get("description"));
-                    Optional.ofNullable(desc).ifPresent(node::setDescription);
+                // Same precedence as the gather-facts path: explicit "description" tag,
+                // then ansible_lsb.description, then "<distribution> <version>".
+                String explicit = InventoryList.findTag(List.of("description"), tags);
+                if (explicit != null) {
+                    node.setDescription(explicit);
+                    return;
                 }
-                else {
-                    Optional.ofNullable(InventoryList.getValue(tags, "ansible_distribution"))
-                            .ifPresent(x -> node.setDescription(x + " "));
-                    Optional.ofNullable(InventoryList.getValue(tags, "ansible_distribution_version"))
-                            .ifPresent(x -> node.setDescription(x + " "));
+                Map<String, Object> lsbMap = InventoryList.getValue(tags, "ansible_lsb");
+                if (lsbMap != null && lsbMap.get("description") != null) {
+                    node.setDescription(InventoryList.valueString(lsbMap.get("description")));
+                    return;
+                }
+                String desc = Stream.of(
+                                InventoryList.findTag(List.of("ansible_distribution"), tags),
+                                InventoryList.findTag(List.of("ansible_distribution_version"), tags))
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.joining(" "));
+                if (!desc.isEmpty()) {
+                    node.setDescription(desc);
                 }
             }
         };

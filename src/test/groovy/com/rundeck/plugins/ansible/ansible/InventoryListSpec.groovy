@@ -89,6 +89,28 @@ class InventoryListSpec extends Specification {
         node.getOsName() == "Debian"
     }
 
+    @Unroll
+    void "DESCRIPTION handle builds #expected from #tags"() {
+        given:
+        NodeEntryImpl node = new NodeEntryImpl()
+
+        when:
+        InventoryList.NodeTag.DESCRIPTION.handle(node, new HashMap<String, Object>(tags))
+
+        then:
+        node.getDescription() == expected
+
+        where:
+        tags                                                                                        | expected
+        [description: 'my host', ansible_lsb: [description: 'lsb'], ansible_distribution: 'Ubuntu'] | 'my host'
+        [ansible_lsb: [description: 'Ubuntu 22.04.4 LTS'], ansible_distribution: 'Ubuntu']          | 'Ubuntu 22.04.4 LTS'
+        [ansible_lsb: [id: 'Ubuntu'], ansible_distribution: 'Ubuntu']                               | 'Ubuntu'
+        [ansible_distribution: 'CentOS Linux']                                                      | 'CentOS Linux'
+        [ansible_distribution: 'CentOS Linux', ansible_distribution_version: '7.9']                 | 'CentOS Linux 7.9'
+        [ansible_distribution_version: '7.9']                                                       | '7.9'
+        [:]                                                                                         | null
+    }
+
     void "OS_NAME handle leaves osName unset when no name tags are present"() {
         given:
         NodeEntryImpl node = new NodeEntryImpl()
