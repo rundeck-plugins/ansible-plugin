@@ -9,6 +9,8 @@ jobs:
 
     steps:
       - uses: rundeck-plugins/.github/.github/actions/setup-java@main
+        with:
+          java-version: '25'
       - name: Get Fetch Tags
         run: git -c protocol.version=2 fetch --tags --progress --no-recurse-submodules origin
         if: "!contains(github.ref, 'refs/tags')"
