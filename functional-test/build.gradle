@@ -38,6 +38,13 @@ dependencies {
 
 }
 
+// The specs in this module run through the functionalTest task below, which needs Docker. The
+// default test task has those sources on its source set but nothing it can discover, which Gradle 9
+// treats as a misconfiguration and fails on.
+tasks.named('test') {
+    failOnNoDiscoveredTests = false
+}
+
 tasks.register('functionalTest', Test) {
     useJUnitPlatform()
 
