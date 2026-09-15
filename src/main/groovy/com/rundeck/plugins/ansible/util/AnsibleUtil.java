@@ -26,12 +26,16 @@ public class AnsibleUtil {
      * Rundeck's canonical lowercase osFamily values ("unix"/"windows"), matching the
      * convention used by other Node Resource plugins (EC2, Local, ServiceNow).
      * RUN-4821.
+     * Windows reports {@code ansible_system} as the .NET {@code PlatformID} name ({@code Win32NT});
+     * {@code windows}, {@code win32*} and {@code wince} map to "windows", anything else to "unix".
      */
     public static String normalizeOsFamily(final String rawOsFamily) {
         if (rawOsFamily == null) {
             return null;
         }
-        return rawOsFamily.equalsIgnoreCase("windows") ? "windows" : "unix";
+        final String value = rawOsFamily.trim().toLowerCase(Locale.ROOT);
+        return (value.equals("windows") || value.startsWith("win32") || value.equals("wince"))
+                ? "windows" : "unix";
     }
 
     public static SecretBundle createBundle(AnsibleRunnerContextBuilder builder){
