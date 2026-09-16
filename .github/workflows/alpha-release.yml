@@ -1,0 +1,148 @@
+on:
+  push:
+    tags:
+      - '*-alpha*'
+
+name: Publish Alpha Release
+
+jobs:
+  build:
+    name: Publish Alpha Release
+    runs-on: ubuntu-latest
+    env:
+      PKGCLD_REPO_URL: ${{ vars.PKGCLD_REPO_URL }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: '25'
+          distribution: 'zulu'
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      # --- rundeck-core SNAPSHOT bootstrap ---------------------------------
+      # A released rundeck-core resolves from Maven Central like any other dependency
+      # and every step below skips. A SNAPSHOT only exists where it was built, so it
+      # is built from source into ~/.m2 first.
+
+      - name: Read rundeck-core version and branch
+        id: core
+        run: |
+          eval "$(./gradlew -q -I .github/print-core-info.init.gradle \
+                    printRundeckCoreInfo --no-configuration-cache \
+                  | grep -E '^RUNDECK_CORE_(VERSION|BRANCH)=')"
+          [ -n "${RUNDECK_CORE_VERSION}" ] || { echo "::error::No org.rundeck:rundeck-core dependency declared"; exit 1; }
+          echo "rundeck-core: ${RUNDECK_CORE_VERSION}"
+          echo "version=${RUNDECK_CORE_VERSION}" >> "$GITHUB_OUTPUT"
+          case "${RUNDECK_CORE_VERSION}" in
+            *-SNAPSHOT)
+              [ -n "${RUNDECK_CORE_BRANCH}" ] || {
+                echo "::error::${RUNDECK_CORE_VERSION} is a SNAPSHOT but rundeckCoreBranch is not set in gradle.properties"
+                exit 1
+              }
+              echo "built from branch: ${RUNDECK_CORE_BRANCH}"
+              echo "snapshot=true" >> "$GITHUB_OUTPUT"
+              echo "branch=${RUNDECK_CORE_BRANCH}" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "snapshot=false" >> "$GITHUB_OUTPUT"
+              ;;
+          esac
+
+      - name: Resolve rundeck core commit
+        id: corerev
+        if: steps.core.outputs.snapshot == 'true'
+        run: |
+          BRANCH='${{ steps.core.outputs.branch }}'
+          SHA=$(git ls-remote https://github.com/rundeck/rundeck.git "refs/heads/${BRANCH}" | cut -f1)
+          [ -n "${SHA}" ] || { echo "::error::Branch '${BRANCH}' not found in rundeck/rundeck"; exit 1; }
+          echo "rundeck/rundeck@${BRANCH} = ${SHA}"
+          echo "sha=${SHA}" >> "$GITHUB_OUTPUT"
+
+      # Keyed on the exact core commit AND the wanted version, with no restore-keys.
+      # A near-miss must be a miss: reusing artifacts from a different commit would
+      # build against a stale core, and omitting the version would turn a version bump
+      # into a cache hit that skips the guard below.
+      - name: Cache rundeck-core artifacts
+        id: corecache
+        if: steps.core.outputs.snapshot == 'true'
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository/org/rundeck
+          key: rundeck-core-${{ steps.corerev.outputs.sha }}-${{ steps.core.outputs.version }}
+
+      - name: Build rundeck-core from source
+        if: steps.core.outputs.snapshot == 'true' && steps.corecache.outputs.cache-hit != 'true'
+        run: |
+          BRANCH='${{ steps.core.outputs.branch }}'
+          git clone --depth 1 --branch "${BRANCH}" \
+            https://github.com/rundeck/rundeck.git "${RUNNER_TEMP}/rundeck"
+          cd "${RUNNER_TEMP}/rundeck"
+
+          # The branch and the version are independent: a branch can perfectly well
+          # produce a version this plugin never asked for. Fail loudly here rather than
+          # let the plugin build fail later with an opaque "not found".
+          BUILT=$(./gradlew -q bashVersionInfo | grep '^VERSION_FULL=' | cut -d= -f2)
+          WANTED='${{ steps.core.outputs.version }}'
+          if [ "${BUILT}" != "${WANTED}" ]; then
+            echo "::error::Branch '${BRANCH}' builds ${BUILT}, but this plugin declares ${WANTED}"
+            exit 1
+          fi
+
+          ./gradlew publishToMavenLocal -x check
+      # --- end bootstrap ----------------------------------------------------
+
+      - name: Build with Gradle
+        run: ./gradlew build
+      - name: Get Release Version
+        id: get_version
+        run: VERSION=$(./gradlew currentVersion -q -Prelease.quiet) && echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+      - name: Create Release
+        run: |
+          gh release create \
+            --generate-notes \
+            --prerelease \
+            --title 'Alpha ${{ steps.get_version.outputs.VERSION }}' \
+            ${{ github.ref_name }} \
+            build/libs/ansible-plugin-${{ steps.get_version.outputs.VERSION }}.jar
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish to PackageCloud
+        run: |
+          if [ -z "$PKGCLD_WRITE_TOKEN" ]; then
+            echo "::error::PKGCLD_WRITE_TOKEN must be set to publish to PackageCloud"
+            exit 1
+          fi
+          ./gradlew publishAllPublicationsToPackageCloudRepository
+        env:
+          PKGCLD_WRITE_TOKEN: ${{ secrets.PKGCLD_WRITE_TOKEN }}
+      - name: Sign and upload GPG signatures to PackageCloud
+        run: |
+          set -e
+          VERSION="${{ steps.get_version.outputs.VERSION }}"
+          BASE_URL="${PKGCLD_REPO_URL:-https://packagecloud.io/pagerduty/rundeck-plugins/maven2}/org/rundeck/plugins/ansible-plugin/${VERSION}"
+
+          echo "$SIGNING_KEY_B64" | base64 -d | gpg --batch --yes --import
+          KEY_ID=$(gpg --list-secret-keys --with-colons | awk -F: '/^sec/ {print $5; exit}')
+
+          sign_and_upload() {
+            local FILE="$1"
+            local REMOTE_NAME="$2"
+            gpg --batch --yes --pinentry-mode loopback --passphrase "$SIGNING_PASSWORD" --default-key "$KEY_ID" --detach-sign --armor "$FILE"
+            curl -sf -H "Authorization: Bearer ${PKGCLD_WRITE_TOKEN}" \
+              -X PUT --data-binary "@${FILE}.asc" \
+              "${BASE_URL}/${REMOTE_NAME}.asc"
+          }
+
+          sign_and_upload "build/libs/ansible-plugin-${VERSION}.jar" "ansible-plugin-${VERSION}.jar"
+          sign_and_upload "build/libs/ansible-plugin-${VERSION}-sources.jar" "ansible-plugin-${VERSION}-sources.jar"
+          sign_and_upload "build/libs/ansible-plugin-${VERSION}-javadoc.jar" "ansible-plugin-${VERSION}-javadoc.jar"
+          sign_and_upload "build/publications/ansible-plugin/pom-default.xml" "ansible-plugin-${VERSION}.pom"
+        env:
+          SIGNING_KEY_B64: ${{ secrets.SIGNING_KEY_B64 }}
+          SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
+          PKGCLD_WRITE_TOKEN: ${{ secrets.PKGCLD_WRITE_TOKEN }}
