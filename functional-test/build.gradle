@@ -4,6 +4,13 @@ plugins {
 
 repositories {
     mavenLocal()
+    // rd-cli / rd-api-client publish here (no longer Maven Central; RUN-4639)
+    maven {
+        url 'https://packagecloud.io/pagerduty/rundeck/maven2'
+        content {
+            includeGroup('org.rundeck.api')
+        }
+    }
     mavenCentral()
 }
 
