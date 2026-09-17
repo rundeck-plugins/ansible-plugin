@@ -1,0 +1,22 @@
+// Reports which rundeck-core this plugin is built against, for CI to act on.
+//
+// The version is read from the DECLARED dependency rather than parsed out of a build
+// file: across the plugin set this dependency is spelled four different ways (version
+// catalog, ext property, inline coordinate, named arguments) and the declared-dependency
+// model is identical for all of them. Reading it resolves nothing, so this works before
+// a SNAPSHOT core has been built.
+//
+// The branch comes from the rundeckCoreBranch property in gradle.properties, kept there
+// so it lives beside the dependency it describes and is versioned with it.
+gradle.projectsEvaluated {
+    rootProject.tasks.register('printRundeckCoreInfo') {
+        doLast {
+            def version = rootProject.configurations
+                    .collectMany { it.dependencies }
+                    .find { it.group == 'org.rundeck' && it.name == 'rundeck-core' }
+                    ?.version
+            println "RUNDECK_CORE_VERSION=${version ?: ''}"
+            println "RUNDECK_CORE_BRANCH=${rootProject.findProperty('rundeckCoreBranch') ?: ''}"
+        }
+    }
+}
