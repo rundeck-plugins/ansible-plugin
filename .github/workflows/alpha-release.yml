@@ -1,23 +1,25 @@
-name: Java CI
+on:
+  push:
+    tags:
+      - '*-alpha*'
 
-on: [push]
+name: Publish Alpha Release
 
 jobs:
   build:
-
+    name: Publish Alpha Release
     runs-on: ubuntu-latest
-
+    env:
+      PKGCLD_REPO_URL: ${{ vars.PKGCLD_REPO_URL }}
     steps:
-      - uses: actions/checkout@v7
+      - name: Checkout code
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - name: Get Fetch Tags
-        run: git -c protocol.version=2 fetch --tags --progress --no-recurse-submodules origin
-        if: "!contains(github.ref, 'refs/tags')"
-      - name: Set up JDK 25
+      - name: Set up JDK 17
         uses: actions/setup-java@v5
         with:
-          java-version: 25
+          java-version: '25'
           distribution: 'zulu'
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
@@ -96,44 +98,51 @@ jobs:
 
       - name: Build with Gradle
         run: ./gradlew build
-      - name: Copy Artifact for integration test
-        run: ./gradlew :functional-test:copyPluginArtifact
-      - name: Run integration Test
-        run: |
-          set -eo pipefail
-          # Non-hidden dirs: upload-artifact often omits dot-directories like .temp/
-          mkdir -p ci-logs "functional-test/build/ci-reports"
-          STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
-          LOG_CI="ci-logs/functionalTest-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${STAMP}.log"
-          LOG_BUILD="functional-test/build/ci-reports/console-${STAMP}.log"
-          echo "Full Gradle log (two copies): $LOG_CI and $LOG_BUILD"
-          ./gradlew :functional-test:functionalTest --stacktrace --info 2>&1 | tee "$LOG_CI" | tee "$LOG_BUILD"
-      - name: List functional test log outputs
-        if: always()
-        run: |
-          echo "=== ci-logs ==="
-          ls -la ci-logs/ 2>/dev/null || echo "(missing)"
-          echo "=== functional-test/build/ci-reports ==="
-          ls -la functional-test/build/ci-reports/ 2>/dev/null || echo "(missing)"
-      - name: Upload functional test reports and logs
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: ansible-functional-test-${{ github.run_id }}-${{ github.run_attempt }}
-          path: |
-            ci-logs/
-            functional-test/build/ci-reports/
-            functional-test/build/reports/tests/
-            functional-test/build/test-results/
-            build/reports/problems/
-          if-no-files-found: warn
       - name: Get Release Version
         id: get_version
         run: VERSION=$(./gradlew currentVersion -q -Prelease.quiet) && echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
-      - name: Upload plugin jar
-        uses: actions/upload-artifact@v7
-        with:
-          # Artifact name
-          name: Grails-Plugin-${{ steps.get_version.outputs.VERSION }}
-          # Directory containing files to upload
-          path: build/libs/ansible-plugin-${{ steps.get_version.outputs.VERSION }}.jar
+      - name: Create Release
+        run: |
+          gh release create \
+            --generate-notes \
+            --prerelease \
+            --title 'Alpha ${{ steps.get_version.outputs.VERSION }}' \
+            ${{ github.ref_name }} \
+            build/libs/ansible-plugin-${{ steps.get_version.outputs.VERSION }}.jar
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish to PackageCloud
+        run: |
+          if [ -z "$PKGCLD_WRITE_TOKEN" ]; then
+            echo "::error::PKGCLD_WRITE_TOKEN must be set to publish to PackageCloud"
+            exit 1
+          fi
+          ./gradlew publishAllPublicationsToPackageCloudRepository
+        env:
+          PKGCLD_WRITE_TOKEN: ${{ secrets.PKGCLD_WRITE_TOKEN }}
+      - name: Sign and upload GPG signatures to PackageCloud
+        run: |
+          set -e
+          VERSION="${{ steps.get_version.outputs.VERSION }}"
+          BASE_URL="${PKGCLD_REPO_URL:-https://packagecloud.io/pagerduty/rundeck-plugins/maven2}/org/rundeck/plugins/ansible-plugin/${VERSION}"
+
+          echo "$SIGNING_KEY_B64" | base64 -d | gpg --batch --yes --import
+          KEY_ID=$(gpg --list-secret-keys --with-colons | awk -F: '/^sec/ {print $5; exit}')
+
+          sign_and_upload() {
+            local FILE="$1"
+            local REMOTE_NAME="$2"
+            gpg --batch --yes --pinentry-mode loopback --passphrase "$SIGNING_PASSWORD" --default-key "$KEY_ID" --detach-sign --armor "$FILE"
+            curl -sf -H "Authorization: Bearer ${PKGCLD_WRITE_TOKEN}" \
+              -X PUT --data-binary "@${FILE}.asc" \
+              "${BASE_URL}/${REMOTE_NAME}.asc"
+          }
+
+          sign_and_upload "build/libs/ansible-plugin-${VERSION}.jar" "ansible-plugin-${VERSION}.jar"
+          sign_and_upload "build/libs/ansible-plugin-${VERSION}-sources.jar" "ansible-plugin-${VERSION}-sources.jar"
+          sign_and_upload "build/libs/ansible-plugin-${VERSION}-javadoc.jar" "ansible-plugin-${VERSION}-javadoc.jar"
+          sign_and_upload "build/publications/ansible-plugin/pom-default.xml" "ansible-plugin-${VERSION}.pom"
+        env:
+          SIGNING_KEY_B64: ${{ secrets.SIGNING_KEY_B64 }}
+          SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
+          PKGCLD_WRITE_TOKEN: ${{ secrets.PKGCLD_WRITE_TOKEN }}
