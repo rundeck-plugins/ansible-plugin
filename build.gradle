@@ -89,6 +89,12 @@ configurations {
       force libs.commons.lang3.get()
       force libs.commons.compress.get()
       force libs.kotlin.stdlib.get()
+      force libs.jackson.core.get()
+      force libs.jackson.databind.get()
+      force libs.jackson.dataformat.yaml.get()
+      force libs.guava.get()
+      force libs.ant.get()
+      force libs.spring.security.crypto.get()
       // Exclude old commons-lang to prevent conflicts
       exclude group: 'commons-lang', module: 'commons-lang'
     }
