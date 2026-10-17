@@ -781,16 +781,20 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
 
     for (Map.Entry<String, Object> pair : children.entrySet()) {
 
-      String hostGroup = pair.getKey();
-      tags.add(hostGroup);
+      // Each group gets its own copy of the tags of the groups above it, so
+      // a group's tags do not leak into its siblings.
+      HashSet<String> groupTags = new HashSet<>(tags);
+      groupTags.add(pair.getKey());
       Map<String, Object> hostNames = InventoryList.getType(pair.getValue());
 
-      if (hostNames.containsKey(CHILDREN)) {
+      // A group can have both child groups and hosts of its own.
+      boolean hasChildren = hostNames.containsKey(CHILDREN);
+      if (hasChildren) {
         Map<String, Object> subChildren = InventoryList.getValue(hostNames, CHILDREN);
-        processChildren(subChildren, tags);
-      } else {
-        processHosts(hostNames, tags);
-        tags.clear();
+        processChildren(subChildren, groupTags);
+      }
+      if (hostNames.containsKey(HOSTS) || !hasChildren) {
+        processHosts(hostNames, groupTags);
       }
     }
   }
