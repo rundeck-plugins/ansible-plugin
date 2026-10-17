@@ -278,6 +278,81 @@ class AnsibleResourceModelSourceSpec extends Specification {
         notThrown(Exception)
     }
 
+    private INodeSet getNodesWithoutFacts(String inventoryYaml) {
+        Framework framework = Mock(Framework) {
+            getBaseDir() >> new File('/tmp')
+            getPropertyLookup() >> Mock(IPropertyLookup){
+                getProperty("framework.tmp.dir") >> '/tmp'
+            }
+        }
+        ResourceModelSource plugin = new AnsibleResourceModelSource(framework)
+        Properties config = new Properties()
+        config.put('project', 'project_1')
+        config.put(AnsibleDescribable.ANSIBLE_GATHER_FACTS, 'false')
+        plugin.configure(config)
+        plugin.setServices(Mock(Services) {
+            getService(KeyStorageTree.class) >> Mock(KeyStorageTree)
+        })
+        plugin.ansibleInventoryListBuilder = Mock(AnsibleInventoryListBuilder) {
+            build() >> Mock(AnsibleInventoryList) {
+                getNodeList() >> inventoryYaml
+            }
+        }
+        return plugin.getNodes()
+    }
+
+    void "a group with both child groups and its own hosts keeps its own hosts"() {
+        given: "ansible-inventory --list -y output for [parent:children] child, [parent] host-a host-b, [child] host-c"
+        String inventory = '''\
+all:
+  children:
+    parent:
+      children:
+        child:
+          hosts:
+            host-c: {}
+      hosts:
+        host-a: {}
+        host-b: {}
+'''
+
+        when:
+        INodeSet nodes = getNodesWithoutFacts(inventory)
+
+        then:
+        nodes.nodeNames as Set == ['host-a', 'host-b', 'host-c'] as Set
+        nodes.getNode('host-a').tags == ['parent'] as Set
+        nodes.getNode('host-b').tags == ['parent'] as Set
+        nodes.getNode('host-c').tags == ['parent', 'child'] as Set
+    }
+
+    void "hosts in sibling child groups keep the tag of their parent group"() {
+        given:
+        String inventory = '''\
+all:
+  children:
+    parent:
+      children:
+        first:
+          hosts:
+            host-1: {}
+        second:
+          hosts:
+            host-2: {}
+    other:
+      hosts:
+        host-3: {}
+'''
+
+        when:
+        INodeSet nodes = getNodesWithoutFacts(inventory)
+
+        then:
+        nodes.getNode('host-1').tags == ['parent', 'first'] as Set
+        nodes.getNode('host-2').tags == ['parent', 'second'] as Set
+        nodes.getNode('host-3').tags == ['other'] as Set
+    }
+
     private AnsibleInventoryListBuilder mockInventoryList(int qtyNodes, boolean nullHosts = false) {
         return Mock(AnsibleInventoryListBuilder) {
             build() >> Mock(AnsibleInventoryList) {
