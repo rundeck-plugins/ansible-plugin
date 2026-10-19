@@ -2,6 +2,7 @@ on:
   push:
     tags:
       - '*.*.*'
+      - '!*-alpha*'
 
 name: Publish Release
 
@@ -19,7 +20,7 @@ jobs:
       - name: Set up JDK 17
         uses: actions/setup-java@v5
         with:
-          java-version: '17'
+          java-version: '25'
           distribution: 'zulu'
       - name: Build with Gradle
         run: ./gradlew build
