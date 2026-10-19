@@ -12,15 +12,7 @@ jobs:
     env:
       PKGCLD_REPO_URL: ${{ vars.PKGCLD_REPO_URL }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-      - name: Set up JDK 17
-        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
-        with:
-          java-version: '17'
-          distribution: 'zulu'
+      - uses: rundeck-plugins/.github/.github/actions/setup-java@main
       - name: Build with Gradle
         run: ./gradlew build
       - name: Get Release Version
