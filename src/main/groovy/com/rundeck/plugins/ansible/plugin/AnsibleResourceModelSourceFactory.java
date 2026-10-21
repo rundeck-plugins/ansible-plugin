@@ -65,6 +65,7 @@ public class AnsibleResourceModelSourceFactory implements ResourceModelSourceFac
 
         builder.property(YAML_DATA_SIZE_PROP);
         builder.property(YAML_MAX_ALIASES_PROP);
+        builder.property(RESOLVE_NESTED_GROUPS_PROP);
 
         builder.mapping(ANSIBLE_INVENTORY,PROJ_PROP_PREFIX + ANSIBLE_INVENTORY);
         builder.frameworkMapping(ANSIBLE_INVENTORY,FWK_PROP_PREFIX + ANSIBLE_INVENTORY);

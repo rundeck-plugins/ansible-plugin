@@ -60,6 +60,7 @@ import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Set;
 
+import static com.rundeck.plugins.ansible.ansible.AnsibleDescribable.ANSIBLE_RESOLVE_NESTED_GROUPS;
 import static com.rundeck.plugins.ansible.ansible.AnsibleDescribable.ANSIBLE_YAML_DATA_SIZE;
 import static com.rundeck.plugins.ansible.ansible.AnsibleDescribable.ANSIBLE_YAML_MAX_ALIASES;
 import static com.rundeck.plugins.ansible.ansible.InventoryList.ALL;
@@ -166,6 +167,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
   private Integer yamlDataSize;
   @Setter
   private Integer yamlMaxAliases;
+  private boolean resolveNestedGroups;
 
   @Setter
   private AnsibleInventoryList.AnsibleInventoryListBuilder ansibleInventoryListBuilder = null;
@@ -288,6 +290,7 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
     // Inventory Yaml
     yamlDataSize = resolveIntProperty(ANSIBLE_YAML_DATA_SIZE,10, configuration, executionDataContext);
     yamlMaxAliases = resolveIntProperty(ANSIBLE_YAML_MAX_ALIASES,1000, configuration, executionDataContext);
+    resolveNestedGroups = "true".equals(resolveProperty(ANSIBLE_RESOLVE_NESTED_GROUPS,"false",configuration,executionDataContext));
 
   }
 
@@ -779,6 +782,11 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
       return;
     }
 
+    if (!resolveNestedGroups) {
+      processChildrenLegacy(children, tags);
+      return;
+    }
+
     for (Map.Entry<String, Object> pair : children.entrySet()) {
 
       // Each group gets its own copy of the tags of the groups above it, so
@@ -795,6 +803,33 @@ public class AnsibleResourceModelSource implements ResourceModelSource, ProxyRun
       }
       if (hostNames.containsKey(HOSTS) || !hasChildren) {
         processHosts(hostNames, groupTags);
+      }
+    }
+  }
+
+  /**
+   * Group processing used when {@code ansible-resolve-nested-groups} is off (the default), kept
+   * unchanged so existing node filters and ACLs that use tags keep matching the same nodes.
+   * The hosts of a group that also has child groups are skipped, and the tag set is shared and
+   * cleared after each group with hosts, so hosts in a second sibling group lose the parent tag.
+   *
+   * @param children the child groups to process
+   * @param tags     the tags of the groups above them
+   * @throws ResourceModelSourceException if an error occurs while processing the nodes
+   */
+  private void processChildrenLegacy(Map<String, Object> children, HashSet<String> tags) throws ResourceModelSourceException {
+    for (Map.Entry<String, Object> pair : children.entrySet()) {
+
+      String hostGroup = pair.getKey();
+      tags.add(hostGroup);
+      Map<String, Object> hostNames = InventoryList.getType(pair.getValue());
+
+      if (hostNames.containsKey(CHILDREN)) {
+        Map<String, Object> subChildren = InventoryList.getValue(hostNames, CHILDREN);
+        processChildren(subChildren, tags);
+      } else {
+        processHosts(hostNames, tags);
+        tags.clear();
       }
     }
   }
