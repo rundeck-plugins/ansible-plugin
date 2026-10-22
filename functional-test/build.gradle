@@ -23,6 +23,9 @@ configurations {
         resolutionStrategy {
             force libs.commons.compress.get()
             force libs.kotlin.stdlib.get()
+            force libs.jackson.core.get()
+            force libs.jackson.databind.get()
+            force libs.jackson.dataformat.yaml.get()
         }
     }
 }

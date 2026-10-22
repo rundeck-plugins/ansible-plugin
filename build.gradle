@@ -83,15 +83,28 @@ repositories {
 configurations {
   pluginLibs
   
-  // Security: Force resolution of vulnerable dependencies (versions: gradle/libs.versions.toml)
+  // Security: Force resolution of vulnerable dependencies (versions: gradle/libs.versions.toml).
+  // Jackson + commons/kotlin apply to all configs (Jackson is bundled in pluginLibs).
+  // guava/ant are pulled transitively from compileOnly/test rundeck-core for Snyk/compile but are not shipped.
   all {
     resolutionStrategy {
       force libs.commons.lang3.get()
       force libs.commons.compress.get()
       force libs.kotlin.stdlib.get()
+      force libs.jackson.core.get()
+      force libs.jackson.databind.get()
+      force libs.jackson.dataformat.yaml.get()
+      force libs.guava.get()
+      force libs.ant.get()
       // Exclude old commons-lang to prevent conflicts
       exclude group: 'commons-lang', module: 'commons-lang'
     }
+  }
+
+  // spring-security-crypto: only on test classpath via rundeck-core; plugin source does not use it.
+  // Snyk has no 6.x fix (6.5.11); 7.1.1 satisfies SNYK-JAVA-ORGSPRINGFRAMEWORKSECURITY-19267391.
+  [testCompileClasspath, testRuntimeClasspath].each { cfg ->
+    cfg.resolutionStrategy.force libs.spring.security.crypto.get()
   }
 
   implementation {

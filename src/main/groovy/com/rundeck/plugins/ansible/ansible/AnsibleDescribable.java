@@ -172,6 +172,7 @@ public interface AnsibleDescribable extends Describable {
     // Inventory Yaml
     String ANSIBLE_YAML_DATA_SIZE   = "ansible-yaml-data-size";
     String ANSIBLE_YAML_MAX_ALIASES = "ansible-yaml-max-aliases";
+    String ANSIBLE_RESOLVE_NESTED_GROUPS = "ansible-resolve-nested-groups";
     String INVENTORY_YAML = "Inventory Yaml";
     Map<String, Object> inventoryYamlOpt = Map.of(
         StringRenderingConstants.GROUPING, SECONDARY,
@@ -571,6 +572,20 @@ public interface AnsibleDescribable extends Describable {
             .title("Max Aliases")
             .description("Set max size (Default value is 1000)."+
                     " Allows to set the maximum number of aliases that the inventory can have."+
+                    " (This only applies when Gather Facts = No)")
+            .renderingOptions(inventoryYamlOpt)
+            .build();
+
+    Property RESOLVE_NESTED_GROUPS_PROP = PropertyBuilder.builder()
+            .booleanType(ANSIBLE_RESOLVE_NESTED_GROUPS)
+            .required(false)
+            .defaultValue("false")
+            .title("Resolve Nested Groups")
+            .description("Also import the hosts of groups that have child groups,"+
+                    " and tag every host with all the groups above it."+
+                    " Off by default to keep the nodes and tags of earlier versions."+
+                    " Turning it on can add nodes and tags, which changes what"+
+                    " tag-based node filters and ACLs match."+
                     " (This only applies when Gather Facts = No)")
             .renderingOptions(inventoryYamlOpt)
             .build();
