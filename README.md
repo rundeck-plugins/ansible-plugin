@@ -24,6 +24,8 @@ Uses the default configured inventory to scan for nodes. Facts are discovered by
 
 Host groups are imported as tags, you can limit the import to just some selected [patterns](http://docs.ansible.com/ansible/intro_patterns.html), if you want.
 
+With Gather Facts off, the **Resolve Nested Groups** option (`ansible-resolve-nested-groups`, under Inventory Yaml) controls how nested groups are read. When it is on, the hosts of a group that also has child groups are imported, and every host is tagged with all the groups above it. For example, with `[fr:children] fr1 fr2`, hosts in `fr2` get the tags `fr, fr2` instead of only `fr2`. It is off by default so existing sources keep the same nodes and tags. Turning it on can add nodes and tags, so check node filters and ACL policies that use tags before you enable it.
+
 A bunch of facts are imported as attributes, e.g.:
 
 ![Example of node attributes being automatically set by Ansible facts](./node.png)

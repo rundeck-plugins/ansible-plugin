@@ -215,9 +215,17 @@ class BaseTestConfiguration extends Specification{
     }
 
     private void touchProjectConfigTime(String projectName) {
+        setProjectConfig(projectName, 'time', String.valueOf(System.currentTimeMillis()))
+    }
+
+    /**
+     * Set one project config property, e.g. {@code resources.source.2.config.<key>}. Changing the
+     * project config also makes Rundeck reload the project's resource model sources.
+     */
+    protected void setProjectConfig(String projectName, String key, String value) {
         String base = client.getApiBaseUrl()
-        String url = (base.endsWith('/') ? base : base + '/') + "project/${projectName}/config/time"
-        String json = JSON_MAPPER.writeValueAsString([value: String.valueOf(System.currentTimeMillis())])
+        String url = (base.endsWith('/') ? base : base + '/') + "project/${projectName}/config/${key}"
+        String json = JSON_MAPPER.writeValueAsString([value: value])
         RequestBody jsonBody = RequestBody.create(Client.MEDIA_TYPE_JSON, json)
         Request httpReq = new Request.Builder()
                 .url(url)
@@ -230,7 +238,7 @@ class BaseTestConfiguration extends Specification{
         try {
             if (!resp.successful) {
                 String err = resp.body()?.string() ?: ''
-                throw new IllegalStateException("PUT project config/time failed: HTTP ${resp.code} ${err}")
+                throw new IllegalStateException("PUT project config/${key} failed: HTTP ${resp.code} ${err}")
             }
         } finally {
             resp.close()

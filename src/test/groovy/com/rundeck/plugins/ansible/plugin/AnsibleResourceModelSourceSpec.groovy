@@ -278,6 +278,105 @@ class AnsibleResourceModelSourceSpec extends Specification {
         notThrown(Exception)
     }
 
+    private INodeSet getNodesWithoutFacts(String inventoryYaml, String resolveNestedGroups = null) {
+        Framework framework = Mock(Framework) {
+            getBaseDir() >> new File('/tmp')
+            getPropertyLookup() >> Mock(IPropertyLookup){
+                getProperty("framework.tmp.dir") >> '/tmp'
+            }
+        }
+        ResourceModelSource plugin = new AnsibleResourceModelSource(framework)
+        Properties config = new Properties()
+        config.put('project', 'project_1')
+        config.put(AnsibleDescribable.ANSIBLE_GATHER_FACTS, 'false')
+        if (resolveNestedGroups != null) {
+            config.put(AnsibleDescribable.ANSIBLE_RESOLVE_NESTED_GROUPS, resolveNestedGroups)
+        }
+        plugin.configure(config)
+        plugin.setServices(Mock(Services) {
+            getService(KeyStorageTree.class) >> Mock(KeyStorageTree)
+        })
+        plugin.ansibleInventoryListBuilder = Mock(AnsibleInventoryListBuilder) {
+            build() >> Mock(AnsibleInventoryList) {
+                getNodeList() >> inventoryYaml
+            }
+        }
+        return plugin.getNodes()
+    }
+
+    static final String GROUP_WITH_CHILDREN_AND_HOSTS = '''\
+all:
+  children:
+    parent:
+      children:
+        child:
+          hosts:
+            host-c: {}
+      hosts:
+        host-a: {}
+        host-b: {}
+'''
+
+    static final String SIBLING_CHILD_GROUPS = '''\
+all:
+  children:
+    parent:
+      children:
+        first:
+          hosts:
+            host-1: {}
+        second:
+          hosts:
+            host-2: {}
+    other:
+      hosts:
+        host-3: {}
+'''
+
+    void "with resolve nested groups on, a group with both child groups and its own hosts keeps its own hosts"() {
+        given: "ansible-inventory --list -y output for [parent:children] child, [parent] host-a host-b, [child] host-c"
+        String inventory = GROUP_WITH_CHILDREN_AND_HOSTS
+
+        when:
+        INodeSet nodes = getNodesWithoutFacts(inventory, 'true')
+
+        then:
+        nodes.nodeNames as Set == ['host-a', 'host-b', 'host-c'] as Set
+        nodes.getNode('host-a').tags == ['parent'] as Set
+        nodes.getNode('host-b').tags == ['parent'] as Set
+        nodes.getNode('host-c').tags == ['parent', 'child'] as Set
+    }
+
+    void "with resolve nested groups on, hosts in sibling child groups keep the tag of their parent group"() {
+        when:
+        INodeSet nodes = getNodesWithoutFacts(SIBLING_CHILD_GROUPS, 'true')
+
+        then:
+        nodes.getNode('host-1').tags == ['parent', 'first'] as Set
+        nodes.getNode('host-2').tags == ['parent', 'second'] as Set
+        nodes.getNode('host-3').tags == ['other'] as Set
+    }
+
+    void "with resolve nested groups #state, nodes and tags are unchanged from earlier versions"() {
+        when:
+        INodeSet mixed = getNodesWithoutFacts(GROUP_WITH_CHILDREN_AND_HOSTS, setting)
+        INodeSet siblings = getNodesWithoutFacts(SIBLING_CHILD_GROUPS, setting)
+
+        then: "the hosts of a group that also has child groups are skipped"
+        mixed.nodeNames as Set == ['host-c'] as Set
+        mixed.getNode('host-c').tags == ['parent', 'child'] as Set
+
+        and: "only the first sibling child group keeps the parent tag"
+        siblings.getNode('host-1').tags == ['parent', 'first'] as Set
+        siblings.getNode('host-2').tags == ['second'] as Set
+        siblings.getNode('host-3').tags == ['other'] as Set
+
+        where:
+        state       | setting
+        'unset'     | null
+        'off'       | 'false'
+    }
+
     private AnsibleInventoryListBuilder mockInventoryList(int qtyNodes, boolean nullHosts = false) {
         return Mock(AnsibleInventoryListBuilder) {
             build() >> Mock(AnsibleInventoryList) {
