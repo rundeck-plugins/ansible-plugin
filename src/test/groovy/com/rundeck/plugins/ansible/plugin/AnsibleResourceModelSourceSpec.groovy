@@ -278,6 +278,56 @@ class AnsibleResourceModelSourceSpec extends Specification {
         notThrown(Exception)
     }
 
+    void "inventory with !vault encrypted variables loads its nodes"() {
+        given:
+        Framework framework = Mock(Framework) {
+            getBaseDir() >> new File('/tmp')
+            getPropertyLookup() >> Mock(IPropertyLookup){
+                getProperty("framework.tmp.dir") >> '/tmp'
+            }
+        }
+        ResourceModelSource plugin = new AnsibleResourceModelSource(framework)
+        Properties config = new Properties()
+        config.put('project', 'project_1')
+        config.put(AnsibleDescribable.ANSIBLE_GATHER_FACTS, 'false')
+        config.put(AnsibleDescribable.ANSIBLE_IMPORT_INVENTORY_VARS, importVars)
+        plugin.configure(config)
+        plugin.setServices(Mock(Services) {
+            getService(KeyStorageTree.class) >> Mock(KeyStorageTree)
+        })
+        // As printed by ansible-inventory --list -y for a vault-encrypted var.
+        String inventory = '''\
+all:
+  children:
+    ungrouped:
+      hosts:
+        web01:
+          ansible_user: deploy
+          secret_access_key: !vault |
+            $ANSIBLE_VAULT;1.1;AES256
+            6162636465
+'''
+        plugin.ansibleInventoryListBuilder = Mock(AnsibleInventoryListBuilder) {
+            build() >> Mock(AnsibleInventoryList) {
+                getNodeList() >> inventory
+            }
+        }
+
+        when:
+        INodeSet nodes = plugin.getNodes()
+        INodeEntry node = nodes.getNode('web01')
+
+        then:
+        node != null
+        node.username == 'deploy'
+        node.getAttributes().get('secret_access_key') == expectedSecret
+
+        where:
+        importVars | expectedSecret
+        'false'    | null
+        'true'     | '$ANSIBLE_VAULT;1.1;AES256\n6162636465\n'
+    }
+
     private INodeSet getNodesWithoutFacts(String inventoryYaml, String resolveNestedGroups = null) {
         Framework framework = Mock(Framework) {
             getBaseDir() >> new File('/tmp')
