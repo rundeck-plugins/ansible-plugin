@@ -1,0 +1,9 @@
+# Vars that broke the gather-facts node source on ansible-core 2.19+.
+# A var referencing hostvars failed with "'hostvars' is undefined".
+backup_job_name: "{{ hostvars[inventory_hostname].inventory_hostname_short }}"
+# Vars that can't be resolved, at the top level and nested in a dict or list,
+# must be skipped instead of failing the whole node source.
+undefined_scalar: "{{ missing_var }}"
+undefined_in_dict: {path: "{{ missing_var }}", ok: 1}
+undefined_in_list: ["{{ missing_var }}", 2]
+plain_value: hello

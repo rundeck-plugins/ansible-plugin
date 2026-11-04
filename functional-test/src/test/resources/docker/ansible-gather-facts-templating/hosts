@@ -1,0 +1,4 @@
+# Local hosts so Gather Facts runs without SSH targets.
+[test_group]
+templating-1.example.net ansible_connection=local
+templating-2.example.net ansible_connection=local
