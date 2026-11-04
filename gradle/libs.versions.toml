@@ -9,7 +9,7 @@ spring-security-crypto = "7.1.1"
 
 # Current dependency versions (maintained for compatibility)
 gson = "2.14.0"
-jackson = "2.22.3"
+jackson = "2.22.4"
 snakeyaml = "2.7"
 groovy = "4.0.33"
 lombok = "1.18.46"
