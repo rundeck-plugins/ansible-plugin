@@ -1,1 +1,22 @@
-{{ hostvars[inventory_hostname] | to_json | safe }}
+{#- Resolve each host var through the play context: ansible-core 2.19+ renders vars when
+    hostvars[...] is serialized, without magic vars like hostvars in scope. A var that
+    cannot be fully resolved, including any value nested in it, is skipped instead of
+    failing the whole node source. -#}
+{%- macro unresolved(value) -%}
+{%-   if value is mapping -%}
+{%-     for k in value -%}
+{%-       if value[k] is not defined -%}x{%- else -%}{{ unresolved(value[k]) }}{%- endif -%}
+{%-     endfor -%}
+{%-   elif value is iterable and value is not string -%}
+{%-     for item in value -%}
+{%-       if item is not defined -%}x{%- else -%}{{ unresolved(item) }}{%- endif -%}
+{%-     endfor -%}
+{%-   endif -%}
+{%- endmacro -%}
+{%- set host_data = {} -%}
+{%- for key in hostvars[inventory_hostname].keys() | list -%}
+{%-   if vars[key] is defined and not unresolved(vars[key]) -%}
+{%-     set _ = host_data.update({key: vars[key]}) -%}
+{%-   endif -%}
+{%- endfor -%}
+{{ host_data | to_json | safe }}

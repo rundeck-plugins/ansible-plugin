@@ -74,6 +74,7 @@ services:
     - ./ansible-child-groups:/home/rundeck/ansible-child-groups:rw
     - ./ansible-max-aliases:/home/rundeck/ansible-max-aliases:rw
     - ./ansible-multi-node-auth:/home/rundeck/ansible-multi-node-auth:rw
+    - ./ansible-gather-facts-templating:/home/rundeck/ansible-gather-facts-templating:rw
 
 volumes:
   rundeck-data:
