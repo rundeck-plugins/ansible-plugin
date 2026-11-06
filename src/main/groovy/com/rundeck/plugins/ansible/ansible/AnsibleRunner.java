@@ -785,12 +785,6 @@ public class AnsibleRunner {
             System.err.flush();
             System.out.flush();
 
-            if (sshUseAgent) {
-                if (sshAgent != null) {
-                    sshAgent.stopAgent();
-                }
-            }
-
             if (result != 0) {
                 if (!ignoreErrors) {
                     throw new AnsibleException("ERROR: Ansible execution returned with non zero code.",
@@ -798,9 +792,8 @@ public class AnsibleRunner {
                 }
             }
         } catch (InterruptedException e) {
-            if (proc != null) {
-                proc.destroy();
-            }
+            // Abort and timeout land here. Stop the whole tree, not only ansible-playbook.
+            ProcessTree.destroy(proc);
             Thread.currentThread().interrupt();
             throw new AnsibleException("ERROR: Ansible Execution Interrupted.", e, AnsibleException.AnsibleFailureReason.Interrupted);
         } catch (IOException e) {
@@ -808,9 +801,7 @@ public class AnsibleRunner {
         } catch (AnsibleException e) {
             throw e;
         } catch (Exception e) {
-            if (proc != null) {
-                proc.destroy();
-            }
+            ProcessTree.destroy(proc);
             throw new AnsibleException("ERROR: Ansible execution returned with non zero code.", e, AnsibleException.AnsibleFailureReason.Unknown);
         } finally {
             // Make sure to always cleanup on failure and success
@@ -818,7 +809,12 @@ public class AnsibleRunner {
                 proc.getErrorStream().close();
                 proc.getInputStream().close();
                 proc.getOutputStream().close();
-                proc.destroy();
+                ProcessTree.destroy(proc);
+            }
+
+            // Stop the agent on every exit path, not only after a normal exit.
+            if (sshUseAgent && sshAgent != null) {
+                sshAgent.stopAgent();
             }
 
             if (tempFile != null && !tempFile.delete()) {
