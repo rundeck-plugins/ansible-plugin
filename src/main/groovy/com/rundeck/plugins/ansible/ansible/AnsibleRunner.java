@@ -367,6 +367,7 @@ public class AnsibleRunner {
 
         List<String> procArgs = new ArrayList<>();
         Process proc = null;
+        ProcessTree processTree = null;
 
         final boolean isAdHoc = (type == AnsibleCommand.AdHoc);
         try {
@@ -774,12 +775,13 @@ public class AnsibleRunner {
             }
 
             proc = processExecutorBuilder.build().run();
+            processTree = new ProcessTree(proc);
 
             Thread errthread = Logging.copyStreamThread(proc.getErrorStream(), listener);
             Thread outthread = Logging.copyStreamThread(proc.getInputStream(), listener);
             errthread.start();
             outthread.start();
-            result = proc.waitFor();
+            result = processTree.waitFor();
             outthread.join();
             errthread.join();
             System.err.flush();
@@ -793,7 +795,9 @@ public class AnsibleRunner {
             }
         } catch (InterruptedException e) {
             // Abort and timeout land here. Stop the whole tree, not only ansible-playbook.
-            ProcessTree.destroy(proc);
+            if (processTree != null) {
+                processTree.destroy();
+            }
             Thread.currentThread().interrupt();
             throw new AnsibleException("ERROR: Ansible Execution Interrupted.", e, AnsibleException.AnsibleFailureReason.Interrupted);
         } catch (IOException e) {
@@ -801,20 +805,27 @@ public class AnsibleRunner {
         } catch (AnsibleException e) {
             throw e;
         } catch (Exception e) {
-            ProcessTree.destroy(proc);
+            if (processTree != null) {
+                processTree.destroy();
+            }
             throw new AnsibleException("ERROR: Ansible execution returned with non zero code.", e, AnsibleException.AnsibleFailureReason.Unknown);
         } finally {
-            // Make sure to always cleanup on failure and success
+            // Make sure to always cleanup on failure and success. These steps log their errors instead of
+            // throwing, so the temporary files below are always deleted and the execution result is kept.
             if (proc != null) {
-                proc.getErrorStream().close();
-                proc.getInputStream().close();
-                proc.getOutputStream().close();
+                closeQuietly(proc.getErrorStream());
+                closeQuietly(proc.getInputStream());
+                closeQuietly(proc.getOutputStream());
                 ProcessTree.destroy(proc);
             }
 
             // Stop the agent on every exit path, not only after a normal exit.
             if (sshUseAgent && sshAgent != null) {
-                sshAgent.stopAgent();
+                try {
+                    sshAgent.stopAgent();
+                } catch (IOException e) {
+                    log.warn("Failed to stop ssh-agent: {}", e.getMessage());
+                }
             }
 
             if (tempFile != null && !tempFile.delete()) {
@@ -879,6 +890,17 @@ public class AnsibleRunner {
         }
 
         return result;
+    }
+
+    private static void closeQuietly(Closeable stream) {
+        if (stream == null) {
+            return;
+        }
+        try {
+            stream.close();
+        } catch (IOException e) {
+            log.warn("Failed to close an ansible-playbook stream: {}", e.getMessage());
+        }
     }
 
     public boolean registerKeySshAgent(String keyPath) throws Exception {
