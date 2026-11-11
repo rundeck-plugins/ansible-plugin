@@ -90,6 +90,7 @@ configurations {
     resolutionStrategy {
       force libs.commons.lang3.get()
       force libs.commons.compress.get()
+      force libs.commons.codec.get()
       force libs.kotlin.stdlib.get()
       force libs.jackson.core.get()
       force libs.jackson.databind.get()
