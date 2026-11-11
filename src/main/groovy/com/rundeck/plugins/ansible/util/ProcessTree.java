@@ -14,13 +14,18 @@ import java.util.concurrent.TimeUnit;
  *
  * {@link #waitFor()} also records the descendants while the process runs. A child that outlives
  * its parent moves to PID 1 and leaves descendants(), so {@link #destroy()} stops the recorded
- * children that are still alive too.
+ * children that are still alive too, and everything they started since.
+ *
+ * Recording works on snapshots: a process that starts and loses every recorded ancestor between
+ * two snapshots is not seen. Java cannot put ansible-playbook in its own process group, which
+ * would close that gap, so the interval is kept short and each snapshot also follows the
+ * recorded processes, not only the top one.
  */
 public final class ProcessTree {
 
     public static final long DEFAULT_GRACE_MILLIS = 10_000;
 
-    public static final long DEFAULT_RECORD_MILLIS = 5_000;
+    public static final long DEFAULT_RECORD_MILLIS = 1_000;
 
     private static final long POLL_MILLIS = 100;
 
@@ -55,10 +60,17 @@ public final class ProcessTree {
 
     private void record() {
         recorded.removeIf(handle -> !handle.isAlive());
+        // Follow the recorded processes too: a worker whose parent exited no longer shows up
+        // under proc, but the processes it starts still belong to this execution.
+        Set<ProcessHandle> known = new LinkedHashSet<>(recorded);
         proc.descendants().forEach(recorded::add);
+        known.forEach(handle -> handle.descendants().forEach(recorded::add));
     }
 
-    /** Stops the process, its descendants, and the recorded descendants that are still alive. */
+    /**
+     * Stops the process, its descendants, the recorded descendants that are still alive, and the
+     * current descendants of those.
+     */
     public void destroy() {
         destroy(DEFAULT_GRACE_MILLIS);
     }
@@ -70,7 +82,10 @@ public final class ProcessTree {
             tree.add(proc.toHandle());
             proc.descendants().forEach(tree::add);
         }
-        recorded.stream().filter(ProcessHandle::isAlive).forEach(tree::add);
+        recorded.stream().filter(ProcessHandle::isAlive).forEach(handle -> {
+            tree.add(handle);
+            handle.descendants().forEach(tree::add);
+        });
         destroyAll(tree, graceMillis);
     }
 

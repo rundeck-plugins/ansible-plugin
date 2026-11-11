@@ -117,6 +117,59 @@ class ProcessTreeSpec extends Specification {
         waitUntil(2000) { children.every { !running(it) } }
     }
 
+    // "sleep <seconds>" processes anywhere on the host. A unique duration marks the one a test started;
+    // the bash processes that mention it in their script are not matched.
+    List<ProcessHandle> findSleep(String seconds) {
+        def found = ProcessHandle.allProcesses()
+                .filter { it.info().command().orElse('').endsWith('/sleep') }
+                .filter { it.info().arguments().map { args -> args as List }.orElse([]) == [seconds] }
+                .collect()
+        started.addAll(found)
+        return found
+    }
+
+    def "destroy stops a child that started after waitFor began"() {
+        given: 'a parent that starts its child only after waitFor has begun, then exits'
+        def proc = new ProcessBuilder("bash", "-c", "sleep 0.5; sleep 3021 & sleep 0.5").start()
+        started << proc.toHandle()
+        def tree = new ProcessTree(proc, 100)
+
+        when:
+        tree.waitFor()
+        def children = findSleep('3021')
+
+        then:
+        children.size() == 1
+        running(children[0])
+
+        when:
+        tree.destroy(2000)
+
+        then:
+        waitUntil(2000) { !running(children[0]) }
+    }
+
+    def "destroy stops processes a recorded worker started after the parent exited"() {
+        given: 'a worker that forks a new process only after the parent has exited'
+        def proc = new ProcessBuilder("bash", "-c", "( sleep 1.5; sleep 3022 & wait ) & sleep 0.5").start()
+        started << proc.toHandle()
+        def tree = new ProcessTree(proc, 100)
+
+        when: 'the parent exits, then the worker forks'
+        tree.waitFor()
+        assert waitUntil(5000) { findSleep('3022').size() == 1 }
+        def late = findSleep('3022')[0]
+
+        then:
+        running(late)
+
+        when:
+        tree.destroy(2000)
+
+        then:
+        waitUntil(2000) { !running(late) }
+    }
+
     def "destroy does nothing for a finished or missing process"() {
         given:
         def proc = new ProcessBuilder("true").start()
