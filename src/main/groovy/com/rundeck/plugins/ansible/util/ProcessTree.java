@@ -1,5 +1,7 @@
 package com.rundeck.plugins.ansible.util;
 
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -61,10 +63,37 @@ public final class ProcessTree {
     private void record() {
         recorded.removeIf(handle -> !handle.isAlive());
         // Follow the recorded processes too: a worker whose parent exited no longer shows up
-        // under proc, but the processes it starts still belong to this execution.
-        Set<ProcessHandle> known = new LinkedHashSet<>(recorded);
-        proc.descendants().forEach(recorded::add);
-        known.forEach(handle -> handle.descendants().forEach(recorded::add));
+        // under proc, but the processes it starts still belong to this execution. proc goes
+        // first, so only the recorded processes outside its subtree are expanded again.
+        ProcessHandle top = proc.toHandle();
+        Set<ProcessHandle> tree = new LinkedHashSet<>();
+        tree.add(top);
+        tree.addAll(recorded);
+        expand(tree);
+        tree.remove(top);
+        recorded.addAll(tree);
+    }
+
+    /**
+     * Adds the current descendants of every live process in tree, and returns the ones that were
+     * not in it yet. Each subtree is listed once: a process already found under another one is
+     * not expanded again.
+     */
+    private static Set<ProcessHandle> expand(Set<ProcessHandle> tree) {
+        Set<ProcessHandle> covered = new HashSet<>();
+        Set<ProcessHandle> found = new LinkedHashSet<>();
+        for (ProcessHandle handle : new ArrayList<>(tree)) {
+            if (covered.contains(handle) || !handle.isAlive()) {
+                continue;
+            }
+            handle.descendants().forEach(child -> {
+                covered.add(child);
+                if (tree.add(child)) {
+                    found.add(child);
+                }
+            });
+        }
+        return found;
     }
 
     /**
@@ -80,12 +109,9 @@ public final class ProcessTree {
         Set<ProcessHandle> tree = new LinkedHashSet<>();
         if (proc.isAlive()) {
             tree.add(proc.toHandle());
-            proc.descendants().forEach(tree::add);
         }
-        recorded.stream().filter(ProcessHandle::isAlive).forEach(handle -> {
-            tree.add(handle);
-            handle.descendants().forEach(tree::add);
-        });
+        recorded.stream().filter(ProcessHandle::isAlive).forEach(tree::add);
+        expand(tree);
         destroyAll(tree, graceMillis);
     }
 
@@ -107,14 +133,18 @@ public final class ProcessTree {
         }
         tree.forEach(ProcessHandle::destroy);
 
+        // A process that survives SIGTERM can still fork. Look for new children while waiting and
+        // once more before SIGKILL, so they get the same signals.
         long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(graceMillis);
         try {
             while (System.nanoTime() < deadline && tree.stream().anyMatch(ProcessHandle::isAlive)) {
                 Thread.sleep(POLL_MILLIS);
+                expand(tree).forEach(ProcessHandle::destroy);
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
+        expand(tree);
         tree.stream().filter(ProcessHandle::isAlive).forEach(ProcessHandle::destroyForcibly);
     }
 }

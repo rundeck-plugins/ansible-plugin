@@ -11,8 +11,11 @@ class ProcessTreeSpec extends Specification {
 
     List<ProcessHandle> started = []
 
+    List<File> pidFiles = []
+
     def cleanup() {
         started.findAll { it.isAlive() }.each { it.destroyForcibly() }
+        pidFiles.each { it.delete() }
     }
 
     // A zombie counts as stopped: it holds no memory and only waits for its new parent to reap it.
@@ -117,50 +120,60 @@ class ProcessTreeSpec extends Specification {
         waitUntil(2000) { children.every { !running(it) } }
     }
 
-    // "sleep <seconds>" processes anywhere on the host. A unique duration marks the one a test started;
-    // the bash processes that mention it in their script are not matched.
-    List<ProcessHandle> findSleep(String seconds) {
-        def found = ProcessHandle.allProcesses()
-                .filter { it.info().command().orElse('').endsWith('/sleep') }
-                .filter { it.info().arguments().map { args -> args as List }.orElse([]) == [seconds] }
-                .collect()
-        started.addAll(found)
-        return found
+    // A test script writes the PID of the child it starts to this file, so the test resolves that exact
+    // process instead of searching the host by command line.
+    File pidFile() {
+        def file = Files.createTempFile('process-tree', '.pid').toFile()
+        pidFiles << file
+        return file
+    }
+
+    ProcessHandle childFrom(File file) {
+        assert waitUntil(5000) { file.text.trim() }
+        def handle = ProcessHandle.of(file.text.trim() as long)
+        handle.ifPresent { started << it }
+        return handle.orElse(null)
+    }
+
+    Process startScript(String script) {
+        def proc = new ProcessBuilder("bash", "-c", script).start()
+        started << proc.toHandle()
+        return proc
     }
 
     def "destroy stops a child that started after waitFor began"() {
         given: 'a parent that starts its child only after waitFor has begun, then exits'
-        def proc = new ProcessBuilder("bash", "-c", "sleep 0.5; sleep 3021 & sleep 0.5").start()
-        started << proc.toHandle()
+        def pid = pidFile()
+        def proc = startScript("sleep 0.5; sleep 300 & echo \$! > '${pid}'; sleep 0.5")
         def tree = new ProcessTree(proc, 100)
 
         when:
         tree.waitFor()
-        def children = findSleep('3021')
+        def child = childFrom(pid)
 
         then:
-        children.size() == 1
-        running(children[0])
+        child != null
+        running(child)
 
         when:
         tree.destroy(2000)
 
         then:
-        waitUntil(2000) { !running(children[0]) }
+        waitUntil(2000) { !running(child) }
     }
 
     def "destroy stops processes a recorded worker started after the parent exited"() {
         given: 'a worker that forks a new process only after the parent has exited'
-        def proc = new ProcessBuilder("bash", "-c", "( sleep 1.5; sleep 3022 & wait ) & sleep 0.5").start()
-        started << proc.toHandle()
+        def pid = pidFile()
+        def proc = startScript("( sleep 1.5; sleep 300 & echo \$! > '${pid}'; wait ) & sleep 0.5")
         def tree = new ProcessTree(proc, 100)
 
         when: 'the parent exits, then the worker forks'
         tree.waitFor()
-        assert waitUntil(5000) { findSleep('3022').size() == 1 }
-        def late = findSleep('3022')[0]
+        def late = childFrom(pid)
 
         then:
+        late != null
         running(late)
 
         when:
@@ -168,6 +181,21 @@ class ProcessTreeSpec extends Specification {
 
         then:
         waitUntil(2000) { !running(late) }
+    }
+
+    def "destroy stops a child started while the tree is being stopped"() {
+        given: 'a process that answers SIGTERM by starting a new child'
+        def pid = pidFile()
+        def proc = startScript("trap \"sleep 300 & echo \\\$! > '${pid}'\" TERM; while true; do sleep 0.1; done")
+        assert waitUntil(5000) { proc.descendants().count() >= 1 }
+
+        when: 'the new child starts during the grace period, after the tree was listed'
+        new ProcessTree(proc, 100).destroy(1000)
+        def child = childFrom(pid)
+
+        then:
+        child == null || waitUntil(2000) { !running(child) }
+        !running(proc.toHandle())
     }
 
     def "destroy does nothing for a finished or missing process"() {
