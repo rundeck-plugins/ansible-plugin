@@ -2,6 +2,7 @@ on:
   push:
     tags:
       - '*.*.*'
+      - '!*-alpha*'
 
 name: Publish Release
 
@@ -13,6 +14,8 @@ jobs:
       PKGCLD_REPO_URL: ${{ vars.PKGCLD_REPO_URL }}
     steps:
       - uses: rundeck-plugins/.github/.github/actions/setup-java@main
+        with:
+          java-version: '25'
       - name: Build with Gradle
         run: ./gradlew build
       - name: Get Release Version
