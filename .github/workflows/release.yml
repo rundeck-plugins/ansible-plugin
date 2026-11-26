@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: rundeck-plugins/.github/.github/actions/setup-java@main
         with:
-          java-version: '25'
+          java-version: '21'
       - name: Build with Gradle
         run: ./gradlew build
       - name: Get Release Version
